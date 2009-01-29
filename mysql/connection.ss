@@ -67,7 +67,7 @@
       (case-lambda 
         [(expectation) (get-message* expectation #f)]
         [(expectation types) (get-message* expectation types)]))
-    
+
     (define/private (get-message* expectation param-types)
       (define (advance . ss)
         (unless (or (not expectation) 
@@ -120,9 +120,9 @@
       (illegal))
     (define/public (get-message . s)
       (illegal))
-    
+
     (define/public (alive?) #f)
-    
+
     (define/private (illegal)
       (error 'backend-link "not connected"))
     (super-new)))
@@ -135,7 +135,7 @@
   (class* object% (mysql-base<%>)
     (init-field [backend-link disconnected-backend-link])
     (super-new)
-    
+
     ;; with-disconnect-on-error
     ;; Specialized to use direct method call rather than 'send'
     (define-syntax with-disconnect-on-error
@@ -146,9 +146,9 @@
                             (disconnect* #f)
                             (raise e))])
            expr)]))
-    
+
     ;; Communication Methods
-    
+
     ;; recv : symbol/#f [(list-of symbol)] -> message
     ;; Automatically handles asynchronous messages
     (define/public (recv behalf . args)
@@ -161,47 +161,47 @@
         (error 'backend "error: ~s" r)
         #; (raise-mysql-backend-error behalf r))
       r)
-    
+
     ;; send-message : message -> void
     (define/public (send-message msg)
       (buffer-message msg)
       (flush-message-buffer))
-    
+
     ;; fresh-exchange : -> void
     (define/public (fresh-exchange)
       (send backend-link fresh-exchange))
-    
+
     ;; buffer-message : message -> void
     (define/public (buffer-message msg)
       (when DEBUG-SENT-MESSAGES
         (fprintf (current-error-port) "  >> ~s\n" msg))
       (with-disconnect-on-error
           (send backend-link encode msg)))
-    
+
     ;; flush-message-buffer : -> void
     (define/public (flush-message-buffer)
       (with-disconnect-on-error
           (send backend-link flush)))
-    
+
     ;; Connection management
-    
+
     ;; disconnect : -> (void)
     (define/public (disconnect)
       (disconnect* #t))
-    
+
     (define/public (disconnect* politely?)
       (when politely?
         (fresh-exchange)
         (send-message (make-command-packet 'quit "")))
       (send backend-link close)
       (set! backend-link disconnected-backend-link))
-    
+
     ;; connected? : -> boolean
     (define/public (connected?)
       (send backend-link alive?))
-    
+
     ;; Initialization
-    
+
     (define/public (after-connect)
       (void))
     ))
@@ -252,7 +252,7 @@
              disconnect*
              after-connect)
     (super-new)
-    
+
     ;; with-disconnect-on-error
     ;; Specialized to use direct method call rather than 'send'
     (define-syntax with-disconnect-on-error
@@ -263,12 +263,12 @@
                             (disconnect* #f)
                             (raise e))])
            . body)]))
-    
+
     ;; attach-to-ports : input-port output-port -> void
     (define/public (attach-to-ports in out)
       (set! backend-link
             (new mysql-backend-link% (inport in) (outport out))))
-    
+
     ;; start-connection-protocol : string string string/#f -> void
     (define/public (start-connection-protocol dbname username password)
       (with-disconnect-on-error
@@ -290,7 +290,7 @@
             [_
              (error 'connect
                     "authentication failed (backend sent unexpected message)")]))))
-    
+
     (define/private (check-required-flags capabilities)
       (for-each (lambda (rf)
                   (unless (memq rf capabilities)
@@ -298,12 +298,12 @@
                            "server does not support required capability: ~s"
                            rf)))
                 REQUIRED-CAPABILITIES))
-    
+
     (define/private (desired-capabilities capabilities)
       (cons 'interactive
             (filter (lambda (c) (memq c DESIRED-CAPABILITIES))
                     capabilities)))
-    
+
     ;; expect-auth-confirmation : -> void
     (define/private (expect-auth-confirmation)
       (let ([r (recv 'connect 'auth)])
@@ -327,30 +327,30 @@
              send-message
              fresh-exchange)
     (super-new)
-    
+
     ;; name-counter : number
     (define name-counter 0)
-    
+
     ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
     ;; The single point of control for the query engine
     (define/public (query* fsym stmts collector)
       (for-each (lambda (stmt) (check-statement fsym stmt)) stmts)
       (map (lambda (stmt) (query1 fsym stmt collector))
            stmts))
-    
+
     ;; query1 : symbol Statement Collector -> QueryResult
     (define/private (query1 fsym stmt collector)
       (fresh-exchange)
       (query1:enqueue stmt)
       (query1:collect stmt collector))
-    
+
     ;; check-statement : symbol any -> void
     (define/private (check-statement fsym stmt)
       (unless (or (string? stmt) (StatementBinding? stmt))
         (raise-type-error fsym "string or StatementBinding" stmt))
       (when (StatementBinding? stmt)
         (check-prepared-statement fsym (StatementBinding-pst stmt))))
-    
+
     ;; check-prepared-statement : symbol any -> void
     (define/private (check-prepared-statement fsym pst)
       (unless (MySQLPreparedStatement? pst)
@@ -361,7 +361,7 @@
          fsym
          "prepared statement owned by another connection"
          pst)))
-    
+
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
       (cond
@@ -385,7 +385,7 @@
                (loop (add1 pos) (cdr params))))
            (send-message
             (make-execute-packet id null 1 null-map 1 param-types params)))]))
-    
+
     ;; query1:collect : Statement Collector -> QueryResult stream
     (define/private (query1:collect stmt collector)
       (cond
@@ -396,7 +396,7 @@
                 [fieldinfos (MySQLPreparedStatement-fieldinfos pst)]
                 [types (map get-type fieldinfos)])
            (query1:result types collector))]))
-    
+
     (define/private (query1:result binary? collector)
       (let ([r (recv 'query* 'result)])
         (match r
@@ -404,7 +404,7 @@
            (make-SimpleResult message)]
           [(struct result-set-header-packet (fields extra))
            (query1:expect-fields binary? null collector)])))
-    
+
     (define/private (query1:expect-fields binary? fieldinfos collector)
       (let ([r (recv 'query* 'field)])
         (match r
@@ -416,32 +416,31 @@
            (let-values ([(init combine finalize info)
                          (collector (reverse fieldinfos) binary?)])
              (query1:data-loop binary? init combine finalize info))])))
-    
-    (define/private (query1:data-loop binary? init combine finalize info)
+
+    (define/private (query1:get-data binary?)
       (let ([r (recv 'query* (if binary? 'binary-data 'data) binary?)])
         (match r
           [(struct row-data-packet (data))
-           (query1:data-loop binary?
-                             (apply combine init data)
-                             combine
-                             finalize
-                             info)]
+           (cons data (query1:get-data binary?))]
           [(struct binary-row-data-packet (data))
-           (query1:data-loop binary?
-                             (apply combine init data)
-                             combine
-                             finalize
-                             info)]
+           (cons data (query1:get-data binary?))]
           [(struct eof-packet (warning-count status))
-           (make-Recordset info (finalize init))])))
-    
+           null])))
+
+    (define/private (query1:data-loop binary? init combine finalize info)
+      (define data (query1:get-data binary?))
+      (let loop ([init init] [data data])
+        (if (pair? data)
+            (loop (apply combine init (car data)) (cdr data))
+            (make-Recordset info (finalize init)))))
+
     ;; datum->external-representation : number datum -> string
     (define/public (datum->external-representation typeoid datum)
       (unless (string? datum)
         (raise-user-error 'datum->external-representation
                           "cannot convert datum: ~s" datum))
       datum)
-    
+
     ;; prepare-multiple : (list-of string) -> (list-of PreparedStatement)
     (define/public (prepare-multiple stmts)
       (for-each (lambda (stmt)
@@ -449,43 +448,45 @@
                     (raise-type-error 'prepare* "string" stmt)))
                 stmts)
       (map (lambda (stmt) (prepare1 stmt)) stmts))
-    
+
     (define/private (prepare1 stmt)
       (fresh-exchange)
       (send-message (make-command-packet 'statement-prepare stmt))
       (let ([r (recv 'prepare* 'prep-ok)])
         (match r
           [(struct ok-prepared-statement-packet (id fields params))
-           (prepare1:params id fields params null)])))
-    
-    (define/private (prepare1:params id fields params paraminfos)
+           (let ([paraminfos
+                  (if (zero? params) null (prepare1:get-params))]
+                 [fieldinfos
+                  (if (zero? fields) null (prepare1:get-fields))])
+             (make-MySQLPreparedStatement fields
+                                          id
+                                          params paraminfos
+                                          fields fieldinfos
+                                          (make-weak-box this)))])))
+
+    (define/private (prepare1:get-params)
       (let ([r (recv 'prepare* 'field)])
         (match r
           [(struct eof-packet (warning-count status))
-           (prepare1:fields id params (reverse paraminfos) fields null)]
+           null]
           [(? field-packet?)
-           (prepare1:params id fields params
-                            (cons (parse-field-info r)
-                                  paraminfos))])))
-    
-    (define/private (prepare1:fields id params paraminfos fields fieldinfos)
+           (cons (parse-field-info r) (prepare1:get-params))])))
+
+    (define/private (prepare1:get-fields)
       (let ([r (recv 'prepare* 'field)])
         (match r
           [(struct eof-packet (warning-count status))
-           (prepare1:done id params paraminfos fields (reverse fieldinfos))]
+           null]
           [(? field-packet?)
-           (prepare1:fields id params paraminfos fields
-                            (cons (parse-field-info r) fieldinfos))])))
-    
-    (define/private (prepare1:done id params paraminfos fields fieldinfos)
-      (make-MySQLPreparedStatement fields
-                                   id
-                                   params paraminfos
-                                   fields fieldinfos
-                                   (make-weak-box this)))
-    
+           (cons (parse-field-info r) (prepare1:get-fields))])))
+
     ;; bind-prepared-statement : PreparedStatement (list-of value) -> StatementBinding
     (define/public (bind-prepared-statement pst params)
+      (printf "wcx = ~s\n"
+              (MySQLPreparedStatement-wcx pst))
+      (printf "owner = this? : ~s\n"
+              (eq? this (weak-box-value (MySQLPreparedStatement-wcx pst))))
       (unless (MySQLPreparedStatement? pst)
         (raise-type-error 'bind-prepared-statement "prepared statement" pst))
       (unless (eq? this (weak-box-value (MySQLPreparedStatement-wcx pst)))
@@ -507,7 +508,7 @@
                       params 
                       param-types)])
            (make-StatementBinding pst params))]))
-    
+
     (define/private (check-params params paraminfos)
       (define len (length params))
       (define tlen (length paraminfos))
@@ -522,16 +523,16 @@
 ;; Adds automatic conversions from SQL external representations to Scheme data
 (define mysql-conversion-mixin
   (mixin (primitive-query<%> primitive-query/conversion<%>) ()
-    
+
     ;; typeid->type : symbol -> symbol
     (define/override (typeid->type type)
       type)
-    
+
     ;; get-type-reader : symbol -> (string -> datum)
     (define/override (get-type-reader type)
       (or (type->type-reader type)
           (super get-type-reader type)))
-    
+
     ;; get-type-writer : symbol -> (datum -> string) or #f
     (define/override (get-type-writer type)
       (or (type->type-writer type)

@@ -1,5 +1,5 @@
-(require scheme
-         (lib "class.ss")
+#lang scheme
+(require scheme/class
          "../mysql/main.ss")
 
 #|

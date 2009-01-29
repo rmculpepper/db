@@ -33,7 +33,9 @@ Use the following procedure to create a connection:
                   [#:socket socket (or/c path? string? bytes? false/c) #f]
                   [#:password password (or/c string? false/c) #f]
                   [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
-         (and/c (is-a/c connection<%>) (is-a/c query<%>) (is-a/c query/prepare<%>))]{
+         (and/c (is-a/c connection<%>)
+                (is-a/c connection:query<%>)
+                (is-a/c connection:query/prepare<%>))]{
 
   Creates a connection to a MySQL server. The meaning of the keyword
   arguments is similar to those of the @scheme[postgresql:connect]

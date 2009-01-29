@@ -1,11 +1,10 @@
 #lang scribble/doc
 
-@(require scribble/manual)
-@(require scribble/eval)
-@(require scribble/struct)
-@(require scheme/sandbox)
-
-@(require (for-label scheme/base)
+@(require scribble/manual
+          scribble/eval
+          scribble/struct
+          scheme/sandbox
+          (for-label scheme/base)
           (for-label "../generic/main.ss"))
 
 @(define the-eval (make-base-eval))
@@ -53,7 +52,7 @@ cursors via the @tt{DECLARE CURSOR}, @tt{MOVE}, and @tt{FETCH} statements.
 A Statement is either a string containing a single SQL statement or an
 opaque value returned by @method[prepare-query<%> bind-prepared-statement].
 
-@definterface[query<%> ()]{
+@definterface[connection:query<%> ()]{
 
 @defmethod[(exec [stmt Statement?] ...)
            void?]{
@@ -147,7 +146,7 @@ A parameterized query is written with positional arguments. For example:
 The following methods provide a convenient functional interface for
 common uses of parameterized prepared statements:
 
-@definterface[query/prepare<%> ()]{
+@definterface[connection:query/prepare<%> (connection:query<%>)]{
 
   Each of the following methods prepares the parameterized SQL
   statement for later execution and returns a closure. The closure

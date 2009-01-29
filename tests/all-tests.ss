@@ -49,3 +49,7 @@
 (define-values/invoke-unit (specialize-test mysql@)
   (import)
   (export (prefix mysql: test^)))
+
+;; (putenv "PGPASSWORD" ???)
+;; (test/graphical-ui postgresql:test)
+;; (test/graphical-ui mysql:test)

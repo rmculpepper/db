@@ -89,7 +89,7 @@
 ;; query-mixin
 ;; Provides high-level query methods in terms of low-level ones
 (define query-mixin
-  (mixin (primitive-query<%>) (query<%>)
+  (mixin (primitive-query<%>) (connection:query<%>)
     (inherit query*)
     (super-new)
     
@@ -207,7 +207,8 @@
 ;; prepare-query-mixin
 ;; Provides closure-producing versions of high-level query methods
 (define prepare-query-mixin
-  (mixin (primitive-query/prepare<%> query<%>) (query/prepare<%>)
+  (mixin (primitive-query/prepare<%> connection:query<%>) 
+         (connection:query/prepare<%>)
     (inherit exec
              query-list
              query-row

@@ -12,7 +12,7 @@
 (define-unit concurrent-test@
   (import config^)
   (export test^)
-  
+
   (define (make-slow-output-port out pause? limit)
     (make-output-port 'slow-port
                       out
@@ -21,7 +21,7 @@
                         (let ([end (min end (+ start limit))])
                           (write-bytes-avail buf out start end)))
                       (lambda () (close-output-port out))))
-  
+
   (define (((mk-worker c iterations) tid))
     (define insert
       (send c prepare-exec "insert into play_numbers (n) values ($1)"))
@@ -33,7 +33,7 @@
             tid
             (send c query-value "select max(n) from play_numbers"))
     #;(send c query "select * from pg_type"))
-  
+
   (define test
     (test-suite "Concurrency"
       (test-case "lots of threads"

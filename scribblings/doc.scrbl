@@ -1,13 +1,10 @@
 #lang scribble/doc
-
-@(require scribble/manual)
-@(require scribble/eval)
-@(require scribble/struct)
-@(require scheme/sandbox)
-
-@(require (for-label scheme/base)
+@(require scribble/manual
+          scribble/eval
+          scribble/struct
+          scheme/sandbox
+          (for-label scheme/base)
           (for-label "../generic/main.ss"))
-
 @(define the-eval (make-base-eval))
 @(interaction-eval #:eval the-eval
                    (require scheme/class
@@ -18,13 +15,11 @@
    (interaction #:eval the-eval (eval:alts example result) ...))
 
 @title[#:version "1.0"]{db: Database connectivity}
+@author{Ryan Culpepper}
 
-By Ryan Culpepper (ryanc at plt-scheme dot org)
-
-This manual documents db version 5.1 (PLaneT version 2 1).
+This manual documents db version 1.0 (PLaneT version 1 0).
 
 Keywords: _postgresql_, _postgres_, _mysql_, _database_, _db_, _spgsql_
-
 
 @section{Introduction}
 
@@ -50,15 +45,10 @@ Spgsql 5 (that is, PLaneT major version 2) only works with PostgreSQL
 servers version 7.4 and later. For older servers, use spgsql 4
 (PLaneT major version 1).
 
-
 @include-section["postgresql.scrbl"]
-
 @include-section["mysql.scrbl"]
-
 @include-section["connection.scrbl"]
-
 @include-section["notes.scrbl"]
-
 @include-section["example.scrbl"]
 
 @section{Acknowledgments}

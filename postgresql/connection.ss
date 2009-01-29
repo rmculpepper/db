@@ -805,11 +805,11 @@
     
     ;; typeid->type : num -> symbol
     (define/override (typeid->type typeid)
-      (hash-table-get typeoid-mapping typeid #f))
+      (hash-ref typeoid-mapping typeid #f))
     
     ;; create-typeoid-mapping : -> void
     (define/private (create-typeoid-mappings)
-      (let ([ht (make-hash-table)]
+      (let ([ht (make-hasheq)]
             [qrs (query*/no-conversion 'create-typeoid-mapping
                                        (list TYPE-QUERY)
                                        vectorlist-collector)])
@@ -817,7 +817,7 @@
          (lambda (v)
            (let ([oid (string->number (vector-ref v 0))]
                  [type (string->symbol (vector-ref v 1))])
-             (hash-table-put! ht oid type)))
+             (hash-set! ht oid type)))
          (Recordset-data (car qrs)))
         (set! typeoid-mapping ht)))
     

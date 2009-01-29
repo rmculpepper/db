@@ -1,11 +1,10 @@
 #lang scribble/doc
 
-@(require scribble/manual)
-@(require scribble/eval)
-@(require scribble/struct)
-@(require scheme/sandbox)
-
-@(require (for-label scheme/base)
+@(require scribble/manual
+          scribble/eval
+          scribble/struct
+          scheme/sandbox
+          (for-label scheme/base)
           (for-label "../generic/main.ss")
           (for-label "../postgresql/main.ss"))
 
@@ -35,7 +34,9 @@ Use the following procedure to create a connection:
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
                   [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
-         (and/c (is-a/c connection<%>) (is-a/c query<%>) (is-a/c query/prepare<%>))]{
+         (and/c (is-a/c connection<%>)
+                (is-a/c connection:query<%>)
+                (is-a/c connection:query/prepare<%>))]{
 
   Creates a connection to a PostgreSQL server. The @scheme[connect]
   procedure recognizes the keyword arguments listed above. Only the

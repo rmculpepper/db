@@ -4,22 +4,23 @@
           scribble/eval
           scribble/struct
           scheme/sandbox
+          "config.ss"
           (for-label scheme/base)
           (for-label "../generic/main.ss"))
 
 @(define the-eval (make-base-eval))
-@(interaction-eval #:eval the-eval
+(interaction-eval #:eval the-eval
                    (require scheme/class
-                            "../generic/main.ss"))
+                            "generic/main.ss"))
 @(define-syntax-rule (examples/results [example result] ...)
    (examples #:eval the-eval (eval:alts example result) ...))
 @(define-syntax-rule (my-interaction [example result] ...)
    (interaction #:eval the-eval (eval:alts example result) ...))
 
-
 @title{Connection API}
 
-@defmodule["../generic/main.ss"]
+@;@defmodule/this-package["generic/main.ss"]
+@defmodule/this-package["generic/main"]
 
 @section{Administrative methods}
 
@@ -34,9 +35,37 @@ Disconnects from the server.
            boolean?]{
 Indicates whether the connection is connected.
 }
+
+@defmethod[(get-system)
+           (is-a/c dbsystem<%>)]{
+
+Gets an object encapsulating information about the database system of
+the connection.
+}
 }
 
-@section{High-level Query API}
+@definterface[dbsystem<%> ()]{
+
+Objects of this interface represent information about particular
+database systems, their SQL dialects, and details about the database
+package's implementation of their protocols.
+
+@defmethod[(get-name)
+           symbol?]{
+
+Returns a symbol identifying the database system, such as
+@scheme['postgresql] or @scheme['mysql].
+}
+
+@defmethod[(get-known-types)
+           (listof symbol?)]{
+
+Returns a list of the type names and aliases understood by connections
+to this kind of database.
+}
+}
+
+@section{Query API}
 
 Spgsql implements a high-level, functional query interface. Once
 connected, connection objects are relatively stateless. When a query
@@ -46,21 +75,60 @@ different constraints on the query results and offer different
 mechanisms for processing the results.
 
 The spgsql query interface does not expose any low-level
-machinery. Programmers who want cursors should use SQL-language
-cursors via the @tt{DECLARE CURSOR}, @tt{MOVE}, and @tt{FETCH} statements.
+machinery. Programmers who want cursors may use SQL-language cursors
+via the @tt{DECLARE CURSOR}, @tt{MOVE}, and @tt{FETCH} statements if
+they are available in their database's SQL dialect.
 
-A Statement is either a string containing a single SQL statement or an
-opaque value returned by @method[prepare-query<%> bind-prepared-statement].
+A @deftech{Statement} is either a string containing a single SQL
+statement or a @scheme[StatementBinding] value returned by
+@method[connection:prepare-query<%> bind-prepared-statement].
+
+A @deftech{QueryResult} is either a @scheme[SimpleResult] or a
+@scheme[Recordset].
+
+@defstruct[SimpleResult
+           ([command string?])]{
+
+Represents the result of a SQL statement that does not return a
+relation.
+}
+
+@defstruct[Recordset
+           ([info (listof FieldInfo?)]
+            [data (listof (vectorof any/c))])]{
+
+Represents the result of SQL statement that results in a relation,
+such as a @tt{SELECT} query.
+}
+
+@defstruct[FieldInfo
+           ([name string?])]{
+
+Represents the name of a column.
+}
+
 
 @definterface[connection:query<%> ()]{
 
-@defmethod[(exec [stmt Statement?] ...)
+@defmethod[(query [stmt (unsyntax @techlink{Statement})])
+           (unsyntax @techlink{QueryResult})]
+@defmethod[(query-multiple [stmts (listof (unsyntax @techlink{Statement}))])
+           (listof (unsyntax @techlink{QueryResult}))]{
+
+  Executes queries, returning structures that describe the
+  results. Unlike the high-level query methods,
+  @method[connection:query<%> query-multiple] supports a mixture of
+  recordset-returning queries and effect-only queries.
+
+}
+
+@defmethod[(exec [stmt (unsyntax @techlink{Statement})] ...)
            void?]{
 
   Executes SQL statements for effect and discards the result(s).
-  Calling @method[query<%> exec] on multiple statements at once may be more
-  efficient than calling @method[query<%> exec] multiple times on the
-  statements individually.
+  Calling @method[connection:query<%> exec] on multiple statements at
+  once may be more efficient than calling @method[connection:query<%>
+  exec] multiple times on the statements individually.
 
   Example:
   @schemeinput[
@@ -68,68 +136,77 @@ opaque value returned by @method[prepare-query<%> bind-prepared-statement].
                  "insert into the_numbers (n, name) values (0, 'zero')")]
 
   @bold{PostgreSQL note}: The set of statements passed to
-  @method[query<%> exec] are executed within their own
+  @method[connection:query<%> exec] are executed within their own
   ``mini-transaction''; if any statement fails, the effects of all
   previous statements in the set are rolled back.
 
 }
 
-@defmethod[(query-list [stmt Statement?])
+@defmethod[(query-list [stmt (unsyntax @techlink{Statement})])
            (listof _field)]{
 
   Executes a SQL query which must return a recordset of exactly one
   column; returns the list of values from the query.
 }
-@defmethod[(query-row [stmt Statement?])
+
+@defmethod[(query-row [stmt (unsyntax @techlink{Statement})])
            (vectorof _field)]{
 
   Executes a SQL query which must return a recordset of exactly one
   row; returns its (single) row result as a vector.
 }
-@defmethod[(query-maybe-row [stmt Statement?])
+
+@defmethod[(query-maybe-row [stmt (unsyntax @techlink{Statement})])
            (or/c (vectorof _field) false/c)]{
 
-  Like @method[query<%> query-row], but the query may return zero rows; in that
-  case, the method returns @scheme[#f].
+  Like @method[connection:query<%> query-row], but the query may
+  return zero rows; in that case, the method returns @scheme[#f].
 }
-@defmethod[(query-value [stmt Statement?])
+
+@defmethod[(query-value [stmt (unsyntax @techlink{Statement})])
            _field]{
 
   Executes a SQL query which must return a recordset of exactly one
   column and exactly one row; returns its single value result.
 }
-@defmethod[(query-maybe-value [stmt Statement?])
+
+@defmethod[(query-maybe-value [stmt (unsyntax @techlink{Statement})])
            (or/c _field false/c)]{
 
-  Like @method[query<%> query-value], but the query may return zero rows; in
-  that case, the method returns false.
+  Like @method[connection:query<%> query-value], but the query may
+  return zero rows; in that case, the method returns false.
 }
-@defmethod[(map [stmt Statement?]
-                [proc (_field _... -> _a)])
-           (listof _a)]{
+
+@defmethod[(map [stmt (unsyntax @techlink{Statement})]
+                [proc (_field _... -> _alpha)])
+           (listof _alpha)]{
 
   Executes a SQL query and applies the given function to the contents
   of each row, returning a list of results.
 }
-@defmethod[(for-each [stmt Statement?]
+
+@defmethod[(for-each [stmt (unsyntax @techlink{Statement})]
                      [proc (_field _... -> any)])
            void?]{
 
   Executes a SQL query and applies the given function to the contents
   of each row, discarding the results.
 }
-@defmethod[(mapfilter [stmt Statement?]
-                      [map-proc (_field _... -> _a)]
-                      [filter-proc (_field _... -> boolean?)])
-           (listof _a)]{
 
-  Like @method[query<%> map], but applies the map procedure (given first) to
-  only those rows which satisfy the given predicate (given second).
+@defmethod[(mapfilter [stmt (unsyntax @techlink{Statement})]
+                      [map-proc (_field _... -> _alpha)]
+                      [filter-proc (_field _... -> boolean?)])
+           (listof _alpha)]{
+
+  Like @method[connection:query<%> map], but applies the map procedure
+  (given first) to only those rows which satisfy the given predicate
+  (given second).
 }
-@defmethod[(fold [stmt Statement?]
-                 [proc (_a _field _... -> _a)]
-                 [init _a])
-           _a]{
+
+@defmethod[(fold [stmt (unsyntax @techlink{Statement})]
+                 [proc (_alpha _field _... -> _alpha)]
+                 [init _alpha])
+           _alpha]{
 
   Left fold over the results of the query.
 }
@@ -139,147 +216,126 @@ Connections also support methods for preparing parameterized
 queries. A parameterized query may be executed any number of times
 with different values for its parameters.
 
-A parameterized query is written with positional arguments. For example:
+A @deftech{PreparedStatement} is the result of a call to
+@method[connection:query/prepare<%> prepare] or similar method.
 
+The syntax of parameterized queries varies depending on the database
+system.
+
+PostgreSQL:
 @verbatim{select * from the_numbers where num > $1;}
+
+MySQL:
+@verbatim{select * from the_numbers where num > ?;}
 
 The following methods provide a convenient functional interface for
 common uses of parameterized prepared statements:
 
 @definterface[connection:query/prepare<%> (connection:query<%>)]{
 
-  Each of the following methods prepares the parameterized SQL
-  statement for later execution and returns a closure. The closure
-  accepts the parameter values and executes the prepared statement,
-  processing the results like the corresponding query method.
-
-  A prepared-statement closure may be executed any number of times.
-  It is possible to prepare a statement that contains no parameters;
-  the resulting procedure should be called with zero arguments.
-
-@defmethod[(prepare-exec [prep string?])
-           (_param _... -> void?)]{
-  Prepared version of @method[query<%> exec]. Unlike @method[query<%>
-  exec], @method[query/prepare<%> prepare-exec] permits only a single
-  statement.
-}
-
-@defmethod[(prepare-query-list [prep string?])
-           (_param _... -> (listof _field))]{
-  Prepared version of @method[query<%> query-list].
-}
-
-@defmethod[(prepare-query-row [prep string?])
-           (_param _... -> (vectorof _field))]{
-  Prepared version of @method[query<%> query-row].
-}
-@defmethod[(prepare-query-maybe-row [prep string?])
-           (_param _... -> (or/c (vectorof _field) false?))]{
-  Prepared version of @method[query<%> query-maybe-row].
-}
-
-@defmethod[(prepare-query-value [prep string?])
-           (_param _... -> _field)]{
-  Prepared version of @method[query<%> query-value].
-}
-
-@defmethod[(prepare-query-maybe-value [prep string?])
-           (_param _... -> (or/c _field false?))]{
-  Prepared version of @method[query<%> query-maybe-value].
-}
-
-@defmethod[(prepare-map [prep string?] [proc (_field _... -> _a)])
-           (_param _... -> (listof _a))]{
-  Prepared version of @method[query<%> map].
-}
-
-@defmethod[(prepare-for-each [prep string?] [proc (_field _... -> void?)])
-           (_param _... -> void?)]{
-  Prepared version of @method[query<%> for-each].
-}
-
-@defmethod[(prepare-mapfilter [prep string?]
-                              [map-proc (_field _... -> _a)]
-                              [filter-proc (_field _... -> boolean?)])
-           (_param _... -> (listof _a))]{
-  Prepared version of @method[query<%> mapfilter].
-}
-
-@defmethod[(prepare-fold [prep string?]
-                         [proc (_a _field _... -> _a)]
-                         [init _a])
-           (_param _... -> _a)]{
-  Prepared version of @method[query<%> fold].
-}
-
-}
-
-@section{Low-level Query API}
-
-In addition to the high-level query API, spgsql connections support
-the following methods for preparing, binding, and executing queries:
-
-@tt{
-A QueryResult is one of:
-  - (make-SimpleResult string)
-  - (make-Recordset (list-of FieldInfo) (list-of (vector-of datum)))
-}
-
-@tt{
-A FieldInfo is (make-FieldInfo string)
-}
-
-@defstruct[SimpleResult
-           ((command any/c))]
-@defstruct[Recordset
-           ((info any/c)
-            (data any/c))]
-@defstruct[FieldInfo
-           ((name symbol?))]
-
-@definterface[query<%> ()]{
-
-The @scheme[query<%>] interface contains the following additional
-low-level query methods:
-
-@defmethod[(query [stmt Statement?])
-           QueryResult?]
-@defmethod[(query-multiple [stmts (listof Statement?)])
-           (listof QueryResult?)]{
-  Executes queries, returning structures that describe the
-  results. Unlike the high-level query methods, @method[query<%> query-multiple]
-  supports a mixture of recordset-returning queries and effect-only
-  queries.
-}
-
 @defmethod[(prepare [prep string?])
-           PreparedStatement?]
+           (unsyntax @techlink{PreparedStatement})]
 @defmethod[(prepare-multiple [preps (listof string?)])
-           (listof PreparedStatement?)]{
-  Prepare parameterized queries. The resulting PreparedStatements are
-  tied to the connection object that prepared them; it is an error to
-  use them with any other connection.
+           (listof (unsyntax @techlink{PreparedStatement}))]{
+
+  Prepare parameterized queries. The resulting
+  @techlink{PreparedStatement}s are tied to the connection object that
+  prepared them; it is an error to use them with any other connection.
+
 }
 
-@defmethod[(bind-prepared-statement [pst PreparedStatement?]
-                                    [params (listof any/c)])
-           Statement?]{
+@defmethod[(bind-prepared-statement
+            [pst (unsyntax @techlink{PreparedStatement})]
+            [params (listof any/c)])
+           (unsyntax @techlink{Statement})]{
 
   Fill in a parameterized prepared query with its parameters. The
-  resulting Statement can be executed with @method[query<%>
-  query-multiple] or any of the high-level query methods, but it must
-  be used with the same connection object.
+  @techlink{PreparedStatement} must have been prepared with the same
+  connection. The resulting @techlink{Statement} can be executed with
+  @method[connection:query<%> query-multiple] or any of the high-level
+  query methods, but it must be used with the same connection object
+  that created it.
 
   @(examples/results
     [(let ([get-name-pst
             (send c prepare "select name from the_numbers where n = $1")])
-       (let ([get-name1 (send c bind-prepared-statement get-name-pst (list 1))]
-             [get-name2 (send c bind-prepared-statement get-name-pst (list 2))])
+       (let ([get-name1
+              (send c bind-prepared-statement get-name-pst (list 1))]
+             [get-name2
+              (send c bind-prepared-statement get-name-pst (list 2))])
          (send c query-multiple (list get-name1 get-name2))))
      (list (make-Recordset (list (make-FieldInfo "name")) (list "one"))
            (make-Recordset (list (make-FieldInfo "name")) (list "two")))])
 }
+
+Each of the following methods prepares the parameterized SQL statement
+for later execution and returns a closure. The closure accepts the
+parameter values and executes the prepared statement, processing the
+results like the corresponding query method.
+
+A prepared-statement closure may be executed any number of times.  It
+is possible to prepare a statement that contains no parameters; the
+resulting procedure should be called with zero arguments.
+
+@defmethod[(prepare-exec [prep string?])
+           (_param _... -> void?)]{
+
+  Prepared version of @method[connection:query<%> exec]. Unlike
+  @method[connection:query<%> exec],
+  @method[connection:query/prepare<%> prepare-exec] permits only a
+  single statement.
+
 }
+
+@defmethod[(prepare-query-list [prep string?])
+           (_param _... -> (listof _field))]{
+  Prepared version of @method[connection:query<%> query-list].
+}
+
+@defmethod[(prepare-query-row [prep string?])
+           (_param _... -> (vectorof _field))]{
+  Prepared version of @method[connection:query<%> query-row].
+}
+@defmethod[(prepare-query-maybe-row [prep string?])
+           (_param _... -> (or/c (vectorof _field) false?))]{
+  Prepared version of @method[connection:query<%> query-maybe-row].
+}
+
+@defmethod[(prepare-query-value [prep string?])
+           (_param _... -> _field)]{
+  Prepared version of @method[connection:query<%> query-value].
+}
+
+@defmethod[(prepare-query-maybe-value [prep string?])
+           (_param _... -> (or/c _field false?))]{
+  Prepared version of @method[connection:query<%> query-maybe-value].
+}
+
+@defmethod[(prepare-map [prep string?] [proc (_field _... -> _alpha)])
+           (_param _... -> (listof _alpha))]{
+  Prepared version of @method[connection:query<%> map].
+}
+
+@defmethod[(prepare-for-each [prep string?] [proc (_field _... -> void?)])
+           (_param _... -> void?)]{
+  Prepared version of @method[connection:query<%> for-each].
+}
+
+@defmethod[(prepare-mapfilter [prep string?]
+                              [map-proc (_field _... -> _alpha)]
+                              [filter-proc (_field _... -> boolean?)])
+           (_param _... -> (listof _alpha))]{
+  Prepared version of @method[connection:query<%> mapfilter].
+}
+
+@defmethod[(prepare-fold [prep string?]
+                         [proc (_alpha _field _... -> _alpha)]
+                         [init _alpha])
+           (_param _... -> _alpha)]{
+  Prepared version of @method[connection:query<%> fold].
+}
+}
+
 
 @section{SQL Types and Conversions}
 
@@ -301,8 +357,9 @@ SQL NULL values are always translated into the unique @scheme[sql-null] value.
 @defthing[sql-null sql-null?]
 @defproc[(sql-null? [val any/c])
          boolean?]{
-  A special value and predicate used to represent NULL values in
-  query results.
+
+A special value and predicate used to represent NULL values in
+query results.
 }
          
 @subsection{Conversions}

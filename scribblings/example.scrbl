@@ -12,9 +12,9 @@
 @(define the-eval (make-base-eval))
 @(interaction-eval #:eval the-eval
                    (require scheme/class
-                            "../generic/main.ss"
-                            "../postgresql/main.ss"
-                            "../postgresql/connection.ss"))
+                            "generic/main.ss"
+                            "postgresql/main.ss"
+                            "postgresql/connection.ss"))
 @(define-syntax-rule (examples/results [example result] ...)
    (examples #:eval the-eval (eval:alts example result) ...))
 @(define-syntax-rule (my-interaction [example result] ...)

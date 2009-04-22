@@ -7,6 +7,8 @@
          connection:query<%>
          connection:query/prepare<%>
 
+         dbsystem<%>
+
          (struct-out SimpleResult)
          (struct-out Recordset)
          (struct-out FieldInfo)
@@ -25,6 +27,4 @@
          srfi-date->sql-timestamp
          srfi-date->sql-timestamp-tz
 
-         sql-basis^
-         sql-format^
-         connect^)
+         database^)

@@ -1,137 +1,130 @@
 #lang scheme/base
 (require (for-syntax scheme/base)
-         scheme/match
          scheme/unit
+         scheme/class
+         "interfaces.ss"
          "sql-data.ss")
-(provide sql-format^
-         sql-format@
-         sql-basis^)
+(provide format-sql
+         concat-sql)
 
-(define-signature sql-format^
-  [;; for macro use only
-   private-sql-marshal-literal/type+datum
-   private-sql-marshal-literal/trust
-   private-sql-marshal-name/no-preserve-case
-   private-sql-marshal-name/preserve-case
-   private-sql-marshal-sql
-   
-   (define-syntaxes (format-sql concat-sql)
+(begin-for-syntax
+  (define (format-part? part)
+    (string? (syntax-e part)))
+
+  (define (ok-format-string? str)
+    (regexp-match? #rx"^(?:[^~]|(?:~[an%~]))*$" str))
+
+  (define (partition parts)
+    (let loop ([fparts null] [parts parts])
+      (cond [(and (pair? parts) (format-part? (car parts)))
+             (unless (ok-format-string? (syntax-e (car parts)))
+               (raise-syntax-error
+                'format-sql
+                "expected format string with only '~a' placeholders"
+                (car parts)))
+             (loop (cons " " (cons (syntax-e (car parts)) fparts))
+                   (cdr parts))]
+            [else
+             (values (reverse fparts) parts)]))))
+
+
+(define-syntax (format-sql stx)
+  (syntax-case stx ()
+    [(format-sql obj-expr part ...)
+     (let-values ([(format-parts type-parts)
+                   (partition (syntax->list #'(part ...)))])
+       (with-syntax ([(part ...) type-parts])
+         #`(let ([obj (convert-to-dbsystem obj-expr)])
+             (format (quote #,(apply string-append format-parts))
+                     (interpret-spec obj part) ...))))]))
+
+(define-syntax (concat-sql stx)
+  (syntax-case stx ()
+    [(concat-sql obj-expr fragment ...)
      (let ()
-       (define (type-spec->expr function tp)
-         (syntax-case tp ()
-           [(#:trust datum type)
-            #'(private-sql-marshal-literal/trust datum type)]
-           [(#:name datum)
-            #'(private-sql-marshal-name/no-preserve-case datum)]
-           [(#:Name datum)
-            #'(private-sql-marshal-name/preserve-case datum)]
-           [(#:sql code)
-            #'(private-sql-marshal-sql code)]
-           [(type datum)
-            (not (memq (syntax-e #'type) '(#:trust #:Name #:name #:sql)))
-            (begin
-              (unless (identifier? #'type)
-                (raise-syntax-error 'format-sql "expected SQL type name"
-                                    #'type))
-              #'(private-sql-marshal-literal/type+datum 'type datum))]
-           [else
-            (raise-syntax-error function "bad type-spec" tp)]))
-       (values
-        ;; format-sql SYNTAX
-        ;; (format-sql format-string [type datum] ...)
-        (lambda (stx)
-          (syntax-case stx ()
-            [(format-sql part ...)
-             (let ()
-               (define (format-part? part)
-                 (string? (syntax-e part)))
-               (define (ok-format-string? str)
-                 (regexp-match? #rx"^(?:[^~]|(?:~[an%~]))*$" str))
-               (define (partition parts)
-                 (let loop ([fparts null] [parts parts])
-                   (cond [(and (pair? parts) (format-part? (car parts)))
-                          (unless (ok-format-string? (syntax-e (car parts)))
-                            (raise-syntax-error
-                             'format-sql
-                             "expected format string with only '~a' placeholders"
-                             (car parts)))
-                          (loop (cons " " (cons (syntax-e (car parts)) fparts))
-                                (cdr parts))]
-                         [else
-                          (values (reverse fparts) parts)])))
-               (define-values (format-parts type-parts)
-                 (partition (syntax->list #'(part ...))))
-               (with-syntax ([(part-as-string ...)
-                              (map (lambda (tp) (type-spec->expr 'format-sql tp))
-                                   type-parts)])
-                 #`(format (quote #,(apply string-append format-parts))
-                           part-as-string ...)))]))
-        ;; concat-sql SYNTAX
-        (lambda (stx)
-          (syntax-case stx ()
-            [(concat-sql fragment ...)
-             (let ()
-               (define (process fragment)
-                 (if (string? (syntax-e fragment))
-                     #`(quote #,fragment)
-                     (type-spec->expr 'concat-sql fragment)))
-               (with-syntax ([(string-expr* ...)
-                              (map process (syntax->list #'(fragment ...)))])
-                 (with-syntax ([((string-expr ...) ...) #'((string-expr* '" ") ...)])
-                   #'(string-append string-expr ... ...))))])))))])
+       (define (process fragment)
+         (if (string? (syntax-e fragment))
+             #`(quote #,fragment)
+             #`(interpret-spec obj #,fragment)))
+       (with-syntax ([(string-expr* ...)
+                      (map process (syntax->list #'(fragment ...)))])
+         (with-syntax ([((string-expr ...) ...) #'((string-expr* '" ") ...)])
+           #`(let ([obj (convert-to-dbsystem obj-expr)])
+               (string-append string-expr ... ...)))))]))
 
-(define-signature sql-basis^
-  [;; escape-name : boolean string -> string
-   ;; (escape-name preserve-case? name)
-   escape-name
+(define (convert-to-dbsystem obj)
+  (cond [(is-a? obj dbsystem<%>) obj]
+        [(is-a? obj connection<%>)
+         (send obj get-system)]
+        [else
+         (raise-type-error 'concat-sql
+                           "instance of connection<%> or dbsystem<%>"
+                           obj)]))
 
-   ;; literal-expression : string string -> string
-   ;; (literal-expression typename external-representation)
-   literal-expression
+(define-syntax (interpret-spec stx)
+  (syntax-case stx ()
+    [(interpret-spec obj fragment)
+     (syntax-case #'fragment ()
+       [(#:trust datum type)
+        #'(private-sql-marshal-literal/trust obj datum type)]
+       [(#:name datum)
+        #'(private-sql-marshal-name/no-preserve-case obj datum)]
+       [(#:Name datum)
+        #'(private-sql-marshal-name/preserve-case obj datum)]
+       [(#:sql code)
+        #'(private-sql-marshal-sql obj code)]
+       [(type datum)
+        (not (memq (syntax-e #'type) '(#:trust #:Name #:name #:sql)))
+        (begin
+          (unless (identifier? #'type)
+            (raise-syntax-error 'concat-sql "expected SQL type name"
+                                #'type))
+          #'(private-sql-marshal-literal/type+datum obj 'type datum))]
+       [else
+        (raise-syntax-error 'concat-sql "bad sql-spec" #'fragment)])]))
 
-   ;; sql-parse : symbol string -> datum
-   sql-parse
-   
-   ;; sql-marshal : symbol datum -> string
-   sql-marshal])
+;; private-sql-marshal-name/no-preserve-case : dbsystem string -> string
+(define (private-sql-marshal-name/no-preserve-case obj datum)
+  (unless (string? datum)
+    (raise-type-error 'concat-sql "string" datum))
+  (send obj escape-name #:preserve-case? #f datum))
 
-(define-unit sql-format@
-  (import sql-basis^)
-  (export sql-format^)
+;; private-sql-marshal-name/preserve-case : dbsystem string -> string
+(define (private-sql-marshal-name/preserve-case obj datum)
+  (unless (string? datum)
+    (raise-type-error 'concat-sql "string" datum))
+  (send obj escape-name #:preserve-case? #t datum))
 
-  ;; private-sql-marshal-name/no-preserve-case : string -> string
-  (define (private-sql-marshal-name/no-preserve-case datum)
-    (unless (string? datum)
-      (raise-type-error 'sql "string" datum))
-    (escape-name #f datum))
+;; private-sql-marshal-sql : dbsystem string -> string
+(define (private-sql-marshal-sql obj code)
+  (unless (string? code)
+    (raise-type-error 'concat-sql "string" code))
+  code)
 
-  ;; private-sql-marshal-name/preserve-case : string -> string
-  (define (private-sql-marshal-name/preserve-case datum)
-    (unless (string? datum)
-      (raise-type-error 'sql "string" datum))
-    (escape-name #t datum))
+;; private-sql-marshal-literal/type+datum : dbsystem symbol datum -> string
+(define (private-sql-marshal-literal/type+datum obj type datum)
+  ;; (error 'private-sql-marshal-literal/type+datum "unimplemented")
+  (unless (symbol? type)
+    (raise-type-error 'private-sql-marshal-literal/type+datum
+                      "symbol" type))
+  (if (sql-null? datum)
+      "NULL"
+      (send obj sql:literal-expression
+            type
+            (sql-marshal obj type datum))))
 
-  ;; private-sql-marshal-sql : string -> string
-  (define (private-sql-marshal-sql code)
-    (unless (string? code)
-      (raise-type-error 'format-sql "string" code))
-    code)
+(define (sql-marshal dbsystem typealias s)
+  (define type (send dbsystem typealias->type typealias))
+  (define writer (send dbsystem get-type-writer type))
+  (unless writer
+    (error 'sql-marshal "no writer for type: ~s (~s)" typealias type))
+  (writer s))
 
-  ;; private-sql-marshal-literal/type+datum : symbol datum -> string
-  (define (private-sql-marshal-literal/type+datum type datum)
-    (unless (symbol? type)
-      (raise-type-error 'private-sql-marshal-literal/type+datum
-                        "symbol" type))
-    (if (sql-null? datum)
-        "NULL"
-        (literal-expression type (sql-marshal type datum))))
-
-  ;; private-sql-marshal-literal/trust : datum string -> string
-  (define (private-sql-marshal-literal/trust datum typename)
-    ;; FIXME: do more checking on valid typenames (ex: no "--")
-    (unless (string? typename)
-      (raise-type-error 'format-sql "string" typename))
-    (if (sql-null? datum)
-        "NULL"
-        (literal-expression typename datum)))
-  )
+;; private-sql-marshal-literal/trust : dbsystem datum string -> string
+(define (private-sql-marshal-literal/trust obj datum typename)
+  ;; FIXME: do more checking on valid typenames (ex: no "--")
+  (unless (string? typename)
+    (raise-type-error 'concat-sql "string" typename))
+  (if (sql-null? datum)
+      "NULL"
+      (send obj sql:literal-expression typename datum)))

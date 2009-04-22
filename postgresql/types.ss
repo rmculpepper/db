@@ -7,6 +7,38 @@
 ;; Derived from 
 ;; http://www.us.postgresql.org/users-lounge/docs/7.2/postgres/datatype.html
 
+(define known-type-aliases
+  '(boolean
+    character
+    string
+    smallint
+    integer int serial serial4
+    bigint serial8
+    float real
+    double double-precision
+    decimal
+    character-varying
+    time-without-time-zone
+    time-with-time-zone
+    timestamp-without-time-zone
+    timestamp-with-time-zone))
+
+(define known-types
+  '(int2 int4 int8 tid xid cid oid
+    float4 float8
+    numeric
+    text varchar char
+    bytea
+    bool
+    date
+    time
+    timetz
+    timestamp
+    timestamptz))
+
+(define known-types+aliases
+  (append known-type-aliases known-types))
+
 ;; type-alias->type : symbol -> symbol
 (define (type-alias->type alias)
   (case alias
@@ -115,39 +147,31 @@
     ((numeric) 1700)
     (else #f)))
 
-(define-unit basis@
-  (import)
-  (export sql-basis^)
+;; escape-name : boolean string -> string
+(define (escape-name preserve-case? s)
+  (let ([s (if preserve-case? s (string-downcase s))])
+    (if (regexp-match? #rx"^[A-Za-z]*$" s)
+        s
+        (escape-name* s))))
 
-  (define (escape-name preserve-case? s)
-    (let ([s (if preserve-case? s (string-downcase s))])
-      (if (regexp-match? #rx"^[A-Za-z]*$" s)
-          s
-          (escape-name* s))))
+;; escape-name* : string -> string
+(define (escape-name* s)
+  (string-append "\""
+                 (regexp-replace #rx"\"" s "\"\"")
+                 "\""))
 
-  ;; escape-name : string -> string
-  (define (escape-name* s)
-    (string-append "\""
-                   (regexp-replace #rx"\"" s "\"\"")
-                   "\""))
+(define (sql-parse type s)
+  (let ([parser (type->type-reader (type-alias->type type))])
+    (unless parser
+      (raise-type-error 'sql-parse "type symbol" type))
+    (parser s)))
 
-  (define (sql-parse type s)
-    (let ([parser (type->type-reader (type-alias->type type))])
-      (unless parser
-        (raise-type-error 'sql-parse "type symbol" type))
-      (parser s)))
+(define (sql-marshal type d)
+  (let ([writer (type->type-writer (type-alias->type type))])
+    (unless writer
+      (raise-type-error 'sql-marshal "type symbol" type))
+    (writer d)))
 
-  (define (sql-marshal type d)
-    (let ([writer (type->type-writer (type-alias->type type))])
-      (unless writer
-        (raise-type-error 'sql-marshal "type symbol" type))
-      (writer d)))
-
-  ;; literal-expression : string datum -> string
-  (define (literal-expression cast-type literal)
-    (format "CAST( E~a AS ~a)" (quote-literal literal) cast-type)))
-
-(define-compound-unit/infer postgresql-sql-format@
-  (import)
-  (export sql-basis^ sql-format^)
-  (link basis@ sql-format@))
+;; literal-expression : string datum -> string
+(define (literal-expression cast-type literal)
+  (format "CAST( E~a AS ~a)" (quote-literal literal) cast-type))

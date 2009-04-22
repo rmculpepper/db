@@ -20,7 +20,7 @@
           (tag sql-types (prefix sql-types: test^))
           (tag concurrent (prefix concurrent: test^)))
   (export test^)
-  
+
   (define test
     (test-suite "All tests"
       query:test
@@ -31,11 +31,10 @@
   (compound-unit
     (import)
     (export ALL-TESTS)
-    (link (((BASIS : sql-basis^) (FORMAT : sql-format^) (CONNECT : connect^))
-           db@)
-          (((CONFIG : config^)) config@ CONNECT)
+    (link (((DB : database^)) db@)
+          (((CONFIG : config^)) config@ DB)
           (((QUERY-TEST : test^)) query-test@ CONFIG)
-          (((SQL-TYPES-TEST : test^)) sql-types-test@ CONFIG BASIS FORMAT)
+          (((SQL-TYPES-TEST : test^)) sql-types-test@ CONFIG DB)
           (((CONCURRENT-TEST : test^)) concurrent-test@ CONFIG)
           (((ALL-TESTS : test^)) all-tests@
                                  (tag query QUERY-TEST)

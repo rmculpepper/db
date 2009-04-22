@@ -10,14 +10,14 @@
 (provide standard-info
          get-field-name
          get-type
-         
+
          vectorlist-collector
          vectorlist-collector/fieldinfo
          void-collector
-         
+
+         primitive-query-base-mixin
          query-mixin
-         prepare-query-mixin
-         conversion-mixin)
+         prepare-query-mixin)
 
 ;; Standard recordset collectors
 
@@ -92,38 +92,38 @@
   (mixin (primitive-query<%>) (connection:query<%>)
     (inherit query*)
     (super-new)
-    
+
     ;; query1 : symbol Statement Collector -> QueryResult
     (define/private (query1 fsym stmt collector)
       (car (query* fsym (list stmt) collector)))
-    
+
     ;; query : Statement -> QueryResult
     ;; Uses the default 'vectorlist' collector
     (define/public-final (query sql)
       (car (query* 'query (list sql) vectorlist-collector/fieldinfo)))
-    
+
     ;; query-multiple : (list-of Statement) -> (list-of QueryResult)
     (define/public-final (query-multiple stmts)
       (query* 'query-multiple stmts vectorlist-collector/fieldinfo))
-    
+
     ;; fold : Statement ('a field ... -> 'a) 'a -> 'a
     (define/public-final (fold sql f base)
       (-fold 'fold sql f base))
-    
+
     ;; -fold : symbol Statement ('a field ... -> 'a) 'a -> 'a
     (define/private (-fold function sql f base)
       (Recordset-data
        (query/recordset function
                         sql
                         (mk-folding-collector base f))))
-    
+
     ;; query-list : Statement -> (listof 'a)
     ;; Expects to get back a recordset with one field per row.
     (define/public-final (query-list sql)
       (Recordset-data
        (query/recordset 'query-list
                         sql (mk-single-column-collector 'query-list sql))))
-    
+
     ;; query-maybe-row : Statement -> (vector-of 'a) or #f
     ;; Expects to get back a recordset of zero or one rows.
     (define/public-final (query-maybe-row sql)
@@ -131,7 +131,7 @@
        'query-maybe-row
        (query/recordset 'query-maybe-row sql vectorlist-collector)
        sql))
-    
+
     ;; query-row : Statement -> (vector-of 'a)
     ;; Expects to get back a recordset of zero or one rows.
     (define/public-final (query-row sql)
@@ -139,7 +139,7 @@
        'query-row
        (query/recordset 'query-row sql vectorlist-collector)
        sql))
-    
+
     ;; query-value : string -> value | raises error
     ;; Expects to get back a recordset of exactly one row, exactly one column.
     (define/public-final (query-value sql)
@@ -148,7 +148,7 @@
        (query/recordset 'query-value
                         sql (mk-single-column-collector 'query-value sql))
        sql))
-    
+
     ;; query-maybe-value : Statement -> value/#f
     ;; Expects to get back a recordset of zero or one rows, exactly one column.
     (define/public-final (query-maybe-value sql)
@@ -158,12 +158,12 @@
         'query-maybe-value sql
         (mk-single-column-collector 'query-maybe-value sql))
        sql))
-    
+
     ;; exec : Statement ... -> void
     (define/public-final (exec . sqls)
       (query* 'exec sqls void-collector)
       (void))
-    
+
     ;; mapfilter : Statement (field... -> 'a) (field... -> boolean) -> (listof 'a)
     (define/public-final (mapfilter sql f keep?)
       (unless (procedure? keep?)
@@ -177,7 +177,7 @@
                             (cons (apply f fields) b)
                             b))
                       null)))
-    
+
     ;; -map : Statement (field ... -> 'a) -> (listof 'a)
     (public (-map map))
     (define (-map sql f)
@@ -186,14 +186,14 @@
       (reverse
        (-fold 'map
               sql (lambda (b . fields) (cons (apply f fields) b)) null)))
-    
+
     ;; -for-each : Statement (field ... -> unspecified) -> unspecified
     (public (-for-each for-each))
     (define (-for-each sql f)
       (unless (procedure? f)
         (raise-type-error 'for-each "procedure" f))
       (-fold 'for-each sql (lambda (_ . fields) (apply f fields)) #f))
-    
+
     ;; query/recordset : symbol Statement collector -> void
     (define/private (query/recordset fsym sql collector)
       (let [(result (query1 fsym sql collector))]
@@ -222,11 +222,11 @@
     (inherit prepare-multiple
              bind-prepared-statement)
     (super-new)
-    
+
     ;; prepare : string -> PreparedStatement
     (define/public-final (prepare stmt)
       (car (prepare-multiple (list stmt))))
-    
+
     (define-syntax prepare-query-method
       (syntax-rules ()
         [(prepare-query-method name method)
@@ -238,7 +238,7 @@
            (let ([pst (prepare sql)])
              (check 'name pst sql) ...
              (lambda args (method (bind-prepared-statement pst args) arg ...))))]))
-    
+
     (prepare-query-method prepare-exec exec)
     (prepare-query-method prepare-query-list query-list
                           [#:check check-results/one-column])
@@ -275,67 +275,58 @@
                       "query does not return a single column (returns ~a columns)"
                       (PreparedStatement-results pst))))
 
-;; conversion-mixin
-;; Adds automatic conversions from SQL external representations to Scheme data
-(define conversion-mixin
-  (mixin (primitive-query<%>) (primitive-query/conversion<%>)
+;; primitive-query-base-mixin
+;; Abstract method 'query*/no-conversion'
+(define primitive-query-base-mixin
+  (mixin (connection<%>) (primitive-query<%>)
+    (inherit get-system)
     (super-new)
-    
+
     ;; query*/no-conversion : symbol (list-of Statement) Collector
     ;;                     -> (list-of QueryResult)
-    (define/public-final (query*/no-conversion fsym stmts collector)
-      (super query* fsym stmts collector))
-    
+    (define/public (query*/no-conversion fsym stmts collector)
+      (error 'query*/no-conversion "unimplemented"))
+
     ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
     ;; Overridden to automatically use type conversion
-    (define/override (query* fsym stmts collector)
-      (super query* fsym stmts (compose-with-converters collector)))
-    
-    ;; compose-with-converters : (FieldInfo -> 'a ('a field ... -> 'a) ('a -> 'b))
-    ;;                        -> (list-of FieldInfo)
-    ;;                        -> 'a ('a field ... -> 'a) ('a -> 'b))
-    (define/private (compose-with-converters f)
-      (lambda (field-infos binary?)
-        (let* ([type-functions
-                (map (lambda (field-info)
-                       (get-type-reader
-                        (typeid->type
-                         (get-type field-info))))
-                     field-infos)]
-               [convert
-                (lambda (args)
-                  (map (lambda (convert arg)
-                         (if (sql-null? arg) sql-null (convert arg)))
-                       type-functions
-                       args))])
-          (let-values ([(base combine finish info) (f field-infos binary?)])
-            (values base 
-                    (if binary?
-                        combine
-                        (lambda (b . args) (apply combine b (convert args))))
-                    finish
-                    info)))))
-    
-    ;; typeid->type : TypeID -> symbol
-    (define/public (typeid->type typeid)
-      #f)
-    
-    ;; get-type-reader : symbol -> (string -> datum)
-    (define/public (get-type-reader key)
-      values)
-    
-    ;; get-type-writer : symbol -> (datum -> string) or #f
-    (define/public (get-type-writer key)
-      #f)
-    
+    (define/public-final (query* fsym stmts collector)
+      (query*/no-conversion fsym stmts
+                            (compose-with-converters (get-system) collector)))
+
     ;; datum->external-representation : TypeID datum -> string
-    (define/override (datum->external-representation typeid datum)
-      (let ([convert (get-type-writer (typeid->type typeid))])
-        (cond [convert
-               (convert datum)]
-              [(string? datum)
-               datum]
+    (define/public (datum->external-representation typeid datum)
+      (let* ([sys (get-system)]
+             [type (send sys typeid->type typeid)]
+             [convert (send sys get-type-writer type)])
+        (cond [convert (convert datum)]
+              [(string? datum) datum]
               [else
                (raise-user-error
                 'datum->external-representation
                 "cannot convert datum: ~s" datum)])))))
+
+;; compose-with-converters
+;;     : (FieldInfo -> 'a ('a field ... -> 'a) ('a -> 'b))
+;;    -> (list-of FieldInfo)
+;;    -> 'a ('a field ... -> 'a) ('a -> 'b))
+(define (compose-with-converters sys f)
+  (lambda (field-infos binary?)
+    (let* ([type-functions
+            (map (lambda (field-info)
+                   (send sys get-type-reader
+                         (send sys typeid->type
+                               (get-type field-info))))
+                 field-infos)]
+           [convert
+            (lambda (args)
+              (map (lambda (convert arg)
+                     (if (sql-null? arg) sql-null (convert arg)))
+                   type-functions
+                   args))])
+      (let-values ([(base combine finish info) (f field-infos binary?)])
+        (values base 
+                (if binary?
+                    combine
+                    (lambda (b . args) (apply combine b (convert args))))
+                finish
+                info)))))

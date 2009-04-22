@@ -1,10 +1,10 @@
 
 #lang scheme/base
 (require scheme/unit
-         "sql-format.ss")
-(provide connect^
-         sql-basis^
-         sql-format^)
+         ;; "sql-format.ss"
+         )
+(provide database^)
 
-(define-signature connect^
-  (connect))
+(define-signature database^
+  (connect
+   dbsystem))

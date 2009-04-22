@@ -4,6 +4,7 @@
           scribble/eval
           scribble/struct
           scheme/sandbox
+          "config.ss"
           (for-label scheme/base)
           (for-label "../generic/main.ss")
           (for-label "../postgresql/main.ss"))
@@ -11,9 +12,9 @@
 @(define the-eval (make-base-eval))
 @(interaction-eval #:eval the-eval
                    (require scheme/class
-                            "../generic/main.ss"
-                            "../postgresql/main.ss"
-                            "../postgresql/connection.ss"))
+                            "generic/main.ss"
+                            "postgresql/main.ss"
+                            "postgresql/connection.ss"))
 @(define-syntax-rule (examples/results [example result] ...)
    (examples #:eval the-eval (eval:alts example result) ...))
 @(define-syntax-rule (my-interaction [example result] ...)
@@ -21,7 +22,8 @@
 
 @title{Connecting to a PostgreSQL server}
 
-@defmodule["../postgresql/main.ss"]
+@;@defmodule/this-package["postgresql/main.ss"]
+@defmodule/this-package["postgresql/main"]
 
 Use the following procedure to create a connection:
 
@@ -75,7 +77,7 @@ Use the following procedure to create a connection:
   If the connection cannot be made, @scheme[connect] raises an exception.
 
   @(examples/results
-    [(connect #:server "db.mysite.tla"
+    [(connect #:server "db.mysite.com"
               #:port 5432
               #:database "webappdb"
               #:user "webapp"

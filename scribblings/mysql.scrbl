@@ -1,9 +1,10 @@
 #lang scribble/doc
 
-@(require scribble/manual)
-@(require scribble/eval)
-@(require scribble/struct)
-@(require scheme/sandbox)
+@(require scribble/manual
+          scribble/eval
+          scribble/struct
+          scheme/sandbox
+          "config.ss")
 
 @(require (for-label scheme/base)
           (for-label "../generic/main.ss")
@@ -12,9 +13,9 @@
 @(define the-eval (make-base-eval))
 @(interaction-eval #:eval the-eval
                    (require scheme/class
-                            "../generic/main.ss"
-                            "../mysql/main.ss"
-                            "../mysql/connection.ss"))
+                            "generic/main.ss"
+                            "mysql/main.ss"
+                            "mysql/connection.ss"))
 @(define-syntax-rule (examples/results [example result] ...)
    (examples #:eval the-eval (eval:alts example result) ...))
 @(define-syntax-rule (my-interaction [example result] ...)
@@ -22,7 +23,8 @@
 
 @title{Connecting to a MySQL server}
 
-@defmodule["../mysql/main.ss"]
+@;@defmodule/this-package["mysql/main.ss"]
+@defmodule/this-package["mysql/main"]
 
 Use the following procedure to create a connection:
 
@@ -44,7 +46,7 @@ Use the following procedure to create a connection:
   The default port for MySQL databases is 3306.
 
   @(examples/results
-    [(connect #:server "db.mysite.tla"
+    [(connect #:server "db.mysite.com"
               #:port 3306
               #:database "webappdb"
               #:user "webapp"

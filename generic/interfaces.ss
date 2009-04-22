@@ -12,6 +12,8 @@
          (struct-out PreparedStatement)
          (struct-out StatementBinding)
 
+         dbsystem<%>
+
          backend-link<%>
          backend-link<%>/sub
 
@@ -20,7 +22,6 @@
          ssl-connector<%>
          primitive-query<%>
          primitive-query/prepare<%>
-         primitive-query/conversion<%>
 
          connection:query<%>
          connection:query/prepare<%>)
@@ -67,7 +68,11 @@
     connected?
 
     ;; disconnect : -> void
-    disconnect))
+    disconnect
+
+    ;; get-system : -> (is-a/c dbsystem<%>)
+    get-system
+    ))
 
 ;; backend-link<%>
 (define backend-link<%>
@@ -124,7 +129,11 @@
     ;; query* : (listof Statement) Collector -> (listof QueryResult)
     query*
 
-    ;; datum->external-representation : number datum -> string
+    ;; query*/no-conversion : (listof Statement) Collector
+    ;;                     -> (listof QueryResult)
+    query*/no-conversion
+
+    ;; datum->external-representation : TypeID datum -> string
     datum->external-representation
     ))
 
@@ -136,22 +145,6 @@
 
     ;; bind-prepared-statement : PreparedStatement (list-of value) -> Statement
     bind-prepared-statement
-    ))
-
-;; primitive-query/conversion<%>
-(define primitive-query/conversion<%>
-  (interface ()
-    ;; query*/no-conversion
-    query*/no-conversion
-
-    ;; typeid->type : TypeID -> symbol
-    typeid->type
-
-    ;; get-type-reader : symbol -> (External -> datum)
-    get-type-reader
-
-    ;; get-type-writer : symbol -> (datum -> External)
-    get-type-writer
     ))
 
 ;; connection:query<%>
@@ -236,3 +229,37 @@
 
     ;; prepare-fold : Preparable ('b 'a ... -> 'b) 'b -> datum ... -> 'b
     prepare-fold))
+
+
+;; dbsystem<%>
+;; Represents brand of database system, SQL dialect, etc
+(define dbsystem<%>
+  (interface ()
+    ;; get-short-name : -> symbol
+    get-short-name
+
+    ;; get-description : -> string
+    get-description
+
+    ;; typeid->type : TypeID -> symbol
+    typeid->type
+
+    ;; typealias->type : TypeAlias -> symbol
+    typealias->type
+
+    ;; get-known-types : #:can-read? [bool #t] #:can-write? [bool #t]
+    ;;                -> (listof symbol)
+    get-known-types
+
+    ;; get-type-reader : symbol #:options [any #f] -> (string -> any)
+    get-type-reader
+
+    ;; get-type-writer : symbol #:options [any #f] -> (string -> any)
+    get-type-writer
+
+    ;; sql:escape-name : string #:preserve-case [boolean #f] -> string
+    sql:escape-name
+
+    ;; sql:literal-expression : string/symbol any -> string
+    ;; Constructs SQL expression evaluating to given value
+    sql:literal-expression))

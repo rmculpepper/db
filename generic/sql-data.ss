@@ -204,11 +204,11 @@
 
 (define (parse-decimal s)
   (cond [(equal? s "NaN") +nan.0]
-        [(regexp-match #rx"^([0-9]*)$" s)
+        [(regexp-match #rx"^-?([0-9]*)$" s)
          ;; big integer
          => (lambda (m)
               (string->number s))]
-        [(regexp-match #rx"^([0-9]*)\\.([0-9]*)$" s)
+        [(regexp-match #rx"^-?([0-9]*)\\.([0-9]*)$" s)
          => (lambda (m)
               (+ (string->number (cadr m))
                  (let ([fp (caddr m)])

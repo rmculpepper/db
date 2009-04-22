@@ -14,6 +14,7 @@
          "../generic/sql-data.ss"
          "../generic/query.ss"
          "message.ss"
+         "dbsystem.ss"
          "types.ss")
 (provide connection%)
 
@@ -48,21 +49,21 @@
     (init-field inport
                 outport)
     (define next-msg-num 0)
-    
+
     (define/public (encode msg)
       (write-packet outport msg next-msg-num)
       (set! next-msg-num (add1 next-msg-num)))
-    
+
     (define/public (fresh-exchange)
       (set! next-msg-num 0))
-    
+
     (define/public (flush)
       (flush-output outport))
-    
+
     (define/public (close)
       (close-output-port outport)
       (close-input-port inport))
-    
+
     (define/public get-message
       (case-lambda 
         [(expectation) (get-message* expectation #f)]
@@ -103,9 +104,9 @@
           [else
            (err next)])
         next))
-    
+
     (define/public (alive?) #t)
-    
+
     (super-new)))
 
 (define disconnected-backend-link%
@@ -132,7 +133,7 @@
 
 ;; mysql-base%
 (define mysql-base%
-  (class* object% (mysql-base<%>)
+  (class* object% (connection<%> mysql-base<%>)
     (init-field [backend-link disconnected-backend-link])
     (super-new)
 
@@ -159,7 +160,7 @@
         (fprintf (current-error-port) "  << ~s\n" r))
       (when (error-packet? r)
         (error 'backend "error: ~s" r)
-        #; (raise-mysql-backend-error behalf r))
+        #| (raise-mysql-backend-error behalf r) |# )
       r)
 
     ;; send-message : message -> void
@@ -199,6 +200,11 @@
     ;; connected? : -> boolean
     (define/public (connected?)
       (send backend-link alive?))
+
+    ;; System
+
+    (define/public (get-system)
+      dbsystem)
 
     ;; Initialization
 
@@ -314,7 +320,7 @@
            (error 'connect
                   (string-append "connection failed after authentication "
                                  "(backend sent unexpected message)"))])))
-    
+
     ))
 
 ;; primitive-query-mixin
@@ -322,10 +328,11 @@
 ;; Provides functionality, not usability. See connection% for friendly 
 ;; interface.
 (define primitive-query-mixin
-  (mixin (mysql-base<%>) (primitive-query<%> primitive-query/prepare<%>)
+  (mixin (mysql-base<%> primitive-query<%>) (primitive-query/prepare<%>)
     (inherit recv
              send-message
-             fresh-exchange)
+             fresh-exchange
+             datum->external-representation)
     (super-new)
 
     ;; name-counter : number
@@ -333,10 +340,11 @@
 
     ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
     ;; The single point of control for the query engine
-    (define/public (query* fsym stmts collector)
-      (for-each (lambda (stmt) (check-statement fsym stmt)) stmts)
-      (map (lambda (stmt) (query1 fsym stmt collector))
-           stmts))
+    (define/override (query*/no-conversion fsym stmts collector)
+      (for ([stmt stmts])
+        (check-statement fsym stmt))
+      (for/list ([stmt stmts])
+        (query1 fsym stmt collector)))
 
     ;; query1 : symbol Statement Collector -> QueryResult
     (define/private (query1 fsym stmt collector)
@@ -374,15 +382,17 @@
                 [null-map (map not params)]
                 [param-types
                  (map get-type (MySQLPreparedStatement-paraminfos pst))])
-           #;
+           #|
            (define (send-param pos data)
              (when data
                (send-message (make-long-data-packet id pos 0 data))))
-           #;
+           |#
+           #|
            (let loop ([pos 0] [params params])
              (when (pair? params)
                (send-param pos (car params))
                (loop (add1 pos) (cdr params))))
+           |#
            (send-message
             (make-execute-packet id null 1 null-map 1 param-types params)))]))
 
@@ -434,13 +444,6 @@
             (loop (apply combine init (car data)) (cdr data))
             (make-Recordset info (finalize init)))))
 
-    ;; datum->external-representation : number datum -> string
-    (define/public (datum->external-representation typeoid datum)
-      (unless (string? datum)
-        (raise-user-error 'datum->external-representation
-                          "cannot convert datum: ~s" datum))
-      datum)
-
     ;; prepare-multiple : (list-of string) -> (list-of PreparedStatement)
     (define/public (prepare-multiple stmts)
       (for-each (lambda (stmt)
@@ -481,7 +484,8 @@
           [(? field-packet?)
            (cons (parse-field-info r) (prepare1:get-fields))])))
 
-    ;; bind-prepared-statement : PreparedStatement (list-of value) -> StatementBinding
+    ;; bind-prepared-statement : PreparedStatement (list-of value)
+    ;;                        -> StatementBinding
     (define/public (bind-prepared-statement pst params)
       (printf "wcx = ~s\n"
               (MySQLPreparedStatement-wcx pst))
@@ -516,37 +520,15 @@
         (raise-user-error
          'bind-prepared-statement
          "prepared statement requires ~s parameters, given ~s" tlen len)))
-    
+
     ))
-
-;; mysql-conversion-mixin
-;; Adds automatic conversions from SQL external representations to Scheme data
-(define mysql-conversion-mixin
-  (mixin (primitive-query<%> primitive-query/conversion<%>) ()
-
-    ;; typeid->type : symbol -> symbol
-    (define/override (typeid->type type)
-      type)
-
-    ;; get-type-reader : symbol -> (string -> datum)
-    (define/override (get-type-reader type)
-      (or (type->type-reader type)
-          (super get-type-reader type)))
-
-    ;; get-type-writer : symbol -> (datum -> string) or #f
-    (define/override (get-type-writer type)
-      (or (type->type-writer type)
-          (super get-type-writer type)))
-    
-    (super-new)))
 
 ;; connection%
 (define connection% 
   (class (prepare-query-mixin
           (query-mixin
-           (mysql-conversion-mixin
-            (conversion-mixin
-             (primitive-query-mixin
-              (connector-mixin
-               mysql-base%))))))
+           (primitive-query-mixin
+            (primitive-query-base-mixin
+             (connector-mixin
+              mysql-base%)))))
     (super-new)))

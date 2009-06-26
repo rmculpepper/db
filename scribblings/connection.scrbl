@@ -9,7 +9,7 @@
           (for-label "../generic/main.ss"))
 
 @(define the-eval (make-base-eval))
-(interaction-eval #:eval the-eval
+@(interaction-eval #:eval the-eval
                    (require scheme/class
                             "generic/main.ss"))
 @(define-syntax-rule (examples/results [example result] ...)
@@ -19,7 +19,6 @@
 
 @title{Connection API}
 
-@;@defmodule/this-package["generic/main.ss"]
 @defmodule/this-package["generic/main"]
 
 @section{Administrative methods}
@@ -67,14 +66,14 @@ to this kind of database.
 
 @section{Query API}
 
-Spgsql implements a high-level, functional query interface. Once
-connected, connection objects are relatively stateless. When a query
-method is invoked, it either returns a result or, if the query caused
-an error, raises an exception. Different query methods impose
-different constraints on the query results and offer different
-mechanisms for processing the results.
+The database package implements a high-level, functional query
+interface. Once connected, connection objects are relatively
+stateless. When a query method is invoked, it either returns a result
+or, if the query caused an error, raises an exception. Different query
+methods impose different constraints on the query results and offer
+different mechanisms for processing the results.
 
-The spgsql query interface does not expose any low-level
+The query interface does not expose any low-level
 machinery. Programmers who want cursors may use SQL-language cursors
 via the @tt{DECLARE CURSOR}, @tt{MOVE}, and @tt{FETCH} statements if
 they are available in their database's SQL dialect.
@@ -269,11 +268,11 @@ common uses of parameterized prepared statements:
 }
 
 Each of the following methods prepares the parameterized SQL statement
-for later execution and returns a closure. The closure accepts the
+for later execution and returns a procedure. The procedure accepts the
 parameter values and executes the prepared statement, processing the
 results like the corresponding query method.
 
-A prepared-statement closure may be executed any number of times.  It
+A prepared-statement procedure may be executed any number of times.  It
 is possible to prepare a statement that contains no parameters; the
 resulting procedure should be called with zero arguments.
 
@@ -364,10 +363,10 @@ query results.
          
 @subsection{Conversions}
 
-Here are the SQL types known to spgsql with their corresponding Scheme
-representations. The type is listed in the notation accepted by
-spgsql; it generally corresponds to the SQL notation with spaces
-replaced by dashes.
+Here are the SQL types known to this package with their corresponding
+Scheme representations. The type is listed by its Scheme notation,
+which generally corresponds to the SQL notation with spaces replaced
+by dashes.
 
 @(require "tabbing.ss")
 @tabbing{
@@ -400,10 +399,10 @@ finite decimal strings are converted without loss of precision. Other
 real values are converted to decimals with a loss of precision.
 
 PostgreSQL defines other datatypes, such as network addresses and
-various geometric concepts. These are not supported by spgsql.
+various geometric concepts. These are not supported.
 
-Array types are also not currently supported by spgsql. Support may be
-added in a future version.
+Array types are also not currently supported. Support may be added in
+a future version.
 
 @subsection{SQL Data}
 
@@ -440,6 +439,7 @@ analogues in Scheme.
   microsecond when they are stored in the database.
 }
 
+@deftogether[[
 @defproc[(sql-datetime->srfi-date [t (or/c sql-date? sql-time? sql-timestamp?)])
          date?]
 @defproc[(srfi-date->sql-date [d date?])
@@ -451,17 +451,23 @@ analogues in Scheme.
 @defproc[(srfi-date->sql-timestamp [d date?])
          sql-timestamp?]
 @defproc[(srfi-date->sql-timestamp-tz [d date?])
-         sql-timestamp?]{
+         sql-timestamp?]]]{
+
   Converts between this library's date and time values and SRFI 19's
   date values. SRFI dates store more information than SQL dates and
   times, so converting a SQL time to a SRFI date, for example, puts
   zeroes in the year, month, and day fields.
 }
 
+@;{
 @subsection{Creating SQL Strings}
 
 The @scheme[format-sql] and @scheme[concat-sql] macros help construct
-SQL query strings safely:
+SQL query strings. 
+
+@emph{Note:} Constructing query strings is error-prone and
+dangerous. When possible, use prepared statements or other means
+instead.
 
 @defform/subs[(format-sql format-string ... sql-spec ...)
               ([sql-spec [type-id expr]
@@ -567,4 +573,5 @@ SQL query strings safely:
                 "from" [#:name "the_numbers"]
                 [#:sql (if only-pos? "where n > 0" "")])
   ]
+}
 }

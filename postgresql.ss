@@ -5,10 +5,10 @@
 #lang scheme/base
 (require scheme/class
          scheme/tcp
-         "../generic/main.ss"
-         "../generic/socket.ss"
-         "connection.ss"
-         "dbsystem.ss")
+         "generic/main.ss"
+         "generic/socket.ss"
+         "postgresql/connection.ss"
+         "postgresql/dbsystem.ss")
 (provide connect
          dbsystem)
 
@@ -38,8 +38,8 @@
       (raise-user-error 'connect
                         "must give input-port and output-port arguments together")))
   (let ([c (new (mixin connection%)
-                #| (allow-cleartext-password? allow-cleartext-password?) |#)])
-    #| (send c set-ssl-options ssl ssl-encrypt) |#
+                (allow-cleartext-password? allow-cleartext-password?))])
+    (send c set-ssl-options ssl ssl-encrypt)
     (cond [socket
            (let-values ([(in out) (unix-socket-connect socket)])
              (send c attach-to-ports in out))]
@@ -47,7 +47,7 @@
            (send c attach-to-port input-port output-port)]
           [else
            (let ([server (or server "localhost")]
-                 [port (or port 3306)])
+                 [port (or port 5432)])
              (let-values ([(in out) (tcp-connect server port)])
                (send c attach-to-ports in out)))])
     (send c start-connection-protocol database user password)

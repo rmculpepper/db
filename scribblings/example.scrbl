@@ -7,14 +7,13 @@
 
 @(require (for-label scheme/base)
           (for-label "../generic/main.ss")
-          (for-label "../postgresql/main.ss"))
+          (for-label "../main.ss"))
 
 @(define the-eval (make-base-eval))
 @(interaction-eval #:eval the-eval
                    (require scheme/class
                             "generic/main.ss"
-                            "postgresql/main.ss"
-                            "postgresql/connection.ss"))
+                            "main.ss"))
 @(define-syntax-rule (examples/results [example result] ...)
    (examples #:eval the-eval (eval:alts example result) ...))
 @(define-syntax-rule (my-interaction [example result] ...)
@@ -22,21 +21,22 @@
 
 @title{Annotated example}
 
-The following program demonstrates how to connect to a PostgreSQL backend
-using spgsql and how to do simple queries on the connection.
+The following program demonstrates how to connect to a PostgreSQL
+backend and perform simple queries.
 
 @schemeinput[
 (require scheme/class
          "generic/main.ss"
-         "postgresql/main.ss")
+         "main.ss")
 ]
 
 Replace these values with the appropriate values for your 
 configuration:
 @schemeinput[
-  (define cx (connect #:user "ryan"
-                      #:database "ryan"
-                      #:password (getenv "PGPASSWORD")))
+  (define cx
+    (postgresql:connect #:user "ryan"
+                        #:database "ryan"
+                        #:password (getenv "DBPASSWORD")))
 ]
 @(my-interaction
   [cx (new connection%)])
@@ -185,6 +185,7 @@ But if there are no numbers less than the one given, @tt{max} returns NULL.
   [(next-largest2 0)
    sql-null])
 
+@;{
 If you want to construct a query from Scheme data, you should probably
 use a parameterized query. But spgsql still provides a way of
 constructing SQL strings.
@@ -221,7 +222,9 @@ conditionally adding constraints, orderings, etc.
 @(my-interaction
   [(get-numbers #t)
    (list 2 1 0)])
+}
 
+@;{
 If you like, you can declare cursors to fetch data incrementally.
 Usually, you must be inside of a transaction to create a cursor.
 
@@ -239,6 +242,7 @@ Usually, you must be inside of a transaction to create a cursor.
       "close MC"
       "commit transaction")
 ]
+}
 
 You should disconnect when you're done to close the communication ports.
 

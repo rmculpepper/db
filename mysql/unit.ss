@@ -5,7 +5,7 @@
 #lang scheme/base
 (require scheme/unit
          "../generic/signatures.ss"
-         "main.ss")
+         "../mysql.ss")
 (provide mysql@)
 
 (define-unit-from-context mysql@ database^)

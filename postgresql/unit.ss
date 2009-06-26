@@ -5,7 +5,7 @@
 #lang scheme/base
 (require scheme/unit
          "../generic/signatures.ss"
-         "main.ss")
+         "../postgresql.ss")
 (provide postgresql@)
 
 (define-unit-from-context postgresql@ database^)

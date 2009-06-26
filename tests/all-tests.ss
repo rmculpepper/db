@@ -1,4 +1,4 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2009 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -49,6 +49,6 @@
   (import)
   (export (prefix mysql: test^)))
 
-;; (putenv "PGPASSWORD" ???)
+;; (putenv "DBPASSWORD" ???)
 ;; (test/graphical-ui postgresql:test)
 ;; (test/graphical-ui mysql:test)

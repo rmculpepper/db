@@ -19,7 +19,9 @@
 @author{Ryan Culpepper}
 
 This manual documents the database package version 1.0 (PLaneT version
-1 0).
+1 0). This package is the successor to spgsql.
+
+@defmodule/this-package[]
 
 @section-index["postgresql" "postgres" "mysql" "database" "spgsql"]
 
@@ -33,7 +35,7 @@ objects, but connection objects do not contain query state, only
 connection state. The query methods are functional in spirit: queries
 return results; they do not stow them away in the connection for later
 manipulation and retrieval. The higher-order query methods are
-patterned after the standard higher-order list processing functions.
+patterned after standard higher-order list processing functions.
 
 Since this package does not use foreign connectivity libraries, it
 works seamlessly with PLT Scheme's resource management systems. The
@@ -44,15 +46,13 @@ the communication, unlike some FFI-based approaches.
 The database package is compatible with PostgreSQL servers version 7.4
 and later and MySQL servers version 5 and later.
 
-@include-section["postgresql.scrbl"]
-@include-section["mysql.scrbl"]
+@include-section["connect.scrbl"]
 @include-section["connection.scrbl"]
 @include-section["notes.scrbl"]
 @include-section["example.scrbl"]
 
 @section{Acknowledgments}
 
-Thanks to Dave Gurnell and Noel Welsh for help implementing SSL
-connections. Further thanks to Dave Gurnell for helping to implement,
-test, and document date and time handling. Thanks to Mike Burns and
-Doug Orleans for help updating spgsql to PLT Scheme 30x.
+Thanks to Dave Gurnell, Noel Welsh, Mike Burns, and Doug Orleans for
+contributions to spgsql, the PostgreSQL-only predecessor of this
+package.

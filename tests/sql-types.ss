@@ -9,6 +9,7 @@
          (prefix-in srfi: srfi/19)
          "../generic/main.ss"
          "../generic/sql-format.ss"
+         "../generic/signatures.ss"
          "config.ss")
 (provide sql-types-test@)
 

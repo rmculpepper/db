@@ -5,11 +5,14 @@
           scribble/struct
           scheme/sandbox
           "config.ss"
-          (for-label scheme/base)
-          (for-label "../generic/main.ss"))
+          (for-label scheme/base scheme/class)
+          (for-label "../main.ss"))
+
+@(define-syntax-rule (qmeth meth) (method connection:query<%> meth))
+@(define-syntax-rule (pmeth meth) (method connection:query/prepare<%> meth))
 
 @title{Connection API}
-@declare-exporting/this-package[]
+@(declare-exporting/this-package (main) ())
 
 Connection methods are divided into three interfaces:
 @scheme[connection:admin<%>], @scheme[connection:query<%>], and
@@ -132,7 +135,7 @@ This interface contains a connection's main query methods.
 
   Example:
   @schemeinput[
-    (send c exec "create table the_numbers (n integer, name varchar)"
+    (send c #, @qmeth[exec] "create table the_numbers (n integer, name varchar)"
                  "insert into the_numbers (n, name) values (0, 'zero')")]
 
   @bold{PostgreSQL note}: The set of statements passed to
@@ -265,12 +268,12 @@ common uses of parameterized prepared statements:
 
   @(examples/results
     [(let ([get-name-pst
-            (send c prepare "select name from the_numbers where n = $1")])
+            (send c #, @pmeth[prepare] "select name from the_numbers where n = $1")])
        (let ([get-name1
-              (send c bind-prepared-statement get-name-pst (list 1))]
+              (send c #, @pmeth[bind-prepared-statement] get-name-pst (list 1))]
              [get-name2
-              (send c bind-prepared-statement get-name-pst (list 2))])
-         (send c query-multiple (list get-name1 get-name2))))
+              (send c #, @pmeth[bind-prepared-statement] get-name-pst (list 2))])
+         (send c #, @qmeth[query-multiple] (list get-name1 get-name2))))
      (list (make-Recordset (list (make-FieldInfo "name")) (list "one"))
            (make-Recordset (list (make-FieldInfo "name")) (list "two")))])
 }
@@ -358,11 +361,11 @@ conversion to or from a SQL type, you must supply or accept a string
 containing the SQL value's external representation.
 
 @(examples/results
-  [(send c query-value "select 18") 18]
-  [(send c query-value "select false") #f]
+  [(send c #, @qmeth[query-value] "select 18") 18]
+  [(send c #, @qmeth[query-value] "select false") #f]
 
-  [(send c query-value "select '{1,2,3}'::int[]") "{1,2,3}"]
-  [(send c query-value "select point (1,2)") "(1,2)"])
+  [(send c #, @qmeth[query-value] "select '{1,2,3}'::int[]") "{1,2,3}"]
+  [(send c #, @qmeth[query-value] "select point (1,2)") "(1,2)"])
 
 SQL NULL values are always translated into the unique @scheme[sql-null] value.
 

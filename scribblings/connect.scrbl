@@ -5,18 +5,19 @@
           scribble/struct
           scheme/sandbox
           (planet cce/scheme:3)
+          "config.ss"
           (for-label scheme/base
                      scheme/contract
                      "../main.ss"))
 
 @title{Connecting to a server}
-@declare-exporting/this-package[]
+@(declare-exporting/this-package (main) ())
 
 @section{Connecting to a PostgreSQL server}
 
 Use the following procedure to create a connection:
 
-@defproc[(postgresql:connect [#:user user string?]
+@defproc[(postgresql-connect [#:user user string?]
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 5432]
@@ -30,7 +31,7 @@ Use the following procedure to create a connection:
                 (is-a/c connection:query/prepare<%>))]{
 
   Creates a connection to a PostgreSQL server. The
-  @scheme[postgresql:connect] procedure recognizes the keyword
+  @scheme[postgresql-connect] procedure recognizes the keyword
   arguments listed above. Only the @scheme[user] and @scheme[database]
   arguments are mandatory.
 
@@ -68,17 +69,17 @@ Use the following procedure to create a connection:
   If the connection cannot be made, an exception is raised.
 
   @(examples/results
-    [(postgresql:connect #:server "db.mysite.com"
+    [(postgresql-connect #:server "db.mysite.com"
                          #:port 5432
                          #:database "webappdb"
                          #:user "webapp"
                          #:password "ultra5ecret")
      (new connection%)]
-    [(postgresql:connect #:user "me"
+    [(postgresql-connect #:user "me"
                          #:database "me"
                          #:password "icecream")
      (new connection%)]
-    [(postgresql:connect @code:comment{Typical socket path on some PostgreSQL configurations}
+    [(postgresql-connect @code:comment{Typical socket path on some PostgreSQL configurations}
                          #:socket "/var/run/postgresql/.s.PGSQL.5432"
                          #:user "me"
                          #:database "me")
@@ -90,7 +91,7 @@ Use the following procedure to create a connection:
 
 Use the following procedure to create a connection:
 
-@defproc[(mysql:connect [#:user user string?]
+@defproc[(mysql-connect [#:user user string?]
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 3306]
@@ -102,23 +103,23 @@ Use the following procedure to create a connection:
                 (is-a/c connection:query/prepare<%>))]{
 
   Creates a connection to a MySQL server. The meaning of the keyword
-  arguments is similar to those of the @scheme[postgresql:connect]
+  arguments is similar to those of the @scheme[postgresql-connect]
   procedure.
 
   The default port for MySQL databases is 3306.
 
   @(examples/results
-    [(mysql:connect #:server "db.mysite.com"
+    [(mysql-connect #:server "db.mysite.com"
                     #:port 3306
                     #:database "webappdb"
                     #:user "webapp"
                     #:password "ultra5ecret")
      (new connection%)]
-    [(mysql:connect #:user "me"
+    [(mysql-connect #:user "me"
                     #:database "me"
                     #:password "icecream")
      (new connection%)]
-    [(mysql:connect @code:comment{Typical socket path on some MySQL configurations}
+    [(mysql-connect @code:comment{Typical socket path on some MySQL configurations}
                     #:socket "/var/run/mysqld/mysqld.sock"
                     #:user "me"
                     #:database "me")

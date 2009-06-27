@@ -3,7 +3,9 @@
 @(require scribble/manual
           scribble/eval
           scribble/struct
-          scheme/sandbox)
+          scheme/sandbox
+          (planet cce/scheme:3)
+          "config.ss")
 @(require (for-label scheme/base)
           (for-label "../main.ss"))
 
@@ -21,7 +23,7 @@ Replace these values with the appropriate values for your
 configuration:
 @schemeinput[
   (define cx
-    (postgresql:connect #:user "ryan"
+    (postgresql-connect #:user "ryan"
                         #:database "ryan"
                         #:password (getenv "DBPASSWORD")))
 ]

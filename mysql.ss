@@ -5,5 +5,5 @@
 #lang scheme/base
 (require "generic/main.ss"
          (prefix-in mysql- "mysql/main.ss"))
-(provide (all-defined-out "generic/main.ss")
-         (all-defined-out "mysql/main.ss"))
+(provide (all-from-out "generic/main.ss")
+         (all-from-out "mysql/main.ss"))

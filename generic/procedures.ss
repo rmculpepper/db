@@ -6,7 +6,7 @@
 (require scheme/class)
 
 (define-syntax-rule (defproc* def ...)
-  (begin (defproc def) ...))
+  (begin (defproc . def) ...))
 (define-syntax defproc
   (syntax-rules ()
     [(_ [proc method] . formals)
@@ -16,7 +16,7 @@
     [(_ proc . formals)
      (defproc [proc proc] . formals)]))
 
-(defprocs
+(defproc*
   (query stmt)
   (query-multiple stmts)
   ([query-exec exec] . stmts)

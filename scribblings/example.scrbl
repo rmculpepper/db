@@ -20,11 +20,13 @@ backend and perform simple queries.
 
 @schemeinput[
 (require #, @(schememodname/this-package)
-         scheme/class)
+         #, @schememodname[scheme/class])
 ]
 
-Replace these values with the appropriate values for your 
-configuration:
+Replace these values with the appropriate values for your
+configuration (see @scheme[postgresql-connect] for other connection
+examples):
+
 @schemeinput[
   (define cx
     (postgresql-connect #:user "ryan"
@@ -53,7 +55,7 @@ You can use @method[connection:query<%> exec] to perform several queries at once
 
 @schemeinput[
 (send cx #, @qmeth[exec]
-  "insert into the_numbers (n, description) values (1, 'unity')"
+  "insert into the_numbers (n, description) values (1, 'the loneliest number')"
   "insert into the_numbers values (2, 'the loneliest number since the number 1')")
 ]
 
@@ -81,7 +83,9 @@ If you know that a query returns exactly one column, you can use
 
 @(my-interaction
   [(send cx #, @qmeth[query-list] "select description from the_numbers order by n")
-   (list "nothing" "unity" "the loneliest number since the number 1")])
+   (list "nothing"
+         "the loneliest number"
+         "the loneliest number since the number 1")])
 
 If you know that a query returns just a single value (one row, 
 one column), then you get use @method[connection:query<%> query-value].
@@ -97,7 +101,7 @@ query-maybe-row] or @method[connection:query<%> query-maybe-value].
 
 @(my-interaction
   [(send cx #, @qmeth[query-maybe-row] "select * from the_numbers where n = 1")
-   (vector 1 "unity")]
+   (vector 1 "the loneliest number")]
   [(send cx #, @qmeth[query-maybe-row] "select * from the_numbers where n = 5")
    #f])
 
@@ -194,7 +198,7 @@ Usually, you must be inside of a transaction to create a cursor.
 ]
 @(my-interaction
   [(send cx #, @qmeth[query-row] "fetch 1 in MC")
-   (vector 1 "unity")])
+   (vector 1 "the loneliest number")])
 @schemeinput[
 (send cx #, @qmeth[exec]
   "close MC"

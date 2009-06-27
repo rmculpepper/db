@@ -4,13 +4,28 @@
 
 #lang scheme/base
 (require scheme/class
+         scheme/contract
          scheme/tcp
          "generic/main.ss"
          "generic/socket.ss"
          "postgresql/connection.ss"
          "postgresql/dbsystem.ss")
-(provide connect
-         dbsystem)
+(provide/contract
+ [connect
+  (->* (#:user string?
+        #:database string?)
+       (#:password (or/c string? false/c)
+        #:server (or/c string? false/c)
+        #:port (or/c exact-positive-integer? false/c)
+        #:socket (or/c string? path? false/c (symbols 'auto))
+        #:input-port (or/c input-port? false/c)
+        #:output-port (or/c output-port? false/c)
+        #:allow-cleartext-password? boolean?
+        #:ssl (symbols 'yes 'no 'optional)
+        #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
+        #:mixin any/c)
+       any/c)])
+(provide dbsystem)
 
 (define (connect #:user user
                  #:database database
@@ -52,3 +67,14 @@
                (send c attach-to-ports in out)))])
     (send c start-connection-protocol database user password)
     c))
+
+(define socket-paths
+  '("/var/run/postgresql/.s.PGSQL.5432"))
+
+(define (socket-path socket)
+  (if (eq? socket 'auto)
+      (or (for/or ([path socket-paths])
+            (and (file-exists? path) path))
+          (error 'postgresql:connect
+                 "automatic socket path search failed"))
+      socket))

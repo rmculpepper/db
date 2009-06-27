@@ -3,7 +3,7 @@
 (require "interfaces.ss"
          "signatures.ss"
          "sql-data.ss")
-(provide connection<%>
+(provide connection:admin<%>
          connection:query<%>
          connection:query/prepare<%>
 
@@ -25,6 +25,4 @@
          srfi-date->sql-time
          srfi-date->sql-time-tz
          srfi-date->sql-timestamp
-         srfi-date->sql-timestamp-tz
-
-         database^)
+         srfi-date->sql-timestamp-tz)

@@ -1,16 +1,29 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2009 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
 #lang scheme/base
-(require scheme/class
+(require scheme/contract
+         scheme/class
          scheme/tcp
          "generic/main.ss"
          "generic/socket.ss"
          "mysql/connection.ss"
          "mysql/dbsystem.ss")
-(provide connect
-         dbsystem)
+(provide/contract
+ [connect
+  (->* (#:user string?
+        #:database string?)
+       (#:password (or/c string? false/c)
+        #:server (or/c string? false/c)
+        #:port (or/c exact-positive-integer? false/c)
+        #:socket (or/c string? path? false/c (symbols 'auto))
+        #:input-port (or/c input-port? false/c)
+        #:output-port (or/c output-port? false/c)
+        #:allow-cleartext-password? boolean?
+        #:mixin any/c)
+       any/c)])
+(provide dbsystem)
 
 (define (connect #:user user
                  #:database database
@@ -21,8 +34,6 @@
                  #:input-port [input-port #f]
                  #:output-port [output-port #f]
                  #:allow-cleartext-password? [allow-cleartext-password? #f]
-                 #:ssl [ssl 'no]
-                 #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
                  #:mixin [mixin values])
   (let ([connection-options
          (+ (if (or server port) 1 0)
@@ -37,11 +48,10 @@
     (unless (and input-port output-port)
       (raise-user-error 'connect
                         "must give input-port and output-port arguments together")))
-  (let ([c (new (mixin connection%)
-                #| (allow-cleartext-password? allow-cleartext-password?) |#)])
-    #| (send c set-ssl-options ssl ssl-encrypt) |#
+  (let ([c (new (mixin connection%))])
     (cond [socket
-           (let-values ([(in out) (unix-socket-connect socket)])
+           (let-values ([(in out)
+                         (unix-socket-connect (socket-path socket))])
              (send c attach-to-ports in out))]
           [input-port
            (send c attach-to-port input-port output-port)]
@@ -52,3 +62,14 @@
                (send c attach-to-ports in out)))])
     (send c start-connection-protocol database user password)
     c))
+
+(define socket-paths
+  '("/var/run/mysqld/mysqld.sock"))
+
+(define (socket-path socket)
+  (if (eq? socket 'auto)
+      (or (for/or ([path socket-paths])
+            (and (file-exists? path) path))
+          (error 'postgresql:connect
+                 "automatic socket path search failed"))
+      socket))

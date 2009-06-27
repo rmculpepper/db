@@ -117,6 +117,13 @@
                         sql
                         (mk-folding-collector base f))))
 
+    ;; query-rows : Statement -> (listof (vectorof 'a))
+    (define/public-final (query-rows sql)
+      (Recordset-data
+       (query/recordset 'query-rows
+                        sql
+                        vectorlist-collector)))
+
     ;; query-list : Statement -> (listof 'a)
     ;; Expects to get back a recordset with one field per row.
     (define/public-final (query-list sql)
@@ -210,6 +217,7 @@
   (mixin (primitive-query/prepare<%> connection:query<%>) 
          (connection:query/prepare<%>)
     (inherit exec
+             query-rows
              query-list
              query-row
              query-maybe-row
@@ -240,6 +248,7 @@
              (lambda args (method (bind-prepared-statement pst args) arg ...))))]))
 
     (prepare-query-method prepare-exec exec)
+    (prepare-query-method prepare-query-rows query-rows)
     (prepare-query-method prepare-query-list query-list
                           [#:check check-results/one-column])
     (prepare-query-method prepare-query-row query-row
@@ -278,7 +287,7 @@
 ;; primitive-query-base-mixin
 ;; Abstract method 'query*/no-conversion'
 (define primitive-query-base-mixin
-  (mixin (connection<%>) (primitive-query<%>)
+  (mixin (connection:admin<%>) (primitive-query<%>)
     (inherit get-system)
     (super-new)
 

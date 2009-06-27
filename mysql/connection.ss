@@ -28,7 +28,7 @@
 ;;   (make-MySQLPreparedStatement int int
 ;;                                int (list-of FieldInfo)
 ;;                                int (list-of FieldInfo)
-;;                                (weak-box connection<%>))
+;;                                (weak-box connection))
 (define-struct (MySQLPreparedStatement PreparedStatement)
   (id params paraminfos fields fieldinfos wcx))
 
@@ -133,7 +133,7 @@
 
 ;; mysql-base%
 (define mysql-base%
-  (class* object% (connection<%> mysql-base<%>)
+  (class* object% (connection:admin<%> mysql-base<%>)
     (init-field [backend-link disconnected-backend-link])
     (super-new)
 

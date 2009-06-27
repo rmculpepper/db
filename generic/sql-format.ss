@@ -54,11 +54,11 @@
 
 (define (convert-to-dbsystem obj)
   (cond [(is-a? obj dbsystem<%>) obj]
-        [(is-a? obj connection<%>)
+        [(is-a? obj connection:admin<%>)
          (send obj get-system)]
         [else
          (raise-type-error 'concat-sql
-                           "instance of connection<%> or dbsystem<%>"
+                           "instance of connection:admin<%> or dbsystem<%>"
                            obj)]))
 
 (define-syntax (interpret-spec stx)

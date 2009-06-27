@@ -10,8 +10,7 @@
           (for-label "../main.ss"))
 
 @title{Connecting to a server}
-
-@defmodule/this-package[]
+@declare-exporting/this-package[]
 
 @section{Connecting to a PostgreSQL server}
 
@@ -26,7 +25,7 @@ Use the following procedure to create a connection:
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
                   [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
-         (and/c (is-a/c connection<%>)
+         (and/c (is-a/c connection:admin<%>)
                 (is-a/c connection:query<%>)
                 (is-a/c connection:query/prepare<%>))]{
 
@@ -95,7 +94,7 @@ Use the following procedure to create a connection:
                   [#:socket socket (or/c path? string? bytes? false/c) #f]
                   [#:password password (or/c string? false/c) #f]
                   [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
-         (and/c (is-a/c connection<%>)
+         (and/c (is-a/c connection:admin<%>)
                 (is-a/c connection:query<%>)
                 (is-a/c connection:query/prepare<%>))]{
 

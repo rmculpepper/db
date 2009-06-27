@@ -31,7 +31,7 @@
 ;;   (make-PostgresPreparedStatement number
 ;;                                   string
 ;;                                   (list-of number)
-;;                                   (weak-box connection<%>))
+;;                                   (weak-box connection))
 (define-struct (PostgresPreparedStatement PreparedStatement)
   (name param-types wcx))
 
@@ -170,7 +170,7 @@
 
 ;; base%
 (define base%
-  (class* object% (connection<%> base<%>)
+  (class* object% (connection:admin<%> base<%>)
     ;; protocol : protocol3
     (init-field [protocol disconnected-backend-link])
     (super-new)

@@ -5,26 +5,167 @@
 #lang scheme/base
 (require scheme/class)
 
-(provide (struct-out SimpleResult)
+(provide connection:admin<%>
+         connection:query<%>
+         connection:query/prepare<%>
+
+         dbsystem<%>
+
+         (struct-out SimpleResult)
          (struct-out Recordset)
          (struct-out FieldInfo)
 
          (struct-out PreparedStatement)
          (struct-out StatementBinding)
 
-         dbsystem<%>
-
          backend-link<%>
          backend-link<%>/sub
 
-         connection<%>
          connector<%>
          ssl-connector<%>
          primitive-query<%>
-         primitive-query/prepare<%>
+         primitive-query/prepare<%>)
 
-         connection:query<%>
-         connection:query/prepare<%>)
+;; ==== Connection Interfaces
+
+;; connection<%>
+(define connection:admin<%>
+  (interface ()
+    ;; connected? : -> boolean
+    connected?
+
+    ;; disconnect : -> void
+    disconnect
+
+    ;; get-system : -> (is-a/c dbsystem<%>)
+    get-system
+    ))
+
+;; connection:query<%>
+(define connection:query<%>
+  (interface ()
+    ;; query : Statement -> QueryResult
+    query
+
+    ;; query-multiple : (list-of Statement) -> (list-of QueryResult)
+    query-multiple
+
+    ;; exec : Statement ... -> void
+    exec
+
+    ;; query-rows : Statement -> (listof (vectorof value))
+    query-rows
+
+    ;; query-list : Statement -> (list-of value)
+    query-list
+
+    ;; query-row : Statement -> (vector-of value)
+    query-row
+
+    ;; query-maybe-row : Statement -> (vector-of value) or #f
+    query-maybe-row
+
+    ;; query-value : Statement -> value
+    query-value
+
+    ;; query-maybe-value : Statement -> value or #f
+    query-maybe-value
+
+    ;; map : Statement (value ... -> a) -> (list-of a)
+    map
+
+    ;; for-each : Statement (value ... -> void) -> void
+    for-each
+
+    ;; mapfilter : Statement (value ... -> a) (value ... -> boolean)
+    ;;           -> (list-of a)
+    mapfilter
+
+    ;; fold : Statement (a value ... -> a) a -> a
+    fold))
+
+;; connection:query/prepare<%>
+(define connection:query/prepare<%>
+  (interface (connection:query<%>)
+    ;; prepare : Preparable -> PreparedStatement
+    prepare
+
+    ;; prepare-multiple : (list-of Preparable) -> (list-of PreparedStatement)
+    prepare-multiple
+
+    ;; bind-prepared-statement : PreparedStatement (list-of param) -> Statement
+    bind-prepared-statement
+
+    ;; prepare-exec : Preparable -> datum ... -> void
+    prepare-exec
+
+    ;; prepare-query-rows : Preparable -> datum ... -> void
+    prepare-query-rows
+
+    ;; prepare-query-list : Preparable -> datum ... -> (list-of value)
+    prepare-query-list
+
+    ;; prepare-query-row : Preparable -> datum ... -> (vector-of value)
+    prepare-query-row
+
+    ;; prepare-query-maybe-row : Preparable -> datum ... -> (vectorof value) or #f
+    prepare-query-maybe-row
+
+    ;; prepare-query-value : Preparable -> datum ... -> value
+    prepare-query-value
+
+    ;; prepare-query-maybe-value : Preparable -> datum ... -> value or #f
+    prepare-query-maybe-value
+
+    ;; prepare-map : Preparable ('a ... -> 'b) -> datum ... -> (list-of 'b)
+    prepare-map
+
+    ;; prepare-for-each : Preparable ('a ... -> void) -> datum ... -> void
+    prepare-for-each
+
+    ;; prepare-mapfilter : Preparable ('a ... -> 'b) ('a ... -> boolean)
+    ;;                  -> datum ... -> (list-of 'b)
+    prepare-mapfilter
+
+    ;; prepare-fold : Preparable ('b 'a ... -> 'b) 'b -> datum ... -> 'b
+    prepare-fold))
+
+;; ==== DBSystem Interface
+
+;; dbsystem<%>
+;; Represents brand of database system, SQL dialect, etc
+(define dbsystem<%>
+  (interface ()
+    ;; get-short-name : -> symbol
+    get-short-name
+
+    ;; get-description : -> string
+    get-description
+
+    ;; typeid->type : TypeID -> symbol
+    typeid->type
+
+    ;; typealias->type : TypeAlias -> symbol
+    typealias->type
+
+    ;; get-known-types : #:can-read? [bool #t] #:can-write? [bool #t]
+    ;;                -> (listof symbol)
+    get-known-types
+
+    ;; get-type-reader : symbol #:options [any #f] -> (string -> any)
+    get-type-reader
+
+    ;; get-type-writer : symbol #:options [any #f] -> (string -> any)
+    get-type-writer
+
+    ;; sql:escape-name : string #:preserve-case [boolean #f] -> string
+    sql:escape-name
+
+    ;; sql:literal-expression : string/symbol any -> string
+    ;; Constructs SQL expression evaluating to given value
+    sql:literal-expression))
+
+;; ==== Auxiliary Interfaces & Structures
 
 ;; A PreparedStatement is:
 ;;   (make-PreparedStatement number/#f)
@@ -60,19 +201,6 @@
 ;;  - string
 
 ;; A Collector = RowDescription boolean -> b (b a ... -> b) (b -> c) Header
-
-;; connection<%>
-(define connection<%>
-  (interface ()
-    ;; connected? : -> boolean
-    connected?
-
-    ;; disconnect : -> void
-    disconnect
-
-    ;; get-system : -> (is-a/c dbsystem<%>)
-    get-system
-    ))
 
 ;; backend-link<%>
 (define backend-link<%>
@@ -147,119 +275,3 @@
     bind-prepared-statement
     ))
 
-;; connection:query<%>
-(define connection:query<%>
-  (interface ()
-    ;; query : Statement -> QueryResult
-    query
-
-    ;; query-multiple : (list-of Statement) -> (list-of QueryResult)
-    query-multiple
-
-    ;; exec : Statement ... -> void
-    exec
-
-    ;; query-list : Statement -> (list-of value)
-    query-list
-
-    ;; query-row : Statement -> (vector-of value)
-    query-row
-
-    ;; query-maybe-row : Statement -> (vector-of value) or #f
-    query-maybe-row
-
-    ;; query-value : Statement -> value
-    query-value
-
-    ;; query-maybe-value : Statement -> value or #f
-    query-maybe-value
-
-    ;; map : Statement (value ... -> a) -> (list-of a)
-    map
-
-    ;; for-each : Statement (value ... -> void) -> void
-    for-each
-
-    ;; mapfilter : Statement (value ... -> a) (value ... -> boolean)
-    ;;           -> (list-of a)
-    mapfilter
-
-    ;; fold : Statement (a value ... -> a) a -> a
-    fold))
-
-;; connection:query/prepare<%>
-(define connection:query/prepare<%>
-  (interface (connection:query<%>)
-    ;; prepare : Preparable -> PreparedStatement
-    prepare
-
-    ;; prepare-multiple : (list-of Preparable) -> (list-of PreparedStatement)
-    prepare-multiple
-
-    ;; bind-prepared-statement : PreparedStatement (list-of param) -> Statement
-    bind-prepared-statement
-
-    ;; prepare-exec : Preparable -> datum ... -> void
-    prepare-exec
-
-    ;; prepare-query-list : Preparable -> datum ... -> (list-of value)
-    prepare-query-list
-
-    ;; prepare-query-row : Preparable -> datum ... -> (vector-of value)
-    prepare-query-row
-
-    ;; prepare-query-maybe-row : Preparable -> datum ... -> (vector-of value) or #f
-    prepare-query-maybe-row
-
-    ;; prepare-query-value : Preparable -> datum ... -> value
-    prepare-query-value
-
-    ;; prepare-query-maybe-value : Preparable -> datum ... -> value or #f
-    prepare-query-maybe-value
-
-    ;; prepare-map : Preparable ('a ... -> 'b) -> datum ... -> (list-of 'b)
-    prepare-map
-
-    ;; prepare-for-each : Preparable ('a ... -> void) -> datum ... -> void
-    prepare-for-each
-
-    ;; prepare-mapfilter : Preparable ('a ... -> 'b) ('a ... -> boolean)
-    ;;                  -> datum ... -> (list-of 'b)
-    prepare-mapfilter
-
-    ;; prepare-fold : Preparable ('b 'a ... -> 'b) 'b -> datum ... -> 'b
-    prepare-fold))
-
-
-;; dbsystem<%>
-;; Represents brand of database system, SQL dialect, etc
-(define dbsystem<%>
-  (interface ()
-    ;; get-short-name : -> symbol
-    get-short-name
-
-    ;; get-description : -> string
-    get-description
-
-    ;; typeid->type : TypeID -> symbol
-    typeid->type
-
-    ;; typealias->type : TypeAlias -> symbol
-    typealias->type
-
-    ;; get-known-types : #:can-read? [bool #t] #:can-write? [bool #t]
-    ;;                -> (listof symbol)
-    get-known-types
-
-    ;; get-type-reader : symbol #:options [any #f] -> (string -> any)
-    get-type-reader
-
-    ;; get-type-writer : symbol #:options [any #f] -> (string -> any)
-    get-type-writer
-
-    ;; sql:escape-name : string #:preserve-case [boolean #f] -> string
-    sql:escape-name
-
-    ;; sql:literal-expression : string/symbol any -> string
-    ;; Constructs SQL expression evaluating to given value
-    sql:literal-expression))

@@ -17,21 +17,3 @@
  (define package-min (this-package-version-min))
  (define package
    `(,package-owner ,package-name ,package-maj ,package-min)))
-
-(define-syntax (thispackagemodname stx)
-  (syntax-case stx ()
-    [(_ mod)
-     #`(schememodname (planet mod #,package))]))
-
-#;
-(define-syntax (defmodule/this-package stx)
-  (syntax-case stx ()
-    [(_ mod)
-     #`(defmodule (planet mod #,package))]))
-
-#;
-(define-syntax (declare-exporting/this-package stx)
-  (syntax-case stx ()
-    [(_ mod)
-     #`(declare-exporting (planet mod #,package))]))
-

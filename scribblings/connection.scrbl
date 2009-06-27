@@ -18,14 +18,22 @@
    (interaction #:eval the-eval (eval:alts example result) ...))
 
 @title{Connection API}
+@declare-exporting/this-package[]
 
-@defmodule/this-package["generic/main"]
+Connection methods are divided into three interfaces:
+@scheme[connection:admin<%>], @scheme[connection:query<%>], and
+@scheme[connection:query/prepare<%>]. The connections for PostgreSQL
+and MySQL servers support all three interfaces.
+
+This section also documents several auxiliary interfaces and data
+types.
 
 @section{Administrative methods}
 
-@definterface[connection<%> ()]{
+@definterface[connection:admin<%> ()]{
 
-A connection contains the following administrative methods:
+This interface contains a connection's administrative methods.
+
 @defmethod[(disconnect)
            void?]{
 Disconnects from the server.
@@ -45,7 +53,7 @@ the connection.
 
 @definterface[dbsystem<%> ()]{
 
-Objects of this interface represent information about particular
+This interface provides access to information about particular
 database systems, their SQL dialects, and details about the database
 package's implementation of their protocols.
 
@@ -109,13 +117,15 @@ Represents the name of a column.
 
 @definterface[connection:query<%> ()]{
 
+This interface contains a connection's main query methods.
+
 @defmethod[(query [stmt (unsyntax @techlink{Statement})])
            (unsyntax @techlink{QueryResult})]
 @defmethod[(query-multiple [stmts (listof (unsyntax @techlink{Statement}))])
            (listof (unsyntax @techlink{QueryResult}))]{
 
   Executes queries, returning structures that describe the
-  results. Unlike the high-level query methods,
+  results. Unlike more specialized query methods,
   @method[connection:query<%> query-multiple] supports a mixture of
   recordset-returning queries and effect-only queries.
 
@@ -141,18 +151,25 @@ Represents the name of a column.
 
 }
 
+@defmethod[(query-rows [stmt (unsyntax @techlink{Statement})])
+           (listof (vectorof _field))]{
+
+  Executes a SQL query which must return a recordset. Returns the list
+  of rows (as vectors) from the query.
+}
+
 @defmethod[(query-list [stmt (unsyntax @techlink{Statement})])
            (listof _field)]{
 
   Executes a SQL query which must return a recordset of exactly one
-  column; returns the list of values from the query.
+  column. Returns the list of values from the query.
 }
 
 @defmethod[(query-row [stmt (unsyntax @techlink{Statement})])
            (vectorof _field)]{
 
   Executes a SQL query which must return a recordset of exactly one
-  row; returns its (single) row result as a vector.
+  row. Returns its (single) row result as a vector.
 }
 
 @defmethod[(query-maybe-row [stmt (unsyntax @techlink{Statement})])
@@ -166,7 +183,7 @@ Represents the name of a column.
            _field]{
 
   Executes a SQL query which must return a recordset of exactly one
-  column and exactly one row; returns its single value result.
+  column and exactly one row. Returns its single value result.
 }
 
 @defmethod[(query-maybe-value [stmt (unsyntax @techlink{Statement})])
@@ -284,6 +301,11 @@ resulting procedure should be called with zero arguments.
   @method[connection:query/prepare<%> prepare-exec] permits only a
   single statement.
 
+}
+
+@defmethod[(prepare-query-rows [prep string?])
+           (_param _... -> (listof (vectorof _field)))]{
+  Prepared version of @method[connection:query<%> query-rows].
 }
 
 @defmethod[(prepare-query-list [prep string?])

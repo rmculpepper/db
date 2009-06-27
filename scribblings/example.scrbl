@@ -1,23 +1,11 @@
 #lang scribble/doc
 
-@(require scribble/manual)
-@(require scribble/eval)
-@(require scribble/struct)
-@(require scheme/sandbox)
-
+@(require scribble/manual
+          scribble/eval
+          scribble/struct
+          scheme/sandbox)
 @(require (for-label scheme/base)
-          (for-label "../generic/main.ss")
           (for-label "../main.ss"))
-
-@(define the-eval (make-base-eval))
-@(interaction-eval #:eval the-eval
-                   (require scheme/class
-                            "generic/main.ss"
-                            "main.ss"))
-@(define-syntax-rule (examples/results [example result] ...)
-   (examples #:eval the-eval (eval:alts example result) ...))
-@(define-syntax-rule (my-interaction [example result] ...)
-   (interaction #:eval the-eval (eval:alts example result) ...))
 
 @title{Annotated example}
 
@@ -25,9 +13,8 @@ The following program demonstrates how to connect to a PostgreSQL
 backend and perform simple queries.
 
 @schemeinput[
-(require scheme/class
-         "generic/main.ss"
-         "main.ss")
+(require #, @(schememodname/this-package)
+         scheme/class)
 ]
 
 Replace these values with the appropriate values for your 
@@ -44,7 +31,7 @@ configuration:
 We'll do all our work with a temporary table. It will be dropped as
 soon as we disconnect.
 
-Use the @method[query<%> exec] method when you want to execute a SQL
+Use the @method[connection:query<%> exec] method when you want to execute a SQL
 statement that doesn't return a recordset.
 
 @schemeinput[
@@ -55,7 +42,7 @@ statement that doesn't return a recordset.
 (send cx exec "insert into the_numbers values (0, 'nothing')")
 ]
 
-You can use @method[query<%> exec] to perform several queries at once.
+You can use @method[connection:query<%> exec] to perform several queries at once.
 
 @schemeinput[
 (send cx exec
@@ -63,7 +50,7 @@ You can use @method[query<%> exec] to perform several queries at once.
   "insert into the_numbers values (2, 'the loneliest number since the number 1')")
 ]
 
-The @method[query<%> query] method gives you the most information, but
+The @method[connection:query<%> query] method gives you the most information, but
 it's the least pleasant to use.
 
 @(my-interaction
@@ -75,21 +62,21 @@ it's the least pleasant to use.
       (vector 0 "nothing")))])
 
 If you know a query returns exactly one row, you can use
-@method[query<%> query-row] to get just that row.
+@method[connection:query<%> query-row] to get just that row.
 
 @(my-interaction
   [(send cx query-row "select * from the_numbers where n = 0")
    (vector 0 "nothing")])
 
 If you know that a query returns exactly one column, you can use
-@method[query<%> query-list] to get just the list of values.
+@method[connection:query<%> query-list] to get just the list of values.
 
 @(my-interaction
   [(send cx query-list "select description from the_numbers order by n")
    (list "nothing" "unity" "the loneliest number since the number 1")])
 
 If you know that a query returns just a single value (one row, 
-one column), then you get use @method[query<%> query-value].
+one column), then you get use @method[connection:query<%> query-value].
 
 @(my-interaction
   [(send cx query-value "select count(*) from the_numbers")
@@ -97,8 +84,8 @@ one column), then you get use @method[query<%> query-value].
   [(send cx query-value "select now()")
    (make-sql-timestamp 2008 4 1 12 34 56 0 #f)])
 
-If you aren't sure whether a row exists, you can use @method[query<%>
-query-maybe-row] or @method[query<%> query-maybe-value].
+If you aren't sure whether a row exists, you can use @method[connection:query<%>
+query-maybe-row] or @method[connection:query<%> query-maybe-value].
 
 @(my-interaction
   [(send cx query-maybe-row "select * from the_numbers where n = 1")
@@ -106,14 +93,14 @@ query-maybe-row] or @method[query<%> query-maybe-value].
   [(send cx query-maybe-row "select * from the_numbers where n = 5")
    #f])
 
-In the second example above, the @method[query<%> query-row] method
+In the second example above, the @method[connection:query<%> query-row] method
 would have raised an error.
 
 @(my-interaction
   [(send cx query-maybe-value "select description from the_numbers where n = 5")
    #f])
 
-The @method[query<%> query-value] method would have raised an error
+The @method[connection:query<%> query-value] method would have raised an error
 here, too.
 
 Errors in queries are generally non-fatal.

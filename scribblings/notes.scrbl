@@ -21,7 +21,9 @@ the server, not the processing of returned results. Clients requiring
 synchronized processing of query results must implement the
 synchronization themselves.
 
-@section[#:tag "connecting-to-server"]{Connecting to a Server}
+@section{PostgreSQL-Specific Notes}
+
+@subsection[#:tag "connecting-to-server"]{Connecting to a Server}
 
 By default, many PostgreSQL servers only listen on local domain
 sockets. Support is provided for communication over local domain
@@ -37,7 +39,7 @@ If local socket communication is not available, the server must be
 reconfigured to listen to a TCP port and restarted. See the PostgreSQL
 manual for information on doing this.
 
-@section{Passwords and Authentication}
+@subsection{Passwords and Authentication}
 
 PostgreSQL also comes with a configuration file (@tt{pg_hba.conf})
 which lists accepted authentication methods. It is sometimes necessary
@@ -55,3 +57,15 @@ support other encodings. If the server changes the client
 encoding---for example, in response to a @tt{SET} statement issued by
 the user---the connection automatically disconnects and raises an
 error.
+
+@section{MySQL-Specific Notes}
+
+The implementation of the MySQL protocol is incomplete. Here are some
+known bugs and issues:
+
+@itemize{
+
+@item{SQL types. The support for MySQL types is not as complete as
+that for PostgreSQL types.}
+
+}

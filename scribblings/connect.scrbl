@@ -5,9 +5,9 @@
           scribble/struct
           scheme/sandbox
           (planet cce/scheme:3)
-          (for-label scheme/base)
-          (for-label "../generic/main.ss")
-          (for-label "../main.ss"))
+          (for-label scheme/base
+                     scheme/contract
+                     "../main.ss"))
 
 @title{Connecting to a server}
 @declare-exporting/this-package[]
@@ -20,7 +20,7 @@ Use the following procedure to create a connection:
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 5432]
-                  [#:socket socket (or/c path? string? bytes? false/c) #f]
+                  [#:socket socket (or/c path? string? false/c (symbols 'auto)) #f]
                   [#:password password (or/c string? false/c) #f]
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
@@ -41,9 +41,11 @@ Use the following procedure to create a connection:
 
   To connect via a local socket, specify the socket path as the
   @scheme[socket] argument. You must not supply the @scheme[socket]
-  argument if you have also supplied either of the TCP arguments. See
-  @secref{connecting-to-server} for notes on finding the socket path.
-  Sockets are only available under Linux (x86) and Mac OS X.
+  argument if you have also supplied either of the TCP arguments. If
+  @scheme['auto] is supplied as the socket path, the socket is
+  searched for in a standard list of locations. See also
+  @secref{connecting-to-server} for notes the socket path.  Sockets
+  are only available under Linux (x86) and Mac OS X.
 
   If the server requests password authentication, the
   @scheme[password] argument must be present; otherwise an exception
@@ -65,21 +67,22 @@ Use the following procedure to create a connection:
 
   If the connection cannot be made, an exception is raised.
 
-  @(schemeinput
-    (postgresql:connect #:server "db.mysite.com"
-             #:port 5432
-             #:database "webappdb"
-             #:user "webapp"
-             #:password "ultra5ecret"))
-  @(schemeinput
-    (postgresql:connect #:user "me"
-             #:database "me"
-             #:password "icecream"))
-  @(schemeinput
-    (postgresql:connect @code:comment{Typical socket path on some PostgreSQL configurations}
-             #:socket "/var/run/postgresql/.s.PGSQL.5432"
-             #:user "me"
-             #:database "me"))
+  @(examples/results
+    [(postgresql:connect #:server "db.mysite.com"
+                         #:port 5432
+                         #:database "webappdb"
+                         #:user "webapp"
+                         #:password "ultra5ecret")
+     (new connection%)]
+    [(postgresql:connect #:user "me"
+                         #:database "me"
+                         #:password "icecream")
+     (new connection%)]
+    [(postgresql:connect @code:comment{Typical socket path on some PostgreSQL configurations}
+                         #:socket "/var/run/postgresql/.s.PGSQL.5432"
+                         #:user "me"
+                         #:database "me")
+     (new connection%)])
 }
 
 
@@ -91,7 +94,7 @@ Use the following procedure to create a connection:
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 3306]
-                  [#:socket socket (or/c path? string? bytes? false/c) #f]
+                  [#:socket socket (or/c path? string? false/c (symbols 'auto)) #f]
                   [#:password password (or/c string? false/c) #f]
                   [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
          (and/c (is-a/c connection:admin<%>)
@@ -104,20 +107,21 @@ Use the following procedure to create a connection:
 
   The default port for MySQL databases is 3306.
 
-  @(schemeinput
-    (mysql:connect #:server "db.mysite.com"
-              #:port 3306
-              #:database "webappdb"
-              #:user "webapp"
-              #:password "ultra5ecret"))
-  @(schemeinput
-    (mysql:connect #:user "me"
-              #:database "me"
-              #:password "icecream"))
-  @(schemeinput
-    (mysql:connect @code:comment{Typical socket path on some MySQL configurations}
-              #:socket "/var/run/mysqld/mysqld.sock"
-              #:user "me"
-              #:database "me"))
+  @(examples/results
+    [(mysql:connect #:server "db.mysite.com"
+                    #:port 3306
+                    #:database "webappdb"
+                    #:user "webapp"
+                    #:password "ultra5ecret")
+     (new connection%)]
+    [(mysql:connect #:user "me"
+                    #:database "me"
+                    #:password "icecream")
+     (new connection%)]
+    [(mysql:connect @code:comment{Typical socket path on some MySQL configurations}
+                    #:socket "/var/run/mysqld/mysqld.sock"
+                    #:user "me"
+                    #:database "me")
+     (new connection%)])
 
 }

@@ -2,7 +2,8 @@
 #lang scheme/base
 (require "interfaces.ss"
          "signatures.ss"
-         "sql-data.ss")
+         "sql-data.ss"
+         "procedures.ss")
 (provide connection:admin<%>
          connection:query<%>
          connection:query/prepare<%>
@@ -25,4 +26,6 @@
          srfi-date->sql-time
          srfi-date->sql-time-tz
          srfi-date->sql-timestamp
-         srfi-date->sql-timestamp-tz)
+         srfi-date->sql-timestamp-tz
+
+         (all-from-out "procedures.ss"))

@@ -3,11 +3,9 @@
 ;; COPYRIGHT for terms).
 
 #lang scheme/base
-(require (prefix-in postgresql- "postgresql.ss")
-         (prefix-in mysql- "mysql.ss")
-         "generic/main.ss"
-         "generic/procedure.ss")
-(provide postgresql-connect
-         mysql-connect
-         (all-from-out "generic/main.ss")
-         (all-from-out "generic/procedures.ss"))
+(require (prefix-in postgresql- "postgresql/main.ss")
+         (prefix-in mysql- "mysql/main.ss")
+         "generic/main.ss")
+(provide (all-from-out "postgresql/main.ss")
+         (all-from-out "mysql/main.ss")
+         (all-from-out "generic/main.ss"))

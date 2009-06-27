@@ -1,19 +1,9 @@
 #lang scribble/doc
 @(require scribble/manual
-          scribble/eval
           scribble/struct
-          scheme/sandbox
           "config.ss"
           (for-label scheme/base)
           (for-label "../generic/main.ss"))
-@(define the-eval (make-base-eval))
-@(interaction-eval #:eval the-eval
-                   (require scheme/class
-                            "generic/main.ss"))
-@(define-syntax-rule (examples/results [example result] ...)
-   (examples #:eval the-eval (eval:alts example result) ...))
-@(define-syntax-rule (my-interaction [example result] ...)
-   (interaction #:eval the-eval (eval:alts example result) ...))
 
 @title[#:version "1.0"]{database: Database connectivity}
 @author{Ryan Culpepper}

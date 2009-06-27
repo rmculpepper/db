@@ -8,12 +8,14 @@
 @title[#:version "1.0"]{database: Database connectivity}
 @author{Ryan Culpepper}
 
+@section-index["postgresql"]
+@section-index["mysql"]
+@section-index["database"]
+
 This manual documents the database package version 1.0 (PLaneT version
 1 0). This package is the successor to spgsql.
 
 @defmodule/this-package[]
-
-@section-index["postgresql" "postgres" "mysql" "database" "spgsql"]
 
 The database package provides a high-level interface to PostgreSQL and
 MySQL database servers. It does not rely on any locally-installed

@@ -520,7 +520,7 @@
 
 ;; nosupport : string -> string
 (define (nosupport str)
-  (string-append "spgsql does not support " str))
+  (string-append "not supported: " str))
 
 ;; md5password : string string bytes -> string
 ;; Compute the MD5 hash of a password in the form expected by the PostgreSQL 

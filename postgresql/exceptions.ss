@@ -4,19 +4,19 @@
 
 #lang scheme/base
 (require "msg.ss")
-(provide (struct-out exn:spgsql:backend)
+(provide (struct-out exn:fail:backend)
          raise-backend-error)
 
-;; exn:spgsql:backend
+;; exn:fail:backend
 ;; Represents an ErrorResponse sent by the backend.
-(define-struct (exn:spgsql:backend exn:fail:user) (properties))
+(define-struct (exn:fail:backend exn:fail:user) (properties))
 
 ;; raise-backend-error : symbol ErrorResponse -> raises exn
 (define (raise-backend-error function r)
   (define code (cdr (assq 'code (ErrorResponse-properties r))))
   (define message (cdr (assq 'message (ErrorResponse-properties r))))
   (raise 
-   (make-exn:spgsql:backend
+   (make-exn:fail:backend
     (string-append (if function
                        (string-append (symbol->string function) ": ")
                        "")

@@ -3,10 +3,10 @@
 ;; COPYRIGHT for terms).
 
 ;; The following program demonstrates how to connect to a PostgreSQL backend
-;; using spgsql and how to do simple queries on the connection.
+;; perform simple queries on the connection.
 
-(require scheme)
-(require "../spgsql.ss")
+(require scheme
+         "../main.ss")
 
 ;; Replace these values with the appropriate values for your 
 ;; configuration.
@@ -134,35 +134,6 @@ cx
 
 (next-largest2 0)
 ;; => sql-null
-
-;; If you want to construct a query from Scheme data, you should probably 
-;; use a parameterized query.
-
-;; But spgsql still provides a way of constructing SQL strings.
-
-(define (next-largest3 cut-off)
-  (send cx query-value
-        (format-sql "select max(n) from the_numbers where n < ~a"
-                    [int cut-off])))
-
-(next-largest3 4)
-;; => 2
-
-;; Sometimes you want to put things in a SQL string that aren't 
-;; scalars. Here's an example of inserting the field name to be returned.
-
-(send cx query-list
-      (format-sql "select ~a from the_numbers" [#:name "description"]))
-;; => (list "nothing" "unity" "the loneliest number since the number 1")
-
-;; You can also splice in an entire piece of SQL code.
-
-(send cx query-list
-      (format-sql "select n from the_numbers ~a"
-                  [#:sql (if 'order-descending
-                             "order by n desc"
-                             "")]))
-;; => (list 2 1 0)
 
 ;; If you like, you can declare cursors to fetch data incrementally.
 ;; Usually, you must be inside of a transaction to create a cursor.

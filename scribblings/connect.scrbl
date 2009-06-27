@@ -96,8 +96,7 @@ Use the following procedure to create a connection:
                   [#:server server string? "localhost"]
                   [#:port port number? 3306]
                   [#:socket socket (or/c path? string? false/c (symbols 'auto)) #f]
-                  [#:password password (or/c string? false/c) #f]
-                  [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
+                  [#:password password (or/c string? false/c) #f])
          (and/c (is-a/c connection:admin<%>)
                 (is-a/c connection:query<%>)
                 (is-a/c connection:query/prepare<%>))]{

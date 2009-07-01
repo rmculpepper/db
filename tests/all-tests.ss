@@ -7,6 +7,7 @@
          (planet "graphical-ui.ss" ("schematics" "schemeunit.plt" 2 7))
          (planet "text-ui.ss" ("schematics" "schemeunit.plt" 2 7))
          scheme/unit
+         scheme/class
          "../generic/signatures.ss"
          "../postgresql/unit.ss"
          "../mysql/unit.ss"
@@ -52,3 +53,9 @@
 ;; (putenv "DBPASSWORD" ???)
 ;; (test/graphical-ui postgresql:test)
 ;; (test/graphical-ui mysql:test)
+
+#|
+(begin (define-values/invoke-unit postgresql@ (import) (export database^))
+       (define-values/invoke-unit config@ (import database^) (export config^))
+       (define c (connect-and-setup)))
+|#

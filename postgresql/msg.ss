@@ -3,8 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang scheme/base
-(require scheme/port
-         "../generic/sql-data.ss"
+(require "../generic/sql-data.ss"
          "../generic/io.ss"
          "msg-util.ss")
 (provide (all-defined-out))

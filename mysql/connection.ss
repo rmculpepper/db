@@ -288,7 +288,7 @@
               (make-client-authentication-packet
                (desired-capabilities capabilities)
                MAX-PACKET-LENGTH
-               charset
+               'utf8-general-ci ;; charset
                username
                (scramble-password scramble password)
                dbname))
@@ -487,10 +487,12 @@
     ;; bind-prepared-statement : PreparedStatement (list-of value)
     ;;                        -> StatementBinding
     (define/public (bind-prepared-statement pst params)
+      #|
       (printf "wcx = ~s\n"
               (MySQLPreparedStatement-wcx pst))
       (printf "owner = this? : ~s\n"
               (eq? this (weak-box-value (MySQLPreparedStatement-wcx pst))))
+      |#
       (unless (MySQLPreparedStatement? pst)
         (raise-type-error 'bind-prepared-statement "prepared statement" pst))
       (unless (eq? this (weak-box-value (MySQLPreparedStatement-wcx pst)))

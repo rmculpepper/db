@@ -3,8 +3,11 @@
 ;; COPYRIGHT for terms).
 
 #lang scheme/base
-(require (for-syntax scheme/base))
-(provide io:write
+(require (for-syntax scheme/base)
+         scheme/port)
+(provide make-limited-input-port
+
+         io:write
          io:write-int16
          io:write-int32
          io:write-null-terminated-bytes
@@ -42,7 +45,55 @@
          io:read-length-code
          io:read-length-coded-bytes
          io:read-length-coded-string
+
+         ;; ???
          io:read-bytes-to-eof)
+
+(require (rename-in scheme/base
+                    [read-byte read-byte/timeout]
+                    [read-bytes read-bytes/timeout]
+                    [write-byte write-byte/timeout]
+                    [write-bytes write-bytes/timeout]))
+
+#|
+(define (make-limited-input-port port limit [close-orig? #t])
+  (let ([limit limit])
+    (make-input-port
+     (object-name port)
+     (lambda (str)
+       (let ([count (min limit (bytes-length str))])
+         (if (zero? count)
+             eof
+             (let ([n (read-bytes-avail!* str port 0 count)])
+               (define (reduce-limit! n)
+                 (cond [(eq? n 0)
+                        (wrap-evt port (lambda (x) 0))]
+                       [(number? n)
+                        (set! limit (- limit n))
+                        n]
+                       [(evt? n)
+                        (wrap-evt n reduce-limit!)]
+                       [else ;;(or (procedure? n) (eof-object? n))
+                        (set! limit (sub1 limit))
+                        n]))
+               (reduce-limit! n)))))
+     (lambda (str skip progress-evt)
+       (let ([count (max 0 (min (- limit skip) (bytes-length str)))])
+         (if (zero? count)
+             eof
+             (let ([n (peek-bytes-avail!* str skip progress-evt port 0 count)])
+               (if (eq? n 0)
+                   (wrap-evt port (lambda (x) 0))
+                   n)))))
+     (lambda ()
+       (when close-orig?
+         (close-input-port port)))
+     (if (port-provides-progress-evts? port)
+         (lambda () (port-progress-evt port))
+         #f)
+     (lambda (k progress-evt done)
+       (port-commit-peeked k progress-evt done port)))))
+|#
 
 (define-syntax (io:write stx)
   (syntax-case stx ()
@@ -110,31 +161,31 @@
 ;; write-int16 : port integer -> (void)
 ;; Writes a 16-bit integer, network byte order
 (define (io:write-int16 port val)
-  (write-bytes (integer->integer-bytes val 2 #t #t) port))
+  (write-bytes/timeout (integer->integer-bytes val 2 #t #t) port))
 
 ;; write-int32 : port integer -> void
 ;; Writes a 32-bit integer, network byte order
 (define (io:write-int32 port val)
-  (write-bytes (integer->integer-bytes val 4 #t #t) port))
+  (write-bytes/timeout (integer->integer-bytes val 4 #t #t) port))
 
 ;; write-byte : port byte -> void
 (define (io:write-byte port byte)
-  (write-byte byte port))
+  (write-byte/timeout byte port))
 
 ;; write-byte/char : port char -> void
 (define (io:write-byte/char port char)
-  (write-byte (char->integer char) port))
+  (write-byte/timeout (char->integer char) port))
 
 ;; write-bytes : port bytes -> void
 (define (io:write-bytes port bytes)
-  (write-bytes bytes port))
+  (write-bytes/timeout bytes port))
 
 ;; write-length+bytes : port bytes/#f -> void
 ;; #f indicates sql-null, represented as length -1
 (define (io:write-length+bytes port bytes)
   (if bytes
       (begin (io:write-int32 port (bytes-length bytes))
-             (write-bytes bytes port))
+             (write-bytes/timeout bytes port))
       (begin (io:write-int32 port -1))))
 
 ;; write-length+string : port string -> void
@@ -146,24 +197,24 @@
 
 ;; write-null-terminated-bytes : port bytes -> void
 (define (io:write-null-terminated-bytes port bytes)
-  (write-bytes bytes port)
-  (write-byte 0 port))
+  (write-bytes/timeout bytes port)
+  (write-byte/timeout 0 port))
 
 ;; write-null-terminated-string : port string -> void
 (define (io:write-null-terminated-string port string)
   (write-string string port)
-  (write-byte 0 port))
+  (write-byte/timeout 0 port))
 
 ;; write-le-int16
 (define (io:write-le-int16 port n)
-  (write-bytes (integer->integer-bytes n 2 #f #f) port))
+  (write-bytes/timeout (integer->integer-bytes n 2 #f #f) port))
 
 (define (io:write-le-int24 port n)
-  (write-bytes (subbytes (integer->integer-bytes n 4 #f #f) 0 3)
-               port))
+  (write-bytes/timeout (subbytes (integer->integer-bytes n 4 #f #f) 0 3)
+                       port))
 
 (define (io:write-le-int32 port n)
-  (write-bytes (integer->integer-bytes n 4 #f #f) port))
+  (write-bytes/timeout (integer->integer-bytes n 4 #f #f) port))
 
 (define (io:write-le-intN port count n)
   (let loop ([count count] [n n])
@@ -197,17 +248,17 @@
 
 ;; read-int16 : port -> integer
 (define (io:read-int16 port)
-  (integer-bytes->integer (read-bytes 2 port) #t #t))
+  (integer-bytes->integer (read-bytes/timeout 2 port) #t #t))
 
 ;; read-int32 : port -> integer
 (define (io:read-int32 port)
-  (integer-bytes->integer (read-bytes 4 port) #t #t))
+  (integer-bytes->integer (read-bytes/timeout 4 port) #t #t))
 
 ;; read-null-terminated-string : port -> string
 (define (io:read-null-terminated-string port)
   (let [(strport (open-output-bytes))]
     (let loop ()
-      (let ([next (read-byte port)])
+      (let ([next (read-byte/timeout port)])
         (cond [(zero? next)
                (get-output-string strport)]
               [else
@@ -218,7 +269,7 @@
 (define (io:read-null-terminated-bytes port)
   (let [(strport (open-output-bytes))]
     (let loop ()
-      (let ([next (read-byte port)])
+      (let ([next (read-byte/timeout port)])
         (cond [(zero? next)
                (get-output-bytes strport)]
               [else
@@ -227,19 +278,19 @@
 
 ;; read-byte : port -> byte
 (define (io:read-byte port)
-  (read-byte port))
+  (read-byte/timeout port))
 
 ;; read-byte : port-> char
 (define (io:read-byte/char port)
-  (integer->char (read-byte port)))
+  (integer->char (read-byte/timeout port)))
 
 ;; read-bytes-as-bytes : port number -> bytes
 (define (io:read-bytes-as-bytes port n)
-  (read-bytes n port))
+  (read-bytes/timeout n port))
 
 ;; read-bytes-as-string : port -> string
 (define (io:read-bytes-as-string port n)
-  (bytes->string/utf-8 (read-bytes n port)))
+  (bytes->string/utf-8 (read-bytes/timeout n port)))
 
 ;; read-length+bytes : port -> bytes | #f
 ;; As a special case, a "length" of -1 results in #f
@@ -260,16 +311,16 @@
         (io:read-bytes-as-string port len))))
 
 (define (io:read-le-int16 port)
-  (integer-bytes->integer (read-bytes 2 port) #f #f))
+  (integer-bytes->integer (read-bytes/timeout 2 port) #f #f))
 
 (define (io:read-le-int24 port)
   (io:read-le-intN port 3))
 
 (define (io:read-le-int32 port)
-  (integer-bytes->integer (read-bytes 4 port) #f #f))
+  (integer-bytes->integer (read-bytes/timeout 4 port) #f #f))
 
 (define (io:read-le-intN port count)
-  (let ([b (read-bytes count port)])
+  (let ([b (read-bytes/timeout count port)])
     (unless (and (bytes? b) (= count (bytes-length b)))
       (error 'io:read-le-intN "unexpected eof; got ~s" b))
     (let loop ([pos 0])
@@ -279,7 +330,7 @@
           0))))
 
 (define (io:read-length-code port)
-  (let ([first (read-byte port)])
+  (let ([first (read-byte/timeout port)])
     (cond [(<= first 250)
            first]
           [(= first 251)
@@ -294,12 +345,13 @@
 
 (define (io:read-length-coded-bytes port)
   (let ([len (io:read-length-code port)])
-    (and len (read-bytes len port))))
+    (and len (read-bytes/timeout len port))))
 
 (define (io:read-length-coded-string port)
   (let ([b (io:read-length-coded-bytes port)])
     (and b (bytes->string/latin-1 b))))
 
+;; FIXME: weird...
 (define (io:read-bytes-to-eof port)
   (let loop ([acc null])
     (let ([next (read-bytes 1024 port)])

@@ -4,6 +4,10 @@
          "types.ss")
 (provide (all-defined-out))
 
+(define options
+  '#hasheq((real-infinities . #f)
+           (numeric-infinities . #f)))
+
 (define mysql-dbsystem%
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'mysql)
@@ -37,6 +41,12 @@
     (define/public (sql:literal-expression type value
                                            #:options [options null])
       (literal-expression type value))
+
+    (define/public (has-support? option)
+      (let ([v (hash-ref options option 'notfound)])
+        (when (eq? v 'notfound)
+          (error 'has-support? "unknown option: ~e" option))
+        v))
 
     (super-new)))
 

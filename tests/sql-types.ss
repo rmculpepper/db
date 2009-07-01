@@ -13,6 +13,8 @@
          "config.ss")
 (provide sql-types-test@)
 
+(require scheme/gui)
+
 (define-unit sql-types-test@
   (import config^ database^)
   (export test^)
@@ -32,15 +34,31 @@
       [(check-roundtrip c type expr check)
        (begin
          (let ([value expr])
-           (when #t
+           (when #f
              (check (let ([q (format-sql c "select ~a" [type value])])
                       (send c query-value q))
                     value))
-           (when #f ;; only valid Postgreql syntax!
-             (check (let ([q (format "select $1::~a"
-                                     (send dbsystem typealias->type 'type))])
-                      ((send c prepare-query-value q) value))
-                    value))))]))
+           (case (send dbsystem get-short-name)
+             ((postgresql)
+              ;; only valid Postgreql syntax!
+              (check (let ([q (format "select $1::~a"
+                                      (send dbsystem typealias->type 'type))])
+                       ((send c prepare-query-value q) value))
+                     value))
+             ((mysql)
+              (when (eq? 'type 'varchar)
+                (check ((send c prepare-query-value "select ?") value) value))))))]))
+
+  (define (check-string-length c value len)
+    (define psql
+      (case (send dbsystem get-short-name)
+        ((postgresql)
+         "select length($1)")
+        ((mysql)
+         "select char_length(?)")))
+    (when (string? psql)
+      (check-equal? ((send c prepare-query-value psql) value)
+                    (string-length value))))
 
   (define (check-timestamptz-equal? a b)
     (check srfi:time=?
@@ -60,6 +78,12 @@
     (unless writer
       (error 'sql-marshal "no writer for type: ~s (~s)" typealias type))
     (writer s))
+
+  (define (supported? option)
+    (send dbsystem has-support? option))
+
+  (define (halt n)
+    ' (message-box "halt" (format "got to step ~s" n)))
 
   (define test
     (test-suite "SQL types"
@@ -125,6 +149,23 @@
                         -12345678901234567890))
         )
 
+      (test-suite "String escaping"
+        (test-case "tricky varchar"
+          (call-with-connection
+           (lambda (c)
+             (check-roundtrip c varchar (string #\\))
+             (check-roundtrip c varchar (string #\\ #\\))
+             (check-roundtrip c varchar (string #\\ #\')))))
+        (test-case "tricky varchar by length"
+          (call-with-connection
+           (lambda (c)
+             ;; backslash = 92
+             ;; apostrophe = 39
+             (check-string-length c (string #\\) 1)
+             (check-string-length c (string #\\ #\\) 2)
+             (check-string-length c (string #\') 1)
+             (check-string-length c (string #\λ) 1)))))
+
       (test-suite "Roundtrip"
         (type-test-case 'boolean
           (call-with-connection
@@ -150,29 +191,39 @@
              (check-roundtrip c float 1.0)
              (check-roundtrip c float 1.1)
              (check-roundtrip c float -5.8)
-             (check-roundtrip c float +inf.0)
-             (check-roundtrip c float -inf.0)
-             (check-roundtrip c float +nan.0))))
+             (when (supported? 'real-infinities)
+               (check-roundtrip c float +inf.0)
+               (check-roundtrip c float -inf.0)
+               (check-roundtrip c float +nan.0)))))
         (type-test-case 'numeric
           (call-with-connection
            (lambda (c)
              (check-roundtrip c numeric 12345678901234567890)
              (check-roundtrip c numeric #e1234567890.0987654321)
-             (check-roundtrip c numeric +nan.0))))
+             (when (supported? 'numeric-infinities)
+               (check-roundtrip c numeric +nan.0)))))
         (type-test-case 'varchar
           (call-with-connection
            (lambda (c)
+             (halt 1)
              (check-roundtrip c varchar "this is the time to remember")
+             (halt 2)
              (check-roundtrip c varchar "that's the way it is")
+             (halt 3)
              (check-roundtrip c varchar (string #\\))
+             (halt 4)
              (check-roundtrip c varchar (string #\'))
+             (halt 5)
              (check-roundtrip c varchar (string #\\ #\'))
+             (halt 6)
              (check-roundtrip c varchar "λ the ultimate")
+             (halt 7)
              (check-roundtrip c varchar
                               (list->string
                                (build-list 800
                                            (lambda (n)
-                                             (integer->char (add1 n)))))))))
+                                             (integer->char (add1 n))))))
+             (halt 8))))
         (type-test-case 'date
           (call-with-connection
            (lambda (c)
@@ -221,156 +272,3 @@
                               (make-sql-timestamp 1980 08 17 12 34 56 000001000 3600)
                               check-timestamptz-equal?))))
         ))))
-
-;; OLD TEST CASES
-#|
-  ;; POSTGRESQL-specific tests
-
-  (define postgresql-test
-    (test-suite "SQL types"
-      (test-suite "Parsing"
-        (test-case "Parse boolean"
-          (check-eq? (sql-parse 'bool "t") #t)
-          (check-eq? (sql-parse 'bool "f") #f)
-          (check-exn exn? (lambda () (sql-parse 'bool "g"))))
-        (test-case "Parse integer"
-          (check-equal? (sql-parse 'int4 "0") 0)
-          (check-equal? (sql-parse 'int4 "17") 17)
-          (check-exn exn? (lambda () (sql-parse 'int4 "")))
-          (check-exn exn? (lambda () (sql-parse 'int4 "alpha"))))
-        (test-case "Parse float"
-          (check-equal? (sql-parse 'float4 "0.0") 0.0)
-          (check-equal? (sql-parse 'float4 "17.123") 17.123)
-          (check-exn exn? (lambda () (sql-parse 'float4 "")))
-          (check-exn exn? (lambda () (sql-parse 'float4 "alpha"))))
-        (test-case "Parse date"
-          (check-equal? (sql-parse 'date "1980-08-17")
-                        (make-sql-date 1980 08 17)))
-        (test-case "Parse time"
-          (check-equal? (sql-parse 'time "12:34:56")
-                        (make-sql-time 12 34 56 0 #f))
-          (check-equal? (sql-parse 'time "12:34:56.789")
-                        (make-sql-time 12 34 56 789000000 #f))
-          (check-equal? (sql-parse 'time "12:34:56.000789")
-                        (make-sql-time 12 34 56 000789000 #f)))
-        (test-case "Parse timetz"
-          (check-equal? (sql-parse 'timetz "12:34:56+0123")
-                        (make-sql-time 12 34 56 0 4980))
-          (check-equal? (sql-parse 'timetz "12:34:56.789+0123")
-                        (make-sql-time 12 34 56 789000000 4980))
-          (check-equal? (sql-parse 'timetz "12:34:56.000789-0123")
-                        (make-sql-time 12 34 56 000789000 -4980)))
-        (test-case "Parse timestamp"
-          (check-equal?
-           (sql-parse 'timestamp "1980-08-17 12:34:56")
-           (make-sql-timestamp 1980 08 17 12 34 56 0 #f))
-          (check-equal?
-           (sql-parse 'timestamp "1980-08-17 12:34:56.123")
-           (make-sql-timestamp 1980 08 17 12 34 56 123000000 #f))
-          (check-equal?
-           (sql-parse 'timestamp "1980-08-17 12:34:56.000123")
-           (make-sql-timestamp 1980 08 17 12 34 56 000123000 #f)))
-        (test-case "Parse timestamptz"
-          (check-equal?
-           (sql-parse 'timestamptz "1980-08-17 12:34:56+0123")
-           (make-sql-timestamp 1980 08 17 12 34 56 0 4980))
-          (check-equal?
-           (sql-parse 'timestamptz "1980-08-17 12:34:56.123+0123")
-           (make-sql-timestamp 1980 08 17 12 34 56 123000000 4980))
-          (check-equal?
-           (sql-parse 'timestamptz "1980-08-17 12:34:56.000123-0123")
-           (make-sql-timestamp 1980 08 17 12 34 56 000123000 -4980))))
-
-      (test-suite "Roundtrip"
-        (test-case "boolean"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c bool #t)
-             (check-roundtrip c bool #f))))
-        (test-case "bytea"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c bytea #"this is the time to remember")
-             (check-roundtrip c bytea #"that's the way it is")
-             (check-roundtrip c bytea (list->bytes (build-list 256 values))))))
-        (test-case "numbers"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c int 5)
-             (check-roundtrip c int -1)
-             (check-roundtrip c int #x7FFFFF)
-             (check-roundtrip c int #x-800000)
-             (check-roundtrip c float 1.0)
-             (check-roundtrip c float 1.1)
-             (check-roundtrip c float -5.8)
-             (check-roundtrip c float +inf.0)
-             (check-roundtrip c float -inf.0)
-             (check-roundtrip c float +nan.0))))
-        (test-case "numeric"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c numeric 12345678901234567890)
-             (check-roundtrip c numeric #e1234567890.0987654321)
-             (check-roundtrip c numeric +nan.0))))
-        (test-case "strings"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c text "this is the time to remember")
-             (check-roundtrip c text "that's the way it is")
-             (check-roundtrip c text (string #\\))
-             (check-roundtrip c text (string #\'))
-             (check-roundtrip c text (string #\\ #\'))
-             (check-roundtrip c text "λ the ultimate")
-             (check-roundtrip c text (list->string
-                                      (build-list 800
-                                                  (lambda (n)
-                                                    (integer->char (add1 n)))))))))
-        (test-case "date"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c date (make-sql-date 1980 08 17)))))
-        (test-case "time"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c time (make-sql-time 12 34 56 0 #f))
-             (check-roundtrip c time (make-sql-time 12 34 56 123456000 #f))
-             (check-roundtrip c time (make-sql-time 12 34 56 100000000 #f))
-             (check-roundtrip c time (make-sql-time 12 34 56 000001000 #f)))))
-        (test-case "timetz"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c timetz (make-sql-time 12 34 56 0 3600))
-             (check-roundtrip c timetz (make-sql-time 12 34 56 123456000 3600))
-             (check-roundtrip c timetz (make-sql-time 12 34 56 100000000 3600))
-             (check-roundtrip c timetz (make-sql-time 12 34 56 000001000 3600)))))
-        (test-case "timestamp"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c timestamp
-                              (make-sql-timestamp 1980 08 17 12 34 56 0 #f))
-             (check-roundtrip c timestamp
-                              (make-sql-timestamp 1980 08 17 12 34 56 123456000 #f))
-             (check-roundtrip c timestamp
-                              (make-sql-timestamp 1980 08 17 12 34 56 100000000 #f))
-             (check-roundtrip c timestamp
-                              (make-sql-timestamp 1980 08 17 12 34 56 000001000 #f)))))
-
-        ;; Bizarrely, PostgreSQL converts timestamptz to a standard timezone
-        ;; when returning them, but it doesn't for timetz.
-        (test-case "timestamptz"
-          (call-with-connection
-           (lambda (c)
-             (check-roundtrip c timestamptz
-                              (make-sql-timestamp 1980 08 17 12 34 56 0 3600)
-                              check-timestamptz-equal?)
-             (check-roundtrip c timestamptz
-                              (make-sql-timestamp 1980 08 17 12 34 56 123456000 3600)
-                              check-timestamptz-equal?)
-             (check-roundtrip c timestamptz
-                              (make-sql-timestamp 1980 08 17 12 34 56 100000000 3600)
-                              check-timestamptz-equal?)
-             (check-roundtrip c timestamptz
-                              (make-sql-timestamp 1980 08 17 12 34 56 000001000 3600)
-                              check-timestamptz-equal?))))
-        )))
-|#

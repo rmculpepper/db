@@ -6,7 +6,6 @@
 (require (for-syntax scheme/base)
          (for-syntax (planet "stx.ss" ("ryanc" "macros.plt" 1 1)))
          (planet "struct.ss" ("ryanc" "macros.plt" 1 1))
-         scheme/port
          "../generic/io.ss")
 (provide (all-defined-out))
 

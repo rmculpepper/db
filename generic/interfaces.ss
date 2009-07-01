@@ -163,7 +163,10 @@
 
     ;; sql:literal-expression : string/symbol any -> string
     ;; Constructs SQL expression evaluating to given value
-    sql:literal-expression))
+    sql:literal-expression
+
+    ;; has-support? : any -> boolean?
+    has-support?))
 
 ;; ==== Auxiliary Interfaces & Structures
 

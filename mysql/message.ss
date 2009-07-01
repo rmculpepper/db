@@ -2,7 +2,6 @@
 
 #lang scheme/base
 (require scheme/match
-         scheme/port
          "../generic/sql-data.ss"
          "../generic/io.ss")
 (provide (all-defined-out))
@@ -236,7 +235,7 @@
          [scramble1 (io:read-bytes-as-bytes in 8)]
          [_ (io:read-byte in)]
          [server-capabilities (io:read-le-int16 in)]
-         [charset (io:read-byte in)]
+         [charset (decode-charset (io:read-byte in))]
          [server-status (io:read-le-int16 in)]
          [_ (io:read-bytes-as-bytes in 13)]
          [scramble2 (io:read-bytes-as-bytes in 12)]
@@ -565,9 +564,13 @@
   (decode-flags n field-flags/decoding 'decode-field-flags))
 
 (define (encode-charset charset)
-  charset)
+  (case charset
+    ((utf8-general-ci) 33)
+    (else (error 'encode-charset "unknown charset: ~e" charset))))
 (define (decode-charset n)
-  n)
+  (case n
+    ((33) 'utf8-general-ci)
+    (else 'unknown)))
 
 (define (encode-type type)
   (fetch type types/encoding 'encode-type))

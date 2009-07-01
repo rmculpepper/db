@@ -4,6 +4,10 @@
          "types.ss")
 (provide (all-defined-out))
 
+(define options
+  '#hasheq((real-infinities . #t)
+           (numeric-infinities . #t)))
+
 (define postgresql-dbsystem%
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'postgresql)
@@ -40,6 +44,12 @@
                               type
                               (symbol->string (typealias->type type)))
                           value))
+
+    (define/public (has-support? option)
+      (let ([v (hash-ref options option 'notfound)])
+        (when (eq? v 'notfound)
+          (error 'has-support? "unknown option: ~e" option))
+        v))
 
     (super-new)))
 

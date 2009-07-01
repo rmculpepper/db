@@ -66,6 +66,17 @@ known bugs and issues:
 @itemize{
 
 @item{SQL types. The support for MySQL types is not as complete as
-that for PostgreSQL types.}
+that for PostgreSQL types. Variations like @tt{unsigned}, precisions
+are ignored or dropped.}
+
+@item{MySQL does not support @tt{real} or @tt{numeric} infinities.}
+
+@item{There seem to be bugs with prepared @tt{DELETE} statements.}
+
+@item{No provision is made to declare types for prepared statement
+parameters. This sometimes results in prepared statements that want
+strings instead of the intended data.}
+
+@item{Many errors kill the connection unnecesarily.}
 
 }

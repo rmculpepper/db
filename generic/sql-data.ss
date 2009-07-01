@@ -124,7 +124,9 @@
 
 ;; string & bytea need full decoder
 
-(define (parse-string s)
+(define (parse-string s) s)
+
+(define (STUPID_parse-string s)
   (define (decode in out)
     (define (loop)
       (let ([next (read-char in)])
@@ -301,7 +303,9 @@
              (loop)])))
   (loop))
 
-(define (marshal-string s)
+(define (marshal-string s) s)
+
+(define (STUPID_marshal-string s)
   (unless (string? s)
     (raise-marshal-error "string" s))
   (if (regexp-match? #rx"[\0\\\\]" s)

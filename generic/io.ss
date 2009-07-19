@@ -17,7 +17,7 @@
          io:write-bytes
          io:write-length+bytes
          io:write-length+string
-         
+
          io:write-le-int16
          io:write-le-int24
          io:write-le-int32
@@ -25,7 +25,7 @@
          io:write-length-code
          io:write-length-coded-bytes
          io:write-length-coded-string
-         
+
          io:read
          io:read-int16
          io:read-int32
@@ -37,7 +37,7 @@
          io:read-bytes-as-bytes
          io:read-length+bytes
          io:read-length+string
-         
+
          io:read-le-int16
          io:read-le-int24
          io:read-le-int32
@@ -46,7 +46,6 @@
          io:read-length-coded-bytes
          io:read-length-coded-string
 
-         ;; ???
          io:read-bytes-to-eof)
 
 (require (rename-in scheme/base

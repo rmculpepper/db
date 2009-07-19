@@ -24,11 +24,13 @@ synchronization themselves.
 
 @section{Character Encodings}
 
-Both PostgreSQL and MySQL allow the character set used for
-communication between client and server to be set via SQL
-statements. This library, however, assumes that the encoding is always
-set to UTF-8. Changing the encoding may cause errors or silent data
-corruption. Don't do that.
+This library is designed to interact with database servers using the
+UTF-8 character encoding. Both the PostgreSQL and MySQL clients
+attempt to negotiate UTF-8 communication at the beginning of every
+communication, but they do not prevent SQL commands from changing the
+encoding. If this happens, the client might be unable to reliably
+communicate with the server, or worse, data might get corrupted in
+transmission. @emph{Avoid changing the character set encoding.}
 
 
 @section{PostgreSQL-Specific Notes}
@@ -71,8 +73,8 @@ error.
 
 @section{MySQL-Specific Notes}
 
-The implementation of the MySQL protocol is incomplete. Here are some
-known bugs and issues:
+The implementation of the MySQL protocol is less mature than the
+PostgreSQL client. Here are some known bugs and issues:
 
 @itemize{
 

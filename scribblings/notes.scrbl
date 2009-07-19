@@ -60,16 +60,6 @@ used for TCP connections. By default, this library supports only
 cleartext and md5-hashed passwords, and it does not send cleartext
 passwords unless explicitly ordered to (see @scheme[connect]).
 
-@section{Server Parameters}
-
-This library only understands the the UTF-8 client encoding.
-Connections set the encoding when they are created; no server
-configuration or user action is necessary. This library does not
-support other encodings. If the server changes the client
-encoding---for example, in response to a @tt{SET} statement issued by
-the user---the connection automatically disconnects and raises an
-error.
-
 
 @section{MySQL-Specific Notes}
 

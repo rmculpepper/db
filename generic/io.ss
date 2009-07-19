@@ -1,11 +1,10 @@
-;; Copyright 2000-2007 Ryan Culpepper
+;; Copyright 2000-2009 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
 #lang scheme/base
-(require (for-syntax scheme/base)
-         scheme/port)
-(provide make-limited-input-port
+(require (for-syntax scheme/base))
+(provide subport
 
          io:write
          io:write-int16
@@ -54,45 +53,16 @@
                     [write-byte write-byte/timeout]
                     [write-bytes write-bytes/timeout]))
 
-#|
-(define (make-limited-input-port port limit [close-orig? #t])
-  (let ([limit limit])
-    (make-input-port
-     (object-name port)
-     (lambda (str)
-       (let ([count (min limit (bytes-length str))])
-         (if (zero? count)
-             eof
-             (let ([n (read-bytes-avail!* str port 0 count)])
-               (define (reduce-limit! n)
-                 (cond [(eq? n 0)
-                        (wrap-evt port (lambda (x) 0))]
-                       [(number? n)
-                        (set! limit (- limit n))
-                        n]
-                       [(evt? n)
-                        (wrap-evt n reduce-limit!)]
-                       [else ;;(or (procedure? n) (eof-object? n))
-                        (set! limit (sub1 limit))
-                        n]))
-               (reduce-limit! n)))))
-     (lambda (str skip progress-evt)
-       (let ([count (max 0 (min (- limit skip) (bytes-length str)))])
-         (if (zero? count)
-             eof
-             (let ([n (peek-bytes-avail!* str skip progress-evt port 0 count)])
-               (if (eq? n 0)
-                   (wrap-evt port (lambda (x) 0))
-                   n)))))
-     (lambda ()
-       (when close-orig?
-         (close-input-port port)))
-     (if (port-provides-progress-evts? port)
-         (lambda () (port-progress-evt port))
-         #f)
-     (lambda (k progress-evt done)
-       (port-commit-peeked k progress-evt done port)))))
-|#
+;; subport : input-port num -> input-port
+;; Reads len bytes from input, then returns input port
+;; containing only those bytes.
+;; Raises error if fewer than len bytes available in input.
+(define (subport in len)
+  (let ([bytes (io:read-bytes-as-bytes in len)])
+    (unless (and (bytes? bytes) (= (bytes-length bytes) len))
+      (error 'subport "truncated input; expected ~s bytes, got ~s"
+             len (if (bytes? bytes) (bytes-length bytes) 0)))
+    (open-input-bytes bytes)))
 
 (define-syntax (io:write stx)
   (syntax-case stx ()

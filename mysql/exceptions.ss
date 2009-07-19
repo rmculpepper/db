@@ -3,13 +3,15 @@
 ;; COPYRIGHT for terms).
 
 #lang scheme/base
-(require "msg.ss"
+(require "message.ss"
          "../generic/exceptions.ss")
 (provide raise-backend-error)
 
-;; raise-backend-error : symbol ErrorResponse -> raises exn
+;; raise-backend-error : symbol ErrorPacket -> raises exn
 (define (raise-backend-error function r)
-  (define props (ErrorResponse-properties r))
-  (define code (cdr (assq 'code props)))
-  (define message (cdr (assq 'message props)))
+  (define code (error-packet-sqlstate r))
+  (define message (error-packet-message r))
+  (define props (list (cons 'errno (error-packet-errno r))
+                      (cons 'code code)
+                      (cons 'message message)))
   (internal-raise-backend-error function code message props))

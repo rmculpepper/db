@@ -1,4 +1,4 @@
-;; Copyright 2007-2008 Ryan Culpepper
+;; Copyright 2007-2009 Ryan Culpepper
 
 #lang scheme/base
 (require scheme/match
@@ -120,7 +120,7 @@
   (let ([o (open-output-bytes)])
     (write-packet* o p)
     (let ([b (get-output-bytes o)])
-      #; (printf "writing packet #~s, length ~s\n" number (bytes-length b))
+      #| (printf "writing packet #~s, length ~s\n" number (bytes-length b)) |#
       (io:write-le-int24 out (bytes-length b))
       (io:write-byte out number)
       (io:write-bytes out b))))
@@ -165,30 +165,19 @@
 (define (parse-packet in expect param-types)
   (let* ([len (io:read-le-int24 in)]
          [num (io:read-byte in)]
-         [inp (make-limited-input-port in len #f)])
-    #;(printf "Received packet #~s, length ~s\n" num len)
-    (let* ([pos0 (port-next-position inp)]
-           [msg (parse-packet/1 inp expect len param-types)]
-           [pos1 (port-next-position inp)])
-      #;
-      (printf "left ~s bytes unparsed (length ~s; pos ~s-~s)\n"
-              (- len (- pos1 pos0)) len pos0 pos1)
-      (when (< (- pos1 pos0) len)
-        (error 'parse-packet "bytes left over after parsing ~s; bytes were: ~s" 
-               msg
-               (io:read-bytes-to-eof inp)))
-      (values num msg))))
-
-(define (port-next-position p)
-  (let-values ([(_l _c pos) (port-next-location p)])
-    pos))
+         [inp (subport in len)]
+         [msg (parse-packet/1 inp expect len param-types)])
+    #|(printf "Received packet #~s, length ~s\n" num len)|#
+    (when (port-has-bytes? inp)
+      (error 'parse-packet "bytes left over after parsing ~s; bytes were: ~s" 
+             msg (io:read-bytes-to-eof inp)))
+    (values num msg)))
 
 (define (port-has-bytes? p)
   (not (eof-object? (peek-byte p))))
 
 (define (parse-packet/1 in expect len param-types)
   (let ([first (peek-byte in)])
-    #; (printf "parse-packet: first byte = ~s\n" first)
     (if (eq? first #xFF)
         (parse-error-packet in len)
         (parse-packet/2 in expect len param-types))))
@@ -280,15 +269,12 @@
           _2)))
 
 (define (parse-ok-packet in len)
-  (let* ([pos0 (port-next-position in)]
-         [_ (io:read-byte in)]
+  (let* ([_ (io:read-byte in)]
          [affected-rows (io:read-length-code in)]
          [insert-id (io:read-length-code in)]
          [server-status (io:read-le-int16 in)]
          [warning-count (io:read-le-int16 in)]
-         [pos1 (port-next-position in)]
-         [left-to-read (- len (- pos1 pos0))]
-         [message (io:read-bytes-as-bytes in left-to-read)])
+         [message (io:read-bytes-to-eof in)])
     (make-ok-packet affected-rows
                     insert-id
                     server-status
@@ -296,16 +282,14 @@
                     (bytes->string/utf-8 message))))
 
 (define (parse-error-packet in len)
-  (let* ([pos0 (port-next-position in)]
-         [_ (io:read-byte in)]
+  (let* ([_ (io:read-byte in)]
          [errno (io:read-le-int16 in)]
          [marker (peek-char in)]
          [sqlstate
           (and (eq? marker #\#)
                (begin (io:read-byte in)
                       (io:read-bytes-as-string in 5)))]
-         [pos1 (port-next-position in)]
-         [message (io:read-bytes-as-bytes in (- len (- pos1 pos0)))])
+         [message (io:read-bytes-to-eof in)])
     (make-error-packet errno
                        sqlstate
                        (bytes->string/utf-8 message))))

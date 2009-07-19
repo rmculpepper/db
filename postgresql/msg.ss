@@ -1,4 +1,4 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2009 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -48,7 +48,7 @@
 
 (define (parse:StartupMessage p)
   (let* ([len (io:read-int32 p)]
-         [p (make-limited-input-port len p)]
+         [p (subport p (- len 4))]
          [version (io:read-int32 p)])
     (make-StartupMessage
      (let loop ([fields null])
@@ -88,7 +88,7 @@
   (error 'write:ErrorResponse "never called"))
 (define (parse:ErrorResponse p)
   (let* ([len (io:read-int32 p)]
-         [in (make-limited-input-port p (- len 4))]
+         [in (subport p (- len 4))]
          [fields (parse-field-list in)])
     (make-ErrorResponse fields)))
 (define-msg-struct ErrorResponse (properties) #\E)
@@ -98,7 +98,7 @@
   (error 'write:NoticeResponse "never called"))
 (define (parse:NoticeResponse p)
   (let* ([len (io:read-int32 p)]
-         [in (make-limited-input-port p (- len 4))]
+         [in (subport p (- len 4))]
          [fields (parse-field-list in)])
     (make-NoticeResponse fields)))
 (define-msg-struct NoticeResponse (properties) #\N)

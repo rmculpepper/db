@@ -1,4 +1,4 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2009 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -14,6 +14,7 @@
          "../generic/sql-data.ss"
          "../generic/query.ss"
          "message.ss"
+         "exceptions.ss"
          "dbsystem.ss"
          "types.ss")
 (provide connection%)
@@ -159,8 +160,7 @@
       (when DEBUG-RESPONSES
         (fprintf (current-error-port) "  << ~s\n" r))
       (when (error-packet? r)
-        (error 'backend "error: ~s" r)
-        #| (raise-mysql-backend-error behalf r) |# )
+        (raise-backend-error behalf r))
       r)
 
     ;; send-message : message -> void
@@ -522,8 +522,6 @@
         (raise-user-error
          'bind-prepared-statement
          "prepared statement requires ~s parameters, given ~s" tlen len)))
-
-              
     ))
 
 ;; connection%

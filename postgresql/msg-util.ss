@@ -1,4 +1,4 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2009 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -160,7 +160,7 @@
      #'(mk v ...)]
     [(_ mk p (v ...) (header c) clause ...)
      #`(let* ([_length (io:read-int32 p)]
-              [limport (make-limited-input-port p _length)])
+              [limport (subport p (- _length 4))])
          (msg-parser mk limport (v ...) clause ...))]
     [(_ mk p (v ...) (literal type val) clause ...)
      #`(let [(t (io:read p type))]

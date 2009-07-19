@@ -18,9 +18,6 @@
          (struct-out PreparedStatement)
          (struct-out StatementBinding)
 
-         backend-link<%>
-         backend-link<%>/sub
-
          connector<%>
          ssl-connector<%>
          primitive-query<%>
@@ -205,37 +202,6 @@
 
 ;; A Collector = RowDescription boolean -> b (b a ... -> b) (b -> c) Header
 
-;; backend-link<%>
-(define backend-link<%>
-  (interface ()
-    ;; new-exchange : ??? -> stream
-    new-exchange
-
-    ;; end-exchange : -> void
-    end-exchange
-
-    ;; close : -> void
-    close
-
-    ;; encode : msg -> void
-    encode
-
-    ;; flush : -> void
-    flush
-
-    ;; alive? : -> boolean
-    alive?
-    ))
-
-;; backend-link<%>/sub
-(define backend-link<%>/sub
-  (interface (backend-link<%>)
-    ;; mk-get-next-message : ??? -> (-> msg)
-    mk-get-next-message
-
-    ;; mk-end-message? : ??? -> (msg -> boolean)
-    mk-end-message?
-    ))
 
 ;; connector<%>
 ;; Manages making connections

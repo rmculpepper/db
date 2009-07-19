@@ -19,8 +19,8 @@
 (provide connection%)
 
 ;; Debugging
-(define DEBUG-RESPONSES #t)
-(define DEBUG-SENT-MESSAGES #t)
+(define DEBUG-RESPONSES #f)
+(define DEBUG-SENT-MESSAGES #f)
 
 (define MAX-PACKET-LENGTH #x1000000)
 
@@ -523,6 +523,7 @@
          'bind-prepared-statement
          "prepared statement requires ~s parameters, given ~s" tlen len)))
 
+              
     ))
 
 ;; connection%
@@ -533,4 +534,10 @@
             (primitive-query-base-mixin
              (connector-mixin
               mysql-base%)))))
-    (super-new)))
+    (super-new)
+    (inherit exec)
+
+    ;; Set connection to use utf8 encoding
+    (define/override (after-connect)
+      (super after-connect)
+      (exec "set names 'utf8'"))))

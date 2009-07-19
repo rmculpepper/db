@@ -242,7 +242,7 @@
   (io:write-bytes port b))
 
 (define (io:write-length-coded-string port s)
-  (io:write-length-coded-bytes port (string->bytes/latin-1 s)))
+  (io:write-length-coded-bytes port (string->bytes/utf-8 s)))
 
 ;; READING
 
@@ -349,7 +349,7 @@
 
 (define (io:read-length-coded-string port)
   (let ([b (io:read-length-coded-bytes port)])
-    (and b (bytes->string/latin-1 b))))
+    (and b (bytes->string/utf-8 b))))
 
 ;; FIXME: weird...
 (define (io:read-bytes-to-eof port)

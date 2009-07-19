@@ -140,12 +140,12 @@
      (io:write-null-terminated-string out database)]
     [(struct command-packet (command arg))
      (io:write-byte out (encode-command command))
-     (io:write-null-terminated-bytes out (string->bytes/latin-1 arg))]
+     (io:write-null-terminated-bytes out (string->bytes/utf-8 arg))]
     [(struct long-data-packet (statement-handler-id parameter-number type data))
      (io:write-le-int32 out statement-handler-id)
      (io:write-le-int16 out parameter-number)
      (io:write-le-int16 out type)
-     (io:write-bytes out (string->bytes/latin-1 data))]
+     (io:write-bytes out (string->bytes/utf-8 data))]
     [(struct execute-packet
              (statement-id flags iterations null-map first? param-types params))
      (io:write-byte out (encode-command 'statement-execute))
@@ -293,7 +293,7 @@
                     insert-id
                     server-status
                     warning-count
-                    (bytes->string/latin-1 message))))
+                    (bytes->string/utf-8 message))))
 
 (define (parse-error-packet in len)
   (let* ([pos0 (port-next-position in)]
@@ -308,7 +308,7 @@
          [message (io:read-bytes-as-bytes in (- len (- pos1 pos0)))])
     (make-error-packet errno
                        sqlstate
-                       (bytes->string/latin-1 message))))
+                       (bytes->string/utf-8 message))))
 
 (define (parse-result-set-header-packet in len)
   (let* ([field-count (io:read-length-code in)]
@@ -386,7 +386,7 @@
 (define (parse-binary-row-data-packet in0 len param-types)
   (define b (io:read-bytes-to-eof in0))
   (define in (open-input-bytes b))
-  #;(printf "binary row: ~s or ~s\n" b (bytes->list b))
+  #|(printf "binary row: ~s or ~s\n" b (bytes->list b))|#
   (let* ([first (io:read-byte in)] ;; SKIP? seems to be always zero
          [param-count (length param-types)]
          [null-map-length (floor (/ (+ 9 param-count) 8))]
@@ -400,8 +400,8 @@
                              sql-null)
                          (loop (cdr null-map) (cdr param-types)))]
                   [else null]))])
-    #; (printf "param-types ~s; null-map-length ~s; null-map ~s\n"
-               param-types null-map-length null-map)
+    #| (printf "param-types ~s; null-map-length ~s; null-map ~s\n"
+               param-types null-map-length null-map) |#
     (make-binary-row-data-packet fields)))
 
 (define (read-binary-datum in type)
@@ -409,6 +409,7 @@
     ((tiny) (io:read-byte in))
     ((short) (io:read-le-int16 in))
     ((long) (io:read-le-int32 in))
+    ((longlong) (io:read-le-intN in 8))
     ((blob var-string) (io:read-length-coded-string in))
     (else (error 'get-param "unimplemented: ~s" type))))
 
@@ -417,6 +418,7 @@
     ((tiny) (io:write-byte out param))
     ((short) (io:write-le-int16 out param))
     ((long) (io:write-le-int32 out param))
+    ((longlong) (io:write-le-intN out param 8))
     ((var-string) (io:write-length-coded-string out param))
     (else (error 'send-param "unimplemented: ~s" type))))
 

@@ -39,8 +39,14 @@
 ;; Manages communication
 (define base<%>
   (interface ()
-    ;; recv : stream -> message stream
-    recv
+    ;; recv-one-message : -> message
+    recv-one-message
+
+    ;; recv-messages : -> (listof message)
+    recv-messages
+
+    ;; split-messages : (listof message) -> (values message (listof message))
+    split-messages
 
     ;; send-message : message -> void
     send-message
@@ -100,44 +106,54 @@
     ;; handle-scm-credential-authentication : -> void
     handle-scm-credential-authentication))
 
+;; backend-link<%>
+(define backend-link<%>
+  (interface ()
+    ;; new-exchange : -> void
+    new-exchange
+
+    ;; end-exchange : -> void
+    end-exchange
+
+    ;; close : -> void
+    close
+
+    ;; get-next-message : -> msg
+    get-next-message
+
+    ;; encode : msg -> void
+    encode
+
+    ;; flush : -> void
+    flush
+
+    ;; alive? : -> boolean
+    alive?
+    ))
+
 ;; backend-link%
 (define backend-link%
-  (class* object% (backend-link<%>/sub)
+  (class* object% (backend-link<%>)
     (init-field inport
                 outport)
 
-    (define stream #f)
     (define wlock (make-semaphore 1))
-    (define rlock (make-semaphore 1))
 
-    (define/public (new-exchange . args)
-      (semaphore-wait wlock)
-      (stream:force-to-end stream)
-      (let ([new-mg
-             (stream:new (lambda ()
-                           (semaphore-wait rlock))
-                         (lambda ()
-                           (semaphore-post rlock))
-                         (mk-get-next-message args)
-                         (mk-end-message? args))])
-        (set! stream new-mg)
-        new-mg))
-
-    (define/public (mk-get-next-message args)
-      (error 'server-link% "must override mk-get-next-message"))
-
-    (define/public (mk-end-message? args)
-      (error 'server-link% "must override mk-end-message?"))
+    (define/public (new-exchange)
+      (semaphore-wait wlock))
 
     (define/public (end-exchange)
       (semaphore-post wlock))
 
+    (define/public (get-next-message)
+      (parse-server-message inport))
+
+    (define/public (encode msg)
+      (write-message msg outport))
+
     (define/public (close)
       (close-output-port outport)
       (close-input-port inport))
-
-    (define/public (encode msg)
-      (error 'server-link% "must override encode"))
 
     (define/public (flush)
       (flush-output outport))
@@ -146,33 +162,38 @@
 
     (super-new)))
 
-(define disconnected-backend-link%
-  (class* object% (backend-link<%>)
-    (define/public (new-exchange . args)
-      (illegal))
-    (define/public (end-exchange . args)
-      (illegal))
-    (define/public (close)
-      (void))
-    (define/public (encode . args)
-      (illegal))
-    (define/public (flush)
-      (illegal))
-
-    (define/public (alive?) #f)
-
-    (define/private (illegal)
-      (error 'backend-link "not connected"))
-    (super-new)))
-
 (define disconnected-backend-link
-  (new disconnected-backend-link%))
+  (let ()
+    (define disconnected-backend-link%
+      (class* object% (backend-link<%>)
+        (define/public (new-exchange . args)
+          (illegal))
+        (define/public (end-exchange . args)
+          (illegal))
+        (define/public (get-next-message)
+          (illegal))
+        (define/public (close)
+          (void))
+        (define/public (encode . args)
+          (illegal))
+        (define/public (flush)
+          (illegal))
+        (define/public (alive?) #f)
+        (define/private (illegal)
+          (error 'backend-link "not connected"))
+        (super-new)))
+    (new disconnected-backend-link%)))
+
+
+;; ----
 
 ;; base%
 (define base%
-  (class* object% (connection:admin<%> base<%>)
-    ;; protocol : protocol3
-    (init-field [protocol disconnected-backend-link])
+  (class* object% (connection:admin<%> postgres-base<%>)
+    ;; protocol : backend-link<%>
+    (init-field [protocol disconnected-backend-link]
+                [process-id #f]
+                [secret-key #f])
     (super-new)
 
     ;; with-disconnect-on-error
@@ -196,32 +217,100 @@
     (define/public (end-exchange)
       (send protocol end-exchange))
 
-    ;; recv : symbol/#f stream -> message stream
-    ;; Automatically handles asynchronous messages
-    (define/public (recv behalf mg)
-      (let-values ([(r mg)
-                    (with-disconnect-on-error
-                        (stream:current+next mg))])
-        (when DEBUG-RESPONSES
-          (fprintf (current-error-port) "  << ~s\n" r))
-        (values r mg)))
+    ;; raw-recv : -> message
+    ;; Must be called within exchange.
+    (define/private (raw-recv)
+      (with-disconnect-on-error
+       (let ([r (send protocol get-next-message)])
+         (when DEBUG-RESPONSES
+           (fprintf (current-error-port) "  << ~s\n" r))
+         r)))
+
+    ;; recv-one-message : symbol -> message
+    (define/public (recv-one-message behalf)
+      (let ([r (raw-recv)])
+        (or (auto-handle-message r behalf)
+            (recv-one-message behalf))))
+
+    ;; recv-messages : -> (listof message)
+    (define/public (recv-messages)
+      (let ([r (raw-recv)])
+        (if (ReadyForQuery? r)
+            (list r)
+            (cons r (recv-messages)))))
+
+    ;; split-messages : symbol (listof msg) -> (values msg (listof msg))
+    (define/public (split-messages behalf msgs)
+      (if (auto-handle-message (car msgs) behalf)
+          (values (car msgs) (cdr msgs))
+          (split-messages behalf (cdr msgs))))
+
+    ;; auto-handle-message : message behalf -> message/#f
+    ;; Returns #f if message handled asynchronously
+    (define/private (auto-handle-message r behalf)
+      (cond [(ErrorResponse? r)
+             (raise-backend-error behalf r)]
+            [(or (NoticeResponse? r)
+                 (NotificationResponse? r)
+                 (ParameterStatus? r))
+             (handle-async-message r)
+             #f]
+            [else r]))
+
+    ;; Asynchronous message hooks
+
+    ;; handle-async-message : message -> void
+    (define/private (handle-async-message msg)
+      (match msg
+        [(struct NoticeResponse (properties))
+         (handle-notice properties)]
+        [(struct NotificationResponse (pid condition info))
+         (handle-notification condition info)]
+        [(struct ParameterStatus (name value))
+         (handle-parameter-status name value)]))
+
+    ;; handle-parameter-status : string string -> void
+    (define/public (handle-parameter-status name value)
+      (when (equal? name "client_encoding")
+        (unless (equal? value "UTF8")
+          (disconnect* #f)
+          (error 'connection
+                 "client encoding must be UTF8, changed to: ~e"
+                 value)))
+      (void))
+
+    ;; handle-notice : (listof (cons symbol string)) -> void
+    (define/public (handle-notice properties)
+      (fprintf (current-error-port)
+               "notice: ~a (SQL code ~a)\n" 
+               (cdr (assq 'message properties))
+               (cdr (assq 'code properties))))
+
+    ;; handle-notification :  string string -> void
+    (define/public (handle-notification condition info)
+      (fprintf (current-error-port)
+               "notification ~a: ~a\n"
+               condition
+               info))
+
+    ;; Sending
+
+    ;; send-message : message -> void
+    (define/public (send-message msg)
+      (buffer-message msg)
+      (flush-message-buffer))
 
     ;; buffer-message : message -> void
     (define/public (buffer-message msg)
       (when DEBUG-SENT-MESSAGES
         (fprintf (current-error-port) "  >> ~s\n" msg))
       (with-disconnect-on-error
-          (send protocol encode msg)))
+       (send protocol encode msg)))
 
     ;; flush-message-buffer : -> void
     (define/public (flush-message-buffer)
       (with-disconnect-on-error
-          (send protocol flush)))
-
-    ;; send-message : message -> void
-    (define/public (send-message msg)
-      (buffer-message msg)
-      (flush-message-buffer))
+       (send protocol flush)))
 
     ;; Connection management
 
@@ -232,6 +321,10 @@
         [(politely?) (disconnect* politely?)]))
 
     (define/public (disconnect* politely?)
+      (when (and politely? (send protocol alive?))
+        (new-exchange)
+        (send-message (make-Terminate))
+        (end-exchange))
       (when DEBUG-SENT-MESSAGES
         (fprintf (current-error-port) "  ** Disconnecting\n"))
       (send protocol close)
@@ -252,84 +345,6 @@
       (void))
     ))
 
-;; postgres-backend-link%
-(define postgres-backend-link%
-  (class backend-link%
-    (inherit-field inport
-                   outport)
-
-    (define/override (mk-get-next-message _)
-      (lambda () (parse-server-message inport)))
-
-    (define/override (mk-end-message? _)
-      ReadyForQuery?)
-
-    (define/override (encode msg)
-      (write-message msg outport))
-
-    (super-new)))
-
-;; postgres-base%
-(define postgres-base%
-  (class base%
-    (inherit-field protocol)
-    (init-field [process-id #f]
-                [secret-key #f])
-    (inherit new-exchange
-             end-exchange
-             send-message)
-
-    (super-new)
-
-    (define/override (recv behalf mg)
-      (let-values ([(r mg) (super recv behalf mg)])
-        (match r
-          [(? ErrorResponse?)
-           (raise-backend-error behalf r)]
-          [(struct NoticeResponse (properties))
-           (handle-notice properties)
-           (recv behalf mg)]
-          [(struct NotificationResponse (process-id condition info))
-           (handle-notification process-id condition info)
-           (recv behalf mg)]
-          [(struct ParameterStatus (name value))
-           (handle-parameter-status name value)
-           (recv behalf mg)]
-          [else
-           (values r mg)])))
-
-    (define/override (disconnect* politely?)
-      (when (and politely? (send protocol alive?))
-        (let ([_ (new-exchange)])
-          (send-message (make-Terminate))
-          (end-exchange)))
-      (super disconnect* politely?))
-
-    ;; Asynchronous message hooks
-
-    ;; handle-parameter-status : string string -> void
-    (define/public (handle-parameter-status name value)
-      (when (equal? name "client_encoding")
-        (unless (equal? value "UTF8")
-          (disconnect* #t)
-          (error 'connection "client encoding must be UTF8, changed to: ~e" value)))
-      (void))
-
-    ;; handle-notice : (listof (cons symbol string)) -> void
-    (define/public (handle-notice properties)
-      (fprintf (current-error-port)
-               "notice: ~a (SQL code ~a)\n" 
-               (cdr (assq 'message properties))
-               (cdr (assq 'code properties))))
-
-    ;; handle-notification : number string string -> void
-    (define/public (handle-notification process-id condition info)
-      (fprintf (current-error-port)
-               "notification ~a: ~a\n"
-               condition
-               info))
-    ))
-
 ;; connector-mixin%
 (define connector-mixin
   (mixin (base<%>) (connector<%>)
@@ -338,7 +353,7 @@
     (inherit-field protocol
                    process-id
                    secret-key)
-    (inherit recv
+    (inherit recv-one-message
              new-exchange
              end-exchange
              buffer-message
@@ -351,58 +366,58 @@
     ;; Specialized to use direct method call rather than 'send'
     (define-syntax with-disconnect-on-error
       (syntax-rules ()
-        [(with-disconnect-on-error expr)
+        [(with-disconnect-on-error . b)
          (with-handlers ([exn:fail?
                           (lambda (e)
                             (disconnect #f)
                             (raise e))])
-           expr)]))
+           . b)]))
 
     ;; attach-to-ports : input-port output-port -> void
     (define/public (attach-to-ports in out)
       (set! protocol
-            (new postgres-backend-link% (inport in) (outport out))))
+            (new backend-link% (inport in) (outport out))))
 
     ;; start-connection-protocol : string string string/#f -> void
     (define/public (start-connection-protocol dbname username password)
       (with-disconnect-on-error
-          (let [(mg (new-exchange))]
-            (send-message
-             (make-StartupMessage
-              (list (cons "user" username)
-                    (cons "database" dbname)
-                    (cons "client_encoding" "UTF8")
-                    (cons "DateStyle" "ISO, MDY"))))
-            (expect-auth mg username password))))
+       (new-exchange)
+       (send-message
+        (make-StartupMessage
+         (list (cons "user" username)
+               (cons "database" dbname)
+               (cons "client_encoding" "UTF8")
+               (cons "DateStyle" "ISO, MDY"))))
+       (expect-auth username password)))
 
-    ;; expect-auth : stream string/#f -> ConnectionResult
-    (define/private (expect-auth mg username password)
-      (let-values [((r mg) (recv 'connect mg))]
+    ;; expect-auth : string/#f -> ConnectionResult
+    (define/private (expect-auth username password)
+      (let ([r (recv-one-message 'connect)])
         (match r
           [(struct AuthenticationOk ())
-           (expect-ready-for-query mg)]
+           (expect-ready-for-query)]
           [(struct AuthenticationCleartextPassword ())
            (handle-cleartext-password-authentication password)
-           (expect-auth mg username password)]
+           (expect-auth username password)]
           [(struct AuthenticationCryptPassword (salt))
            (handle-crypt-password-authentication password salt)
-           (expect-auth mg username password)]
+           (expect-auth username password)]
           [(struct AuthenticationMD5Password (salt))
            (handle-md5-password-authentication username password salt)
-           (expect-auth mg username password)]
+           (expect-auth username password)]
           [(struct AuthenticationKerberosV5 ())
            (handle-kerberos5-authentication)
-           (expect-auth mg username password)]
+           (expect-auth username password)]
           [(struct AuthenticationSCMCredential ())
            (handle-scm-credential-authentication)
-           (expect-auth mg username password)]
+           (expect-auth username password)]
           [_
            (error 'connect
                   "authentication failed (backend sent unexpected message)")])))
 
-    ;; expect-ready-for-query : stream -> void
-    (define/private (expect-ready-for-query mg)
-      (let-values [((r mg) (recv 'connect mg))]
+    ;; expect-ready-for-query : -> void
+    (define/private (expect-ready-for-query)
+      (let ([r (recv-one-message 'connect)])
         (match r
           [(struct ReadyForQuery (status))
            (end-exchange)
@@ -410,11 +425,12 @@
           [(struct BackendKeyData (pid secret))
            (set! process-id pid)
            (set! secret-key secret)
-           (expect-ready-for-query mg)]
+           (expect-ready-for-query)]
           [_
            (error 'connect
                   (string-append "connection failed after authentication "
-                                 "(backend sent unexpected message)"))])))
+                                 "(backend sent unexpected message: ~e)")
+                  r)])))
 
     ;; Authentication hooks
     ;; The authentication hooks serve two purposes:
@@ -544,7 +560,8 @@
     (inherit-field protocol
                    process-id
                    secret-key)
-    (inherit recv
+    (inherit recv-messages
+             split-messages
              send-message
              buffer-message
              flush-message-buffer
@@ -569,10 +586,11 @@
     ;; The single point of control for the query engine
     (define/override (query*/no-conversion fsym stmts collector)
       (for-each (lambda (stmt) (check-statement fsym stmt)) stmts)
-      (let ([mg (new-exchange)])
-        (with-final-end-exchange
-            (for-each (lambda (stmt) (query1:enqueue stmt)) stmts)
-          (send-message (make-Sync)))
+      (new-exchange)
+      (let ([mg (with-final-end-exchange
+                 (for-each (lambda (stmt) (query1:enqueue stmt)) stmts)
+                 (send-message (make-Sync))
+                 (recv-messages))])
         (let loop ([stmts stmts] [mg mg])
           (if (null? stmts)
               (begin (check-ready-for-query mg)
@@ -580,9 +598,9 @@
               (let-values ([(result mg) (query1:collect mg (car stmts) collector)])
                 (cons result (loop (cdr stmts) mg)))))))
 
-    ;; check-ready-for-query : stream -> void
+    ;; check-ready-for-query : (listof msg) -> void
     (define/private (check-ready-for-query mg)
-      (let-values ([(r mg) (recv 'query* mg)])
+      (let-values ([(r mg) (split-messages 'query* mg)])
         (unless (ReadyForQuery? r)
           (error 'query* "backend sent unexpected message after query results"))))
 
@@ -620,19 +638,19 @@
           (query1:expect-parse-complete mg collector)
           (query1:expect-bind-complete mg collector)))
     (define/private (query1:expect-parse-complete mg collector)
-      (let-values ([(r mg) (recv 'query* mg)])
+      (let-values ([(r mg) (split-messages 'query* mg)])
         (match r
           [(struct ParseComplete ())
            (query1:expect-bind-complete mg collector)]
           [_ (query1:error-recovery r mg)])))
     (define/private (query1:expect-bind-complete mg collector)
-      (let-values ([(r mg) (recv 'query* mg)])
+      (let-values ([(r mg) (split-messages 'query* mg)])
         (match r
           [(struct BindComplete ())
            (query1:expect-portal-description mg collector)]
           [_ (query1:error-recovery r mg)])))
     (define/private (query1:expect-portal-description mg collector)
-      (let-values ([(r mg) (recv 'query* mg)])
+      (let-values ([(r mg) (split-messages 'query* mg)])
         (match r
           [(struct RowDescription (rows))
            (let-values ([(init combine finalize info)
@@ -642,7 +660,7 @@
            (query1:expect-completion mg)]
           [_ (query1:error-recovery r mg)])))
     (define/private (query1:data-loop mg init combine finalize info)
-      (let-values ([(r mg) (recv 'query* mg)])
+      (let-values ([(r mg) (split-messages 'query* mg)])
         (match r
           [(struct DataRow (value))
            (query1:data-loop mg 
@@ -654,7 +672,7 @@
            (query1:finalize mg (make-Recordset info (finalize init)))]
           [_ (query1:error-recovery r mg)])))
     (define/private (query1:expect-completion mg)
-      (let-values ([(r mg) (recv 'query* mg)])
+      (let-values ([(r mg) (split-messages 'query* mg)])
         (match r
           [(struct CommandComplete (command))
            (query1:finalize mg (make-SimpleResult command))]
@@ -662,7 +680,7 @@
            (query1:finalize mg (make-SimpleResult #f))]
           [_ (query1:error-recovery r mg)])))
     (define/private (query1:finalize mg result)
-      (let-values ([(r mg) (recv 'query* mg)])
+      (let-values ([(r mg) (split-messages 'query* mg)])
         (match r
           [(struct CloseComplete ())
            (values result mg)]
@@ -671,10 +689,10 @@
       (match r
         [(struct CopyInResponse (format column-formats))
          (raise-user-error 'query*
-                           "COPY IN statements not allowed in this query mode")]
+                           "COPY IN statements not supported")]
         [(struct CopyOutResponse (format column-formats))
          (raise-user-error 'query*
-                           "COPY OUT statements not allowed in this query mode")]
+                           "COPY OUT statements not supported")]
         [_ (error 'query "unexpected message")]))
 
     ;; generate-name : -> string
@@ -689,14 +707,15 @@
                   (unless (string? stmt)
                     (raise-type-error 'prepare* "string" stmt)))
                 stmts)
-      (let* ([mg (new-exchange)]
-             ;; name generation within exchange: synchronized
-             [names (map (lambda (_) (generate-name)) stmts)])
-        (with-final-end-exchange
-            (for-each (lambda (name stmt) (prepare1:enqueue name stmt))
-                      names
-                      stmts)
-          (send-message (make-Sync)))
+      (new-exchange)
+      (let* (;; name generation within exchange: synchronized
+             [names (map (lambda (_) (generate-name)) stmts)]
+             [mg (with-final-end-exchange
+                  (for-each (lambda (name stmt) (prepare1:enqueue name stmt))
+                            names
+                            stmts)
+                  (send-message (make-Sync))
+                  (recv-messages))])
         (let loop ([names names] [stmts stmts] [mg mg])
           (if (null? stmts)
               (begin (check-ready-for-query mg)
@@ -711,19 +730,19 @@
 
     ;; prepare1:collect : stream string string -> PreparedStatement stream
     (define/private (prepare1:collect mg name stmt)
-      (let-values ([(r mg) (recv 'prepare* mg)])
+      (let-values ([(r mg) (split-messages 'prepare* mg)])
         (match r
           [(struct ParseComplete ())
            (prepare1:describe-params mg name stmt)]
           [else (prepare1:error mg r stmt)])))
     (define/private (prepare1:describe-params mg name stmt)
-      (let-values ([(r mg) (recv 'prepare* mg)])
+      (let-values ([(r mg) (split-messages 'prepare* mg)])
         (match r
           [(struct ParameterDescription (param-types))
            (prepare1:describe-result mg name stmt param-types)]
           [else (prepare1:error mg r stmt)])))
     (define/private (prepare1:describe-result mg name stmt param-types)
-      (let-values ([(r mg) (recv 'prepare* mg)])
+      (let-values ([(r mg) (split-messages 'prepare* mg)])
         (match r
           [(struct RowDescription (field-records))
            (prepare1:finish mg name stmt param-types (length field-records))]
@@ -734,7 +753,8 @@
       (error 'prepare* "unexpected message processing ~s: ~s" stmt r))
     (define/private (prepare1:finish mg name stmt param-types result-fields)
       (values 
-       (make-PostgresPreparedStatement result-fields name param-types (make-weak-box this))
+       (make-PostgresPreparedStatement result-fields name param-types
+                                       (make-weak-box this))
        mg))
 
     ;; bind-prepared-statement : PreparedStatement (list-of value) -> StatementBinding
@@ -775,7 +795,7 @@
            (primitive-query-mixin
             (primitive-query-base-mixin
              (connector-mixin
-              postgres-base%)))))
+              base%)))))
     (super-new)))
 
 ;; connection%

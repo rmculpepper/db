@@ -34,6 +34,7 @@
          parse-timestamp-tz
 
          marshal-string
+         marshal-ascii-string
          marshal-bytea
          marshal-integer
          marshal-int1
@@ -304,6 +305,14 @@
   (loop))
 
 (define (marshal-string s) s)
+
+(define (marshal-ascii-string s)
+  (for ([i (in-range (string-length s))])
+    (unless (<= 0 (char->integer (string-ref s i)) 127)
+      (raise-type-error 'marshal-ascii-string
+                        "string containing only ascii characters"
+                        s)))
+  s)
 
 (define (STUPID_marshal-string s)
   (unless (string? s)

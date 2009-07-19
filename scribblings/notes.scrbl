@@ -21,6 +21,16 @@ the server, not the processing of returned results. Clients requiring
 synchronized processing of query results must implement the
 synchronization themselves.
 
+
+@section{Character Encodings}
+
+Both PostgreSQL and MySQL allow the character set used for
+communication between client and server to be set via SQL
+statements. This library, however, assumes that the encoding is always
+set to UTF-8. Changing the encoding may cause errors or silent data
+corruption. Don't do that.
+
+
 @section{PostgreSQL-Specific Notes}
 
 @subsection[#:tag "connecting-to-server"]{Connecting to a Server}
@@ -58,6 +68,7 @@ encoding---for example, in response to a @tt{SET} statement issued by
 the user---the connection automatically disconnects and raises an
 error.
 
+
 @section{MySQL-Specific Notes}
 
 The implementation of the MySQL protocol is incomplete. Here are some
@@ -65,18 +76,16 @@ known bugs and issues:
 
 @itemize{
 
+@item{Most errors kill the connection unnecesarily.}
+
 @item{SQL types. The support for MySQL types is not as complete as
 that for PostgreSQL types. Variations like @tt{unsigned}, precisions
 are ignored or dropped.}
 
-@item{MySQL does not support @tt{real} or @tt{numeric} infinities.}
-
-@item{There seem to be bugs with prepared @tt{DELETE} statements.}
-
 @item{No provision is made to declare types for prepared statement
-parameters. This sometimes results in prepared statements that want
+parameters. This sometimes results in prepared statements that expect
 strings instead of the intended data.}
 
-@item{Many errors kill the connection unnecesarily.}
+@item{MySQL does not support @tt{real} or @tt{numeric} infinities.}
 
 }

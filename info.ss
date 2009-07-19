@@ -11,7 +11,6 @@
   '("This library provides a high-level interface to PostgreSQL "
     "and MySQL database servers. It is implemented in Scheme and "
     "requires no native client libraries."))
-(define version "1.0")
 (define scribblings '(("scribblings/doc.scrbl" (multi-page))))
 (define categories '(net))
 (define can-be-loaded-with 'all)

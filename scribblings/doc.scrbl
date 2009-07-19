@@ -5,15 +5,16 @@
           (for-label scheme/base)
           (for-label "../generic/main.ss"))
 
-@title[#:version "1.0"]{database: Database connectivity}
+@title[#:version (package-version)]{database: Database connectivity}
 @author{Ryan Culpepper}
 
 @section-index["postgresql"]
 @section-index["mysql"]
 @section-index["database"]
 
-This manual documents the database package version 1.0 (PLaneT version
-1 0). This package is the successor to spgsql.
+This manual documents the database package version
+@(package-version). This package is the successor to
+spgsql.
 
 @defmodule/this-package[]
 

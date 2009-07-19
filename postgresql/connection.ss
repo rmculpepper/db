@@ -12,7 +12,6 @@
          scheme/match
          file/md5
          openssl/mzssl
-         "../generic/stream.ss"
          "../generic/interfaces.ss"
          "../generic/sql-data.ss"
          "../generic/query.ss"

@@ -24,11 +24,11 @@ client libraries: this package is everything you need to connect PLT
 Scheme to a PostgreSQL or MySQL server.
 
 The library is object-based, using @schememodname[scheme/class]
-objects, but connection objects do not contain query state, only
-connection state. The query methods are functional in spirit: queries
-return results; they do not stow them away in the connection for later
-manipulation and retrieval. The higher-order query methods are
-patterned after standard higher-order list processing functions.
+objects, but connection objects do not contain query state. The query
+methods are functional in spirit: queries return results; they do not
+stow them away in the connection for later manipulation and
+retrieval. The higher-order query methods are patterned after standard
+higher-order list processing functions.
 
 Since this package does not use foreign connectivity libraries, it
 works seamlessly with PLT Scheme's resource management systems. The

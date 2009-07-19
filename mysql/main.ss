@@ -8,6 +8,7 @@
          scheme/tcp
          "../generic/main.ss"
          "../generic/socket.ss"
+         "../generic/find-socket.ss"
          "connection.ss"
          "dbsystem.ss")
 (provide/contract
@@ -17,12 +18,14 @@
        (#:password (or/c string? false/c)
         #:server (or/c string? false/c)
         #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c string? path? false/c (symbols 'auto))
+        #:socket (or/c string? path? false/c)
         #:input-port (or/c input-port? false/c)
         #:output-port (or/c output-port? false/c)
         #:allow-cleartext-password? boolean?
         #:mixin any/c)
-       any/c)])
+       any/c)]
+ [guess-socket-path
+  (-> (or/c string? path?))])
 (provide dbsystem)
 
 (define (connect #:user user
@@ -51,7 +54,7 @@
   (let ([c (new (mixin connection%))])
     (cond [socket
            (let-values ([(in out)
-                         (unix-socket-connect (socket-path socket))])
+                         (unix-socket-connect socket)])
              (send c attach-to-ports in out))]
           [input-port
            (send c attach-to-port input-port output-port)]
@@ -63,13 +66,9 @@
     (send c start-connection-protocol database user password)
     c))
 
+
 (define socket-paths
   '("/var/run/mysqld/mysqld.sock"))
 
-(define (socket-path socket)
-  (if (eq? socket 'auto)
-      (or (for/or ([path socket-paths])
-            (and (file-exists? path) path))
-          (error 'postgresql:connect
-                 "automatic socket path search failed"))
-      socket))
+(define (guess-socket-path)
+  (guess-socket-path/paths 'mysql-guess-socket-path socket-paths))

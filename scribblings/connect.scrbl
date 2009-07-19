@@ -13,6 +13,10 @@
 @title{Connecting to a server}
 @(declare-exporting/this-package (main) ())
 
+Connections are made using the @scheme[postgresql-connect] and
+@scheme[mysql-connect] procedures. The connection classes are not
+exposed, so they cannot be instantiated directly.
+
 @section{Connecting to a PostgreSQL server}
 
 Use the following procedure to create a connection:
@@ -21,7 +25,7 @@ Use the following procedure to create a connection:
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 5432]
-                  [#:socket socket (or/c path? string? false/c (symbols 'auto)) #f]
+                  [#:socket socket (or/c path? string? false/c) #f]
                   [#:password password (or/c string? false/c) #f]
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
@@ -42,11 +46,9 @@ Use the following procedure to create a connection:
 
   To connect via a local socket, specify the socket path as the
   @scheme[socket] argument. You must not supply the @scheme[socket]
-  argument if you have also supplied either of the TCP arguments. If
-  @scheme['auto] is supplied as the socket path, the socket is
-  searched for in a standard list of locations. See also
-  @secref{connecting-to-server} for notes the socket path.  Sockets
-  are only available under Linux (x86) and Mac OS X.
+  argument if you have also supplied either of the TCP arguments. See
+  also @secref{connecting-to-server} for notes the socket path.
+  Sockets are only available under Linux (x86) and Mac OS X.
 
   If the server requests password authentication, the
   @scheme[password] argument must be present; otherwise an exception
@@ -62,9 +64,10 @@ Use the following procedure to create a connection:
   If the @scheme[ssl] argument is either @scheme['yes] or
   @scheme['optional], the connection attempts to negotiate an SSL
   connection. If the server refuses SSL, the connection raises an
-  error if @scheme[ssl] was set to @scheme['yes] or continues with a
-  normal connection if @scheme[ssl] was set to @scheme['optional]. SSL
-  may only be used with TCP connections, not with local sockets.
+  error if @scheme[ssl] was set to @scheme['yes] or continues with an
+  unencrypted connection if @scheme[ssl] was set to
+  @scheme['optional]. SSL may only be used with TCP connections, not
+  with local sockets.
 
   If the connection cannot be made, an exception is raised.
 
@@ -79,11 +82,27 @@ Use the following procedure to create a connection:
                          #:database "me"
                          #:password "icecream")
      (new connection%)]
-    [(postgresql-connect @code:comment{Typical socket path on some PostgreSQL configurations}
+    [(postgresql-connect @code:comment{Typical socket path}
                          #:socket "/var/run/postgresql/.s.PGSQL.5432"
                          #:user "me"
                          #:database "me")
+     (new connection%)]
+    [(postgresql-connect #:socket (postgresql-guess-socket-path)
+                         #:user "me"
+                         #:database "me")
      (new connection%)])
+}
+
+@defproc[(postgresql-guess-socket-path)
+         (or/c path? string?)]{
+
+  Attempts to guess the path for the socket based on conventional
+  locations. This procedure returns the first such conventional path
+  that exists in the filesystem. It does not check that the path is a
+  socket file, nor that the path is connected to a PostgreSQL server.
+
+  If the socket file cannot be found, an error is raised.
+
 }
 
 
@@ -95,7 +114,7 @@ Use the following procedure to create a connection:
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 3306]
-                  [#:socket socket (or/c path? string? false/c (symbols 'auto)) #f]
+                  [#:socket socket (or/c path? string? false/c) #f]
                   [#:password password (or/c string? false/c) #f])
          (and/c (is-a/c connection:admin<%>)
                 (is-a/c connection:query<%>)
@@ -118,10 +137,25 @@ Use the following procedure to create a connection:
                     #:database "me"
                     #:password "icecream")
      (new connection%)]
-    [(mysql-connect @code:comment{Typical socket path on some MySQL configurations}
+    [(mysql-connect @code:comment{Typical socket path}
                     #:socket "/var/run/mysqld/mysqld.sock"
                     #:user "me"
                     #:database "me")
+     (new connection%)]
+    [(mysql-connect #:socket (mysql-guess-socket-path)
+                    #:user "me"
+                    #:database "me")
      (new connection%)])
+}
+
+@defproc[(mysql-guess-socket-path)
+         (or/c path? string?)]{
+
+  Attempts to guess the path for the socket based on conventional
+  locations. This procedure returns the first such conventional path
+  that exists in the filesystem. It does not check that the path is a
+  socket file, nor that the path is connected to a MySQL server.
+
+  If the socket file cannot be found, an error is raised.
 
 }

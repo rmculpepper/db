@@ -533,9 +533,9 @@
              (connector-mixin
               mysql-base%)))))
     (super-new)
-    (inherit exec)
+    (inherit query-exec)
 
     ;; Set connection to use utf8 encoding
     (define/override (after-connect)
       (super after-connect)
-      (exec "set names 'utf8'"))))
+      (query-exec "set names 'utf8'"))))

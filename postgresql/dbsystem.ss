@@ -29,10 +29,14 @@
         type))
 
     (define/public (get-type-reader type #:options [options null])
-      (type->type-reader type))
+      (or (type->type-reader type) values))
 
     (define/public (get-type-writer type #:options [options null])
-      (type->type-writer type))
+      (or (type->type-writer type)
+          (lambda (s)
+            (unless (string? s)
+              (raise-type-error 'default-type-writer "string" s))
+            s)))
 
     (define/public (sql:escape-name name
                                     #:preserve-case? [preserve-case? #f])

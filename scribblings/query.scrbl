@@ -297,9 +297,9 @@ Predicate for connections supporting the prepared query API.
              (bind-prepared-statement c get-name-pst (list 1))]
             [get-name2
              (bind-prepared-statement c get-name-pst (list 2))])
-       (query-multiple c (list get-name1 get-name2)))
-     (list (make-Recordset (list (make-FieldInfo "name")) (list "one"))
-           (make-Recordset (list (make-FieldInfo "name")) (list "two")))])
+       (list (query-value c get-name1)
+             (query-value c get-name2)))
+     (list "one" "two")])
 }
 
 The following procedures prepares the parameterized SQL statement for
@@ -315,12 +315,12 @@ resulting procedure should be called with zero arguments.
 Prepared-statement procedures hold their associated connections
 strongly.
 
-@defproc[(prepare-exec [connection connection:query/prepare?]
-                       [prep string?])
+@defproc[(prepare-query-exec [connection connection:query/prepare?]
+                             [prep string?])
          (_param _... -> void?)]{
 
   Prepared version of @scheme[query-exec]. Unlike @scheme[query-exec],
-  @scheme[prepare-exec] permits only a single statement.
+  @scheme[prepare-query-exec] permits only a single statement.
 
 }
 
@@ -372,38 +372,38 @@ strongly.
 
 }
 
-@defproc[(prepare-map [connection connection:query/prepare?]
-                      [prep string?]
-                      [proc (_field _... -> _alpha)])
+@defproc[(prepare-query-map [connection connection:query/prepare?]
+                            [prep string?]
+                            [proc (_field _... -> _alpha)])
          (_param _... -> (listof _alpha))]{
 
   Prepared version of @scheme[query-map].
 
 }
 
-@defproc[(prepare-for-each [connection connection:query/prepare?]
-                           [prep string?]
-                           [proc (_field _... -> void?)])
+@defproc[(prepare-query-for-each [connection connection:query/prepare?]
+                                 [prep string?]
+                                 [proc (_field _... -> void?)])
          (_param _... -> void?)]{
 
   Prepared version of @scheme[query-for-each].
 
 }
 
-@defproc[(prepare-mapfilter [connection connection:query/prepare?]
-                            [prep string?]
-                            [map-proc (_field _... -> _alpha)]
-                            [filter-proc (_field _... -> boolean?)])
+@defproc[(prepare-query-mapfilter [connection connection:query/prepare?]
+                                  [prep string?]
+                                  [map-proc (_field _... -> _alpha)]
+                                  [filter-proc (_field _... -> boolean?)])
          (_param _... -> (listof _alpha))]{
 
   Prepared version of @scheme[query-mapfilter].
 
 }
 
-@defproc[(prepare-fold [connection connection:query/prepare?]
-                       [prep string?]
-                       [proc (_alpha _field _... -> _alpha)]
-                       [init _alpha])
+@defproc[(prepare-query-fold [connection connection:query/prepare?]
+                             [prep string?]
+                             [proc (_alpha _field _... -> _alpha)]
+                             [init _alpha])
          (_param _... -> _alpha)]{
 
   Prepared version of @scheme[query-fold].

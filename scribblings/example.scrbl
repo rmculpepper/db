@@ -9,10 +9,6 @@
 @(require (for-label scheme/base)
           (for-label "../main.ss"))
 
-@(define-syntax-rule (ameth meth) (method connection:admin<%> meth))
-@(define-syntax-rule (qmeth meth) (method connection:query<%> meth))
-@(define-syntax-rule (pmeth meth) (method connection:query/prepare<%> meth))
-
 @title{Annotated example}
 
 The following program demonstrates how to connect to a PostgreSQL
@@ -28,42 +24,42 @@ configuration (see @scheme[postgresql-connect] for other connection
 examples):
 
 @schemeinput[
-  (define cx
+  (define psql-c
     (postgresql-connect #:user "ryan"
                         #:database "ryan"
                         #:password (getenv "DBPASSWORD")))
 ]
 @(my-interaction
-  [cx (new connection%)])
+  [psql-c (new connection%)])
 
 We'll do all our work with a temporary table. It will be dropped as
 soon as we disconnect.
 
-Use the @method[connection:query<%> exec] method when you want to execute a SQL
+Use @scheme[query-exec] method when you want to execute a SQL
 statement that doesn't return a recordset.
 
 @schemeinput[
-(send cx #, @qmeth[exec]
+(query-exec psql-c
   "create temporary table the_numbers (n integer, description varchar(80))")
 ]
 @schemeinput[
-(send cx #, @qmeth[exec]
+(query-exec psql-c
   "insert into the_numbers values (0, 'nothing')")
 ]
 
-You can use @method[connection:query<%> exec] to perform several queries at once.
+You can use @scheme[query-exec] to perform several queries at once.
 
 @schemeinput[
-(send cx #, @qmeth[exec]
+(query-exec psql-c
   "insert into the_numbers (n, description) values (1, 'the loneliest number')"
   "insert into the_numbers values (2, 'the loneliest number since the number 1')")
 ]
 
-The @method[connection:query<%> query] method gives you the most information, but
-it's the least pleasant to use.
+The @scheme[query] procedure gives you the most information, but it's
+the least pleasant to use.
 
 @(my-interaction
-   [(send cx #, @qmeth[query]
+   [(query psql-c
       "select n, description from the_numbers where n % 2 = 0")
     (make-Recordset
      (list (make-FieldInfo "n") (make-FieldInfo "description"))
@@ -72,71 +68,70 @@ it's the least pleasant to use.
       (vector 0 "nothing")))])
 
 If you know a query returns exactly one row, you can use
-@method[connection:query<%> query-row] to get just that row.
+@scheme[query-row] to get just that row.
 
 @(my-interaction
-  [(send cx #, @qmeth[query-row] "select * from the_numbers where n = 0")
+  [(query-row psql-c "select * from the_numbers where n = 0")
    (vector 0 "nothing")])
 
 If you know that a query returns exactly one column, you can use
-@method[connection:query<%> query-list] to get just the list of values.
+@scheme[query-list] to get just the list of values.
 
 @(my-interaction
-  [(send cx #, @qmeth[query-list] "select description from the_numbers order by n")
+  [(query-list psql-c "select description from the_numbers order by n")
    (list "nothing"
          "the loneliest number"
          "the loneliest number since the number 1")])
 
 If you know that a query returns just a single value (one row, 
-one column), then you get use @method[connection:query<%> query-value].
+one column), then you get use @scheme[query-value].
 
 @(my-interaction
-  [(send cx #, @qmeth[query-value] "select count(*) from the_numbers")
+  [(query-value psql-c "select count(*) from the_numbers")
    3]
-  [(send cx #, @qmeth[query-value] "select now()")
+  [(query-value psql-c "select now()")
    (make-sql-timestamp 2008 4 1 12 34 56 0 #f)])
 
-If you aren't sure whether a row exists, you can use @method[connection:query<%>
-query-maybe-row] or @method[connection:query<%> query-maybe-value].
+If you aren't sure whether a row exists, you can use
+@scheme[query-maybe-row] or @scheme[query-maybe-value].
 
 @(my-interaction
-  [(send cx #, @qmeth[query-maybe-row] "select * from the_numbers where n = 1")
+  [(query-maybe-row psql-c "select * from the_numbers where n = 1")
    (vector 1 "the loneliest number")]
-  [(send cx #, @qmeth[query-maybe-row] "select * from the_numbers where n = 5")
+  [(query-maybe-row psql-c "select * from the_numbers where n = 5")
    #f])
 
-In the second example above, the @method[connection:query<%> query-row] method
-would have raised an error.
+In the second example above, the @scheme[query-row] method would have
+raised an error.
 
 @(my-interaction
-  [(send cx #, @qmeth[query-maybe-value]
+  [(query-maybe-value psql-c
      "select description from the_numbers where n = 5")
    #f])
 
-The @method[connection:query<%> query-value] method would have raised an error
-here, too.
+The @scheme[query-value] method would have raised an error here, too.
 
 Errors in queries are generally non-fatal.
 
 @(my-interaction
   [(begin (with-handlers [(exn:fail?
                            (lambda (e) (printf "~a~n" (exn-message e))))]
-            (send cx #, @qmeth[query-value] "select NoSuchField from NoSuchTable"))
-          (send cx #, @qmeth[query-value] "select 'okay to proceed!'"))
+            (query-value psql-c "select NoSuchField from NoSuchTable"))
+          (query-value psql-c "select 'okay to proceed!'"))
    (begin (display "field 'NoSuchField' does not exist")
           "okay to proceed!")])
 
 You can use the higher-order query methods to process results.
 
 @schemeinput[
-  (send cx #, @qmeth[map] "select n1.n, n2.n from the_numbers n1, the_numbers n2"
-         (lambda (x y) (list x y)))]
+  (query-map psql-c "select n1.n, n2.n from the_numbers n1, the_numbers n2"
+    (lambda (x y) (list x y)))]
 @schemeblock[
    (code:comment "the cartesian product of {0,1,2} with itself")
 ]
 
 @schemeinput[
-  (send cx #, @qmeth[mapfilter]
+  (query-mapfilter psql-c
     "select n1.n, n2.n from the_numbers n1, the_numbers n2"
     list
     (lambda (x y) (= 2 (+ x y))))]
@@ -144,19 +139,19 @@ You can use the higher-order query methods to process results.
    (code:comment "all ordered pairs from {0,1,2} that sum to 2")]
 
 @(my-interaction
-  [(send cx #, @qmeth[fold] "select n from the_numbers" + 0)
+  [(query-fold psql-c "select n from the_numbers" + 0)
    3])
 
 You can create parameterized queries and apply them to values later.
 
 @schemeinput[
   (define all-less-than
-    (send cx #, @pmeth[prepare-query-list]
+    (prepare-query-list psql-c
       "select n from the_numbers where n < $1"))
 ]
 @schemeinput[
   (define next-largest
-    (send cx #, @pmeth[prepare-query-maybe-value]
+    (prepare-query-maybe-value psql-c
       "select n from the_numbers where n < $1 order by n desc limit 1"))
 ]
 
@@ -174,7 +169,7 @@ There's another way to do that, of course:
 
 @schemeinput[
 (define next-largest2
-  (send cx #, @pmeth[prepare-query-value]
+  (prepare-query-value psql-c
     "select max(n) from the_numbers where n < $1"))
 ]
 @(my-interaction
@@ -191,16 +186,16 @@ If you like, you can declare cursors to fetch data incrementally.
 Usually, you must be inside of a transaction to create a cursor.
 
 @schemeinput[
-(send cx #, @qmeth[exec]
+(query-exec psql-c
   "begin transaction"
   "declare MC cursor for select * from the_numbers order by n"
   "move forward 1 in MC")
 ]
 @(my-interaction
-  [(send cx #, @qmeth[query-row] "fetch 1 in MC")
+  [(query-row psql-c "fetch 1 in MC")
    (vector 1 "the loneliest number")])
 @schemeinput[
-(send cx #, @qmeth[exec]
+(query-exec psql-c
   "close MC"
   "commit transaction")
 ]
@@ -208,5 +203,5 @@ Usually, you must be inside of a transaction to create a cursor.
 You should disconnect when you're done to close the communication ports.
 
 @schemeinput[
-(send cx #, @ameth[disconnect])
+(disconnect psql-c)
 ]

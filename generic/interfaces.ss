@@ -1,4 +1,4 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2009 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -47,8 +47,8 @@
     ;; query-multiple : (list-of Statement) -> (list-of QueryResult)
     query-multiple
 
-    ;; exec : Statement ... -> void
-    exec
+    ;; query-exec : Statement ... -> void
+    query-exec
 
     ;; query-rows : Statement -> (listof (vectorof value))
     query-rows
@@ -68,18 +68,18 @@
     ;; query-maybe-value : Statement -> value or #f
     query-maybe-value
 
-    ;; map : Statement (value ... -> a) -> (list-of a)
-    map
+    ;; query-map : Statement (value ... -> a) -> (list-of a)
+    query-map
 
-    ;; for-each : Statement (value ... -> void) -> void
-    for-each
+    ;; query-for-each : Statement (value ... -> void) -> void
+    query-for-each
 
-    ;; mapfilter : Statement (value ... -> a) (value ... -> boolean)
+    ;; query-mapfilter : Statement (value ... -> a) (value ... -> boolean)
     ;;           -> (list-of a)
-    mapfilter
+    query-mapfilter
 
-    ;; fold : Statement (a value ... -> a) a -> a
-    fold))
+    ;; query-fold : Statement (a value ... -> a) a -> a
+    query-fold))
 
 ;; connection:query/prepare<%>
 (define connection:query/prepare<%>
@@ -93,8 +93,8 @@
     ;; bind-prepared-statement : PreparedStatement (list-of param) -> Statement
     bind-prepared-statement
 
-    ;; prepare-exec : Preparable -> datum ... -> void
-    prepare-exec
+    ;; prepare-query-exec : Preparable -> datum ... -> void
+    prepare-query-exec
 
     ;; prepare-query-rows : Preparable -> datum ... -> void
     prepare-query-rows
@@ -105,7 +105,8 @@
     ;; prepare-query-row : Preparable -> datum ... -> (vector-of value)
     prepare-query-row
 
-    ;; prepare-query-maybe-row : Preparable -> datum ... -> (vectorof value) or #f
+    ;; prepare-query-maybe-row : Preparable
+    ;;                        -> datum ... -> (vectorof value) or #f
     prepare-query-maybe-row
 
     ;; prepare-query-value : Preparable -> datum ... -> value
@@ -114,18 +115,20 @@
     ;; prepare-query-maybe-value : Preparable -> datum ... -> value or #f
     prepare-query-maybe-value
 
-    ;; prepare-map : Preparable ('a ... -> 'b) -> datum ... -> (list-of 'b)
-    prepare-map
-
-    ;; prepare-for-each : Preparable ('a ... -> void) -> datum ... -> void
-    prepare-for-each
-
-    ;; prepare-mapfilter : Preparable ('a ... -> 'b) ('a ... -> boolean)
+    ;; prepare-query-map : Preparable ('a ... -> 'b)
     ;;                  -> datum ... -> (list-of 'b)
-    prepare-mapfilter
+    prepare-query-map
 
-    ;; prepare-fold : Preparable ('b 'a ... -> 'b) 'b -> datum ... -> 'b
-    prepare-fold))
+    ;; prepare-query-for-each : Preparable ('a ... -> void)
+    ;;                       -> datum ... -> void
+    prepare-query-for-each
+
+    ;; prepare-query-mapfilter : Preparable ('a ... -> 'b) ('a ... -> boolean)
+    ;;                        -> datum ... -> (list-of 'b)
+    prepare-query-mapfilter
+
+    ;; prepare-query-fold : Preparable ('b 'a ... -> 'b) 'b -> datum ... -> 'b
+    prepare-query-fold))
 
 ;; ==== DBSystem Interface
 

@@ -6,7 +6,7 @@
 @(require scheme/sandbox)
 
 @(require (for-label scheme/base)
-          (for-label "../generic/main.ss"))
+          (for-label "../main.ss"))
 
 @title{Notes}
 
@@ -58,7 +58,8 @@ which lists accepted authentication methods. It is sometimes necessary
 to add lines to this file that describe what authentication method is
 used for TCP connections. By default, this library supports only
 cleartext and md5-hashed passwords, and it does not send cleartext
-passwords unless explicitly ordered to (see @scheme[connect]).
+passwords unless explicitly ordered to (see
+@scheme[postgresql-connect]).
 
 
 @section{MySQL-Specific Notes}

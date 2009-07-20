@@ -106,8 +106,8 @@
     (define/public-final (query-multiple stmts)
       (query* 'query-multiple stmts vectorlist-collector/fieldinfo))
 
-    ;; fold : Statement ('a field ... -> 'a) 'a -> 'a
-    (define/public-final (fold sql f base)
+    ;; query-fold : Statement ('a field ... -> 'a) 'a -> 'a
+    (define/public-final (query-fold sql f base)
       (-fold 'fold sql f base))
 
     ;; -fold : symbol Statement ('a field ... -> 'a) 'a -> 'a
@@ -166,18 +166,19 @@
         (mk-single-column-collector 'query-maybe-value sql))
        sql))
 
-    ;; exec : Statement ... -> void
-    (define/public-final (exec . sqls)
-      (query* 'exec sqls void-collector)
+    ;; query-exec : Statement ... -> void
+    (define/public-final (query-exec . sqls)
+      (query* 'query-exec sqls void-collector)
       (void))
 
-    ;; mapfilter : Statement (field... -> 'a) (field... -> boolean) -> (listof 'a)
-    (define/public-final (mapfilter sql f keep?)
+    ;; query-mapfilter : Statement (field... -> 'a) (field... -> boolean)
+    ;;                -> (listof 'a)
+    (define/public-final (query-mapfilter sql f keep?)
       (unless (procedure? keep?)
-        (raise-type-error 'mapfilter "procedure" keep?))
+        (raise-type-error 'query-mapfilter "procedure" keep?))
       (unless (procedure? f)
-        (raise-type-error 'mapfilter "procedure" f))
-      (reverse (-fold 'mapfilter
+        (raise-type-error 'query-mapfilter "procedure" f))
+      (reverse (-fold 'query-mapfilter
                       sql
                       (lambda (b . fields)
                         (if (apply keep? fields)
@@ -185,21 +186,19 @@
                             b))
                       null)))
 
-    ;; -map : Statement (field ... -> 'a) -> (listof 'a)
-    (public (-map map))
-    (define (-map sql f)
+    ;; query-map : Statement (field ... -> 'a) -> (listof 'a)
+    (define/public-final (query-map sql f)
       (unless (procedure? f)
-        (raise-type-error 'map "procedure" f))
+        (raise-type-error 'query-map "procedure" f))
       (reverse
-       (-fold 'map
+       (-fold 'query-map
               sql (lambda (b . fields) (cons (apply f fields) b)) null)))
 
-    ;; -for-each : Statement (field ... -> unspecified) -> unspecified
-    (public (-for-each for-each))
-    (define (-for-each sql f)
+    ;; query-for-each : Statement (field ... -> unspecified) -> unspecified
+    (define/public-final (query-for-each sql f)
       (unless (procedure? f)
-        (raise-type-error 'for-each "procedure" f))
-      (-fold 'for-each sql (lambda (_ . fields) (apply f fields)) #f))
+        (raise-type-error 'query-for-each "procedure" f))
+      (-fold 'query-for-each sql (lambda (_ . fields) (apply f fields)) #f))
 
     ;; query/recordset : symbol Statement collector -> void
     (define/private (query/recordset fsym sql collector)
@@ -216,17 +215,17 @@
 (define prepare-query-mixin
   (mixin (primitive-query/prepare<%> connection:query<%>) 
          (connection:query/prepare<%>)
-    (inherit exec
+    (inherit query-exec
              query-rows
              query-list
              query-row
              query-maybe-row
              query-value
              query-maybe-value
-             map
-             for-each
-             mapfilter
-             fold)
+             query-map
+             query-for-each
+             query-mapfilter
+             query-fold)
     (inherit prepare-multiple
              bind-prepared-statement)
     (super-new)
@@ -247,7 +246,7 @@
              (check 'name pst sql) ...
              (lambda args (method (bind-prepared-statement pst args) arg ...))))]))
 
-    (prepare-query-method prepare-exec exec)
+    (prepare-query-method prepare-query-exec query-exec)
     (prepare-query-method prepare-query-rows query-rows)
     (prepare-query-method prepare-query-list query-list
                           [#:check check-results/one-column])
@@ -260,16 +259,16 @@
     (prepare-query-method prepare-query-maybe-value query-maybe-value
                           [#:check check-results/one-column])
     
-    (prepare-query-method prepare-map map
+    (prepare-query-method prepare-query-map query-map
                           [#:check check-results]
                           [#:arg proc])
-    (prepare-query-method prepare-for-each for-each
+    (prepare-query-method prepare-query-for-each query-for-each
                           [#:check check-results]
                           [#:arg proc])
-    (prepare-query-method prepare-mapfilter mapfilter
+    (prepare-query-method prepare-query-mapfilter query-mapfilter
                           [#:check check-results]
                           [#:arg map-proc filter-proc])
-    (prepare-query-method prepare-fold fold
+    (prepare-query-method prepare-query-fold query-fold
                           [#:check check-results]
                           [#:arg combine base])
     ))

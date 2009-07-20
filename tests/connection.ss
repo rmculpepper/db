@@ -75,68 +75,68 @@
            (let [(q (sendq c query-maybe-value
                           "select N from the_numbers where N > 1000"))]
              (check-equal? q #f)))))
-      (test-case "map"
+      (test-case "query-map"
         (call-with-connection
          (lambda (c)
-           (let [(q (sendq c map 
+           (let [(q (sendq c query-map 
                           "select N, description from the_numbers where N < 2"
                           list))]
              (check-true 
               (set-equal? q
                           (filter (lambda (p) (< (car p) 2)) test-data)))))))
-      (test-case "for-each"
+      (test-case "query-for-each"
         (call-with-connection
          (lambda (c)
            (define a null)
-           (let ([q (sendq c for-each
+           (let ([q (sendq c query-for-each
                           "select N, description from the_numbers where N < 2"
                           (lambda (N description)
                             (set! a (cons (list N description) a))))])
              (check-true 
               (set-equal? a
                           (filter (lambda (p) (< (car p) 2)) test-data)))))))
-      (test-case "mapfilter - odds"
+      (test-case "query-mapfilter - odds"
         (call-with-connection
          (lambda (c)
-           (let [(q (sendq c mapfilter 
+           (let [(q (sendq c query-mapfilter 
                           "select N, description from the_numbers"
                           list
                           (lambda (n d) (odd? n))))]
              (check-true 
               (set-equal? q
                           (filter (lambda (p) (odd? (car p))) test-data)))))))
-      (test-case "fold - sum"
+      (test-case "query-fold - sum"
         (call-with-connection 
          (lambda (c)
-           (let [(q (sendq c fold "select N from the_numbers" + 0))]
+           (let [(q (sendq c query-fold "select N from the_numbers" + 0))]
              (check-equal? q
                            (foldl + 0 (map car test-data)))))))
-      (test-case "fold/query-list - sum"
+      (test-case "query-fold/query-list - sum"
         (call-with-connection
          (lambda (c)
-           (let [(q (sendq c fold "select N from the_numbers" + 0))
+           (let [(q (sendq c query-fold "select N from the_numbers" + 0))
                  (q2 (sendq c query-list "select N from the_numbers"))]
              (check-equal? q (foldl + 0 q2))))))
-      (test-case "fold - max"
+      (test-case "query-fold - max"
         (call-with-connection
          (lambda (c)
-           (let [(q (sendq c fold
+           (let [(q (sendq c query-fold
                           "select N from the_numbers where N > 0 order by N"
                           max -1000))]
              (check-equal? q (foldl max -1000 (map car test-data)))))))
-      (test-case "exec - insert"
+      (test-case "query-exec - insert"
         (call-with-connection
          (lambda (c)
-           (let [(q (sendq c exec 
+           (let [(q (sendq c query-exec 
                           "insert into the_numbers values(-1, 'mysterious')"))]
              (check-equal? 
               (sendq c query-value
                     "select description from the_numbers where N = -1")
               "mysterious")))))
-      (test-case "exec - delete"
+      (test-case "query-exec - delete"
         (call-with-connection
          (lambda (c)
-           (let [(q (sendq c exec "delete from the_numbers where N <> 0"))]
+           (let [(q (sendq c query-exec "delete from the_numbers where N <> 0"))]
              (check-equal? (sendq c query-value "select count(*) from the_numbers")
                            1)
              (check-equal? (sendq c query-list "select N from the_numbers")
@@ -192,7 +192,7 @@
           (call-with-connection
            (lambda (c)
              (define q
-               (send c map
+               (send c query-map
                      "select N from the_numbers where N > 0 and N < 3 order by N"
                      (lambda (a)
                        (send c query-value 
@@ -222,7 +222,7 @@
                              (k2 #t))))
                     (q 
                      (let/cc return
-                       (send c for-each "select N from the_numbers order by N asc"
+                       (send c query-for-each "select N from the_numbers order by N asc"
                              (lambda (id)
                                (let/cc k
                                  (set! k2 k1)

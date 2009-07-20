@@ -82,10 +82,9 @@ Method for @scheme[query].
 Method for @scheme[query-multiple].
 }
 
-@defmethod[(exec [stmt (unsyntax @techlink{Statement})] ...)
+@defmethod[(query-exec [stmt (unsyntax @techlink{Statement})] ...)
            void?]{
-Method for @scheme[query-exec]. Note the method name is simply
-@qmeth[exec].
+Method for @scheme[query-exec].
 }
 
 @defmethod[(query-rows [stmt (unsyntax @techlink{Statement})])
@@ -118,35 +117,31 @@ Method for @scheme[query-value].
 Method for @scheme[query-maybe-value].
 }
 
-@defmethod[(map [stmt (unsyntax @techlink{Statement})]
-                [proc (_field _... -> _alpha)])
+@defmethod[(query-map [stmt (unsyntax @techlink{Statement})]
+                      [proc (_field _... -> _alpha)])
            (listof _alpha)]{
-Method for @scheme[query-map]. Note the method name is simply
-@qmeth[map].
+Method for @scheme[query-map].
 }
 
-@defmethod[(for-each [stmt (unsyntax @techlink{Statement})]
-                     [proc (_field _... -> any)])
+@defmethod[(query-for-each [stmt (unsyntax @techlink{Statement})]
+                           [proc (_field _... -> any)])
            void?]{
-Method for @scheme[query-for-each]. Note the method name is simply
-@qmeth[for-each].
+Method for @scheme[query-for-each].
 }
 
-@defmethod[(mapfilter [stmt (unsyntax @techlink{Statement})]
-                      [map-proc (_field _... -> _alpha)]
-                      [filter-proc (_field _... -> boolean?)])
+@defmethod[(query-mapfilter [stmt (unsyntax @techlink{Statement})]
+                            [map-proc (_field _... -> _alpha)]
+                            [filter-proc (_field _... -> boolean?)])
            (listof _alpha)]{
-Method for @scheme[mapfilter]. Note the method name is simply 
-@qmeth[mapfilter].
+Method for @scheme[query-mapfilter].
 }
 
-@defmethod[(fold [stmt (unsyntax @techlink{Statement})]
-                 [proc (_alpha _field _... -> _alpha)]
-                 [init _alpha])
+@defmethod[(query-fold [stmt (unsyntax @techlink{Statement})]
+                       [proc (_alpha _field _... -> _alpha)]
+                       [init _alpha])
            _alpha]{
 
-Method for @scheme[query-fold]. Note the method name is simply
-@qmeth[fold].
+Method for @scheme[query-fold].
 }
 }
 
@@ -171,9 +166,9 @@ Method @scheme[prepare-multiple].
 Method for @scheme[bind-prepared-statement].
 }
 
-@defmethod[(prepare-exec [prep string?])
+@defmethod[(prepare-query-exec [prep string?])
            (_param _... -> void?)]{
-Method for @scheme[prepare-exec].
+Method for @scheme[prepare-query-exec].
 }
 
 @defmethod[(prepare-query-rows [prep string?])
@@ -206,27 +201,29 @@ Method for @scheme[prepare-query-value].
 Method for @scheme[prepare-query-maybe-value].
 }
 
-@defmethod[(prepare-map [prep string?] [proc (_field _... -> _alpha)])
+@defmethod[(prepare-query-map [prep string?]
+                              [proc (_field _... -> _alpha)])
            (_param _... -> (listof _alpha))]{
-Method for @scheme[prepare-map].
+Method for @scheme[prepare-query-map].
 }
 
-@defmethod[(prepare-for-each [prep string?] [proc (_field _... -> void?)])
+@defmethod[(prepare-query-for-each [prep string?]
+                                   [proc (_field _... -> void?)])
            (_param _... -> void?)]{
-Method for @scheme[prepare-for-each].
+Method for @scheme[prepare-query-for-each].
 }
 
-@defmethod[(prepare-mapfilter [prep string?]
-                              [map-proc (_field _... -> _alpha)]
-                              [filter-proc (_field _... -> boolean?)])
+@defmethod[(prepare-query-mapfilter [prep string?]
+                                    [map-proc (_field _... -> _alpha)]
+                                    [filter-proc (_field _... -> boolean?)])
            (_param _... -> (listof _alpha))]{
-Method for @scheme[prepare-mapfilter].
+Method for @scheme[prepare-query-mapfilter].
 }
 
-@defmethod[(prepare-fold [prep string?]
-                         [proc (_alpha _field _... -> _alpha)]
-                         [init _alpha])
+@defmethod[(prepare-query-fold [prep string?]
+                               [proc (_alpha _field _... -> _alpha)]
+                               [init _alpha])
            (_param _... -> _alpha)]{
-Method for @scheme[prepare-fold].
+Method for @scheme[prepare-query-fold].
 }
 }

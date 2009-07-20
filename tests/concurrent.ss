@@ -24,7 +24,7 @@
 
   (define (((mk-worker c iterations) tid))
     (define insert
-      (send c prepare-exec "insert into play_numbers (n) values ($1)"))
+      (send c prepare-query-exec "insert into play_numbers (n) values ($1)"))
     (define (add-to-max n)
       (insert (+ n (send c query-value "select max(n) from play_numbers"))))
     (for-each insert (build-list iterations add1))
@@ -39,7 +39,7 @@
       (test-case "lots of threads"
         (call-with-connection
          (lambda (c)
-           (send c exec "create temporary table play_numbers (n integer)")
+           (send c query-exec "create temporary table play_numbers (n integer)")
            (for-each thread-wait
                      (map thread
                           (map (mk-worker c 100) (build-list 20 add1)))))))
@@ -54,7 +54,7 @@
                             (super-new)))))
           (call-with-connection
            (lambda (c)
-             (send c exec "create temporary table play_numbers (n integer)")
+             (send c query-exec "create temporary table play_numbers (n integer)")
              (for-each thread-wait
                        (map thread
                             (map (mk-worker c 5) (build-list 4 add1))))))))
@@ -69,7 +69,7 @@
                             (super-new)))))
           (call-with-connection
            (lambda (c)
-             (send c exec "create temporary table play_numbers (n integer)")
+             (send c query-exec "create temporary table play_numbers (n integer)")
              (for-each thread-wait
                        (map thread
                             (map (mk-worker c 5) (build-list 4 add1)))))))))))

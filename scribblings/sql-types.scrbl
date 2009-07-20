@@ -22,11 +22,15 @@ conversion to or from a SQL type, you must supply or accept a string
 containing the SQL value's external representation.
 
 @(examples/results
-  [(send c #, @qmeth[query-value] "select 18") 18]
-  [(send c #, @qmeth[query-value] "select false") #f]
+  [(query-value psql-c "select 18") 18]
+  [(query-value psql-c "select false") #f]
+  [(query-value psql-c "select '{1,2,3}'::int[]") "{1,2,3}"]
+  [(query-value psql-c "select point (1,2)") "(1,2)"])
 
-  [(send c #, @qmeth[query-value] "select '{1,2,3}'::int[]") "{1,2,3}"]
-  [(send c #, @qmeth[query-value] "select point (1,2)") "(1,2)"])
+The sections below describe this library's support for PostgreSQL and
+MySQL data types. The listed type names and aliases are not used by
+any operation defined in this library yet, but more operations on SQL
+data types are planned, and they will use the names listed below.
          
 @section{PostgreSQL Types and Conversions}
 
@@ -65,11 +69,18 @@ finite decimal strings are converted without loss of precision. Other
 real values are converted to decimals with a loss of precision.
 
 PostgreSQL defines other datatypes, such as network addresses and
-various geometric concepts. These are not supported.
+various geometric concepts. These are not converted.
 
 Array types are also not currently supported. Support may be added in
 a future version.
 
+@(examples/results
+  [(query-value psql-c "select real '+Infinity'")
+   +inf.0]
+  [(query-value psql-c "select decimal '12345678901234567890'")
+   12345678901234567890])
+
+See also date and time examples in @secref{sql-data}.
 
 @section{MySQL Types and Conversions}
 
@@ -98,7 +109,7 @@ A SQL value of type @tt{numeric/decimal} is always converted to an
 exact rational (MySQL seems not to support infinite numerics).
 
 
-@section{SQL Data}
+@section[#:tag "sql-data"]{SQL Data}
 
 SQL NULL values are always translated into the unique @scheme[sql-null] value.
 
@@ -108,6 +119,10 @@ SQL NULL values are always translated into the unique @scheme[sql-null] value.
 
 A special value and predicate used to represent NULL values in
 query results.
+
+@(examples/results
+  [(query-value psql-c "select NULL")
+   sql-null])
 }
 
 New Scheme datatypes are also provided for a few SQL types that have
@@ -141,7 +156,25 @@ no close analogues in Scheme.
   SRFI 19. Note, however, that PostgreSQL only supports microsecond
   time accuracy. Fractional seconds are rounded to the nearest
   microsecond when they are stored in the database.
+
+@(examples/results
+  [(query-value psql-c "select date '25-dec-1980'")
+   (make-sql-date 1980 12 25)]
+  [(query-value psql-c "select time '7:30'")
+   (make-sql-time 7 30 0 0 #f)]
+  [(query-value psql-c "select timestamp 'epoch'")
+   (make-sql-timestamp 1970 1 1 0 0 0 0 #f)]
+  [(query-value psql-c "select timestamp with time zone 'epoch'")
+   (make-sql-timestamp 1969 12 31 19 0 0 0 -18000)])
 }
+
+@(examples/results
+  [(query-value mysql-c "select date('1980-12-25')")
+   (make-sql-date 1980 12 25)]
+  [(query-value mysql-c "select time('7:30')")
+   (make-sql-time 7 30 0 0 #f)]
+  [(query-value mysql-c "select from_unixtime(0)")
+   (make-sql-timestamp 1969 12 31 19 0 0 0 #f)])
 
 @defproc[(sql-datetime->srfi-date [t (or/c sql-date? sql-time? sql-timestamp?)])
          date?]
@@ -160,6 +193,19 @@ no close analogues in Scheme.
   date values. SRFI dates store more information than SQL dates and
   times, so converting a SQL time to a SRFI date, for example, puts
   zeroes in the year, month, and day fields.
+
+@(examples/results
+  [(sql-datetime->srfi-date
+    (query-value psql-c "select time '7:30'"))
+   (sql-datetime->srfi-date (make-sql-time 7 30 0 0 #f))]
+  [(sql-datetime->srfi-date
+    (query-value psql-c "select date '25-dec-1980'"))
+   (sql-datetime->srfi-date
+    (make-sql-date 1980 12 25))]
+  [(sql-datetime->srfi-date
+    (query-value psql-c "select timestamp 'epoch'"))
+   (sql-datetime->srfi-date (make-sql-timestamp 1970 1 1 0 0 0 0 #f))])
+
 }
 
 @;{

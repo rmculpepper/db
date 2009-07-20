@@ -45,10 +45,12 @@
 
   (define (connect-and-setup)
     (let [(cx (connect-for-test))]
-      (send cx exec "create temporary table the_numbers (N integer primary key, description text)")
+      (send cx query-exec
+            "create temporary table the_numbers (N integer primary key, description text)")
       (for-each (lambda (p)
-                  (send cx exec (format "insert into the_numbers values (~a, '~a')"
-                                        (car p) (cadr p))))
+                  (send cx query-exec
+                        (format "insert into the_numbers values (~a, '~a')"
+                                (car p) (cadr p))))
                 test-data)
       cx))
 

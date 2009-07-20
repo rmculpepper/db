@@ -20,7 +20,7 @@ spgsql.
 
 The database package provides a high-level interface to PostgreSQL and
 MySQL database servers. It does not rely on any locally-installed
-client libraries: this package is everything you need to connect PLT
+client libraries; this package is everything you need to connect PLT
 Scheme to a PostgreSQL or MySQL server.
 
 The library is object-based, using @schememodname[scheme/class]

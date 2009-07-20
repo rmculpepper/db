@@ -1,3 +1,6 @@
+;; Copyright 2009 Ryan Culpepper
+;; Released under the terms of the modified BSD license (see the file
+;; COPYRIGHT for terms).
 
 #lang scheme/base
 (provide guess-socket-path/paths)

@@ -3,7 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang setup/infotab
-(define name "db")
+(define name "database")
 (define compile-omit-paths
   '("samples"
     "tests"))

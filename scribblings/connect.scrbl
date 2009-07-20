@@ -30,9 +30,9 @@ Use the following procedure to create a connection:
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
                   [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
-         (and/c (is-a/c connection:admin<%>)
-                (is-a/c connection:query<%>)
-                (is-a/c connection:query/prepare<%>))]{
+         (and/c connection:admin?
+                connection:query?
+                connection:query/prepare?)]{
 
   Creates a connection to a PostgreSQL server. The
   @scheme[postgresql-connect] procedure recognizes the keyword
@@ -116,9 +116,9 @@ Use the following procedure to create a connection:
                   [#:port port number? 3306]
                   [#:socket socket (or/c path? string? false/c) #f]
                   [#:password password (or/c string? false/c) #f])
-         (and/c (is-a/c connection:admin<%>)
-                (is-a/c connection:query<%>)
-                (is-a/c connection:query/prepare<%>))]{
+         (and/c connection:admin?
+                connection:query?
+                connection:query/prepare?)]{
 
   Creates a connection to a MySQL server. The meaning of the keyword
   arguments is similar to those of the @scheme[postgresql-connect]

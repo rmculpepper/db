@@ -42,6 +42,7 @@ and later and MySQL servers version 5 and later.
 @include-section["connect.scrbl"]
 @include-section["query.scrbl"]
 @include-section["sql-types.scrbl"]
+@include-section["class-api.scrbl"]
 @include-section["notes.scrbl"]
 @include-section["example.scrbl"]
 

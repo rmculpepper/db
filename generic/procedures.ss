@@ -3,34 +3,56 @@
 ;; COPYRIGHT for terms).
 
 #lang scheme/base
-(require scheme/class)
+(require scheme/class
+         "interfaces.ss")
+(provide (except-out (all-defined-out)
+                     defproc*
+                     defproc))
 
-(define-syntax-rule (defproc* def ...)
-  (begin (defproc . def) ...))
+(define-syntax-rule (defproc* ifc def ...)
+  (begin (defproc ifc . def) ...))
 (define-syntax defproc
   (syntax-rules ()
-    [(_ [proc method] . formals)
-     (begin (provide proc)
-            (define (proc c . formals)
+    [(_ ifc [proc method] . formals)
+     (begin (define (proc c . formals)
+              (unless (is-a? c ifc)
+                (raise-type-error 'proc
+                                  (format "instance of ~s" 'ifc)
+                                  c))
               (send c method . formals)))]
-    [(_ proc . formals)
-     (defproc [proc proc] . formals)]))
+    [(_ ifc proc . formals)
+     (defproc ifc [proc proc] . formals)]))
 
-(defproc*
+(define (connection:admin? x)
+  (is-a? x connection:admin<%>))
+
+(defproc* connection:admin<%>
+  (connected?)
+  (disconnect)
+  (get-system))
+
+(define (connection:query? x)
+  (is-a? x connection:query<%>))
+
+(defproc* connection:query<%>
   (query stmt)
   (query-multiple stmts)
   ([query-exec exec] . stmts)
   (query-rows stmt)
   (query-list stmt)
   (query-row stmt)
-  (query-maybe-rows stmt)
+  (query-maybe-row stmt)
   (query-value stmt)
   (query-maybe-value stmt)
   ([query-map map] stmt proc)
   ([query-for-each for-each] stmt proc)
   ([query-mapfilter mapfilter] stmt mapproc filterproc)
-  ([query-fold fold] stmt proc base)
+  ([query-fold fold] stmt proc base))
 
+(define (connection:query/prepare? x)
+  (is-a? x connection:query/prepare<%>))
+
+(defproc* connection:query/prepare<%>
   (prepare stmt)
   (prepare-multiple stmts)
   (bind-prepared-statement prep params)
@@ -45,3 +67,6 @@
   (prepare-for-each stmt proc)
   (prepare-mapfilter stmt mapproc filterproc)
   (prepare-fold stmt proc base))
+
+(define (dbsystem? x)
+  (is-a? x dbsystem<%>))

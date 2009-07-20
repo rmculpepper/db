@@ -17,11 +17,14 @@
 ;; ----
 
 (define the-eval (make-base-eval))
-(interaction-eval #:eval the-eval
-                  (require scheme/class
-                           "main.ss"))
-(interaction-eval #:eval the-eval
-                  (define connection% (class object% (super-new))))
+(void
+ (interaction-eval #:eval the-eval
+                   (require scheme/class
+                            "main.ss")))
+(void
+ (interaction-eval #:eval the-eval
+                   (define connection% (class object% (super-new)))))
+
 (define-syntax-rule (examples/results [example result] ...)
   (examples #:eval the-eval (eval:alts example result) ...))
 (define-syntax-rule (my-interaction [example result] ...)

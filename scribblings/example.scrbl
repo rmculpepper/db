@@ -15,8 +15,7 @@ The following program demonstrates how to connect to a PostgreSQL
 backend and perform simple queries.
 
 @schemeinput[
-(require #, @(schememodname/this-package)
-         #, @schememodname[scheme/class])
+(require #, @(schememodname/this-package))
 ]
 
 Replace these values with the appropriate values for your

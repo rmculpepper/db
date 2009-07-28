@@ -21,6 +21,8 @@ the server, not the processing of returned results. Clients requiring
 synchronized processing of query results must implement the
 synchronization themselves.
 
+Connections are not kill-safe.
+
 
 @section{Character Encodings}
 
@@ -60,6 +62,10 @@ used for TCP connections. By default, this library supports only
 cleartext and md5-hashed passwords, and it does not send cleartext
 passwords unless explicitly ordered to (see
 @scheme[postgresql-connect]).
+
+@subsection{Notices and Notifications}
+
+This library does not currently handle notices or notifications.
 
 
 @section{MySQL-Specific Notes}

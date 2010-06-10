@@ -5,7 +5,7 @@
 #lang racket/base
 (require (for-syntax racket/base
                      syntax/parse
-                     "unstable-syntax.ss"))
+                     "unstable-syntax.rkt"))
 (provide define-struct-property)
 
 ;; syntax define-struct-property

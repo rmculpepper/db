@@ -4,8 +4,8 @@
 
 #lang racket/base
 (require racket/unit
-         "../generic/signatures.ss"
-         "main.ss")
+         "../generic/signatures.rkt"
+         "main.rkt")
 (provide mysql@)
 
 (define-unit-from-context mysql@ database^)

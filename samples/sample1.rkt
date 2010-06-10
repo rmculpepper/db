@@ -6,7 +6,7 @@
 ;; perform simple queries on the connection.
 
 (require racket
-         "../main.ss")
+         "../main.rkt")
 
 ;; Replace these values with the appropriate values for your 
 ;; configuration.

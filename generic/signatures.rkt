@@ -4,7 +4,7 @@
 
 #lang racket/base
 (require racket/unit
-         ;; "sql-format.ss"
+         ;; "sql-format.rkt"
          )
 (provide database^)
 

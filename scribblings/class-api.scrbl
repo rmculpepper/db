@@ -4,9 +4,9 @@
           scribble/eval
           scribble/struct
           scheme/sandbox
-          "config.ss"
+          "config.rkt"
           (for-label scheme/base scheme/class scheme/contract)
-          (for-label "../main.ss"))
+          (for-label "../main.rkt"))
 
 @(define-syntax-rule (qmeth meth) (method connection:query<%> meth))
 @(define-syntax-rule (pmeth meth) (method connection:query/prepare<%> meth))

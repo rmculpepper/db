@@ -6,8 +6,8 @@
 (require (for-syntax racket/base)
          racket/unit
          racket/class
-         "interfaces.ss"
-         "sql-data.ss")
+         "interfaces.rkt"
+         "sql-data.rkt")
 (provide format-sql
          concat-sql)
 

@@ -3,8 +3,8 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "msg.ss"
-         "../generic/exceptions.ss")
+(require "msg.rkt"
+         "../generic/exceptions.rkt")
 (provide raise-backend-error)
 
 ;; raise-backend-error : symbol ErrorResponse -> raises exn

@@ -3,7 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "generic/main.ss"
-         (prefix-in mysql- "mysql/main.ss"))
-(provide (all-from-out "generic/main.ss")
-         (all-from-out "mysql/main.ss"))
+(require "generic/main.rkt"
+         (prefix-in mysql- "mysql/main.rkt"))
+(provide (all-from-out "generic/main.rkt")
+         (all-from-out "mysql/main.rkt"))

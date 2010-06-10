@@ -3,7 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "generic/main.ss"
-         (prefix-in postgresql- "postgresql/main.ss"))
-(provide (all-from-out "generic/main.ss")
-         (all-from-out "postgresql/main.ss"))
+(require "generic/main.rkt"
+         (prefix-in postgresql- "postgresql/main.rkt"))
+(provide (all-from-out "generic/main.rkt")
+         (all-from-out "postgresql/main.rkt"))

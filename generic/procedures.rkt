@@ -4,7 +4,7 @@
 
 #lang racket/base
 (require racket/class
-         "interfaces.ss")
+         "interfaces.rkt")
 (provide (except-out (all-defined-out)
                      defproc*
                      defproc))

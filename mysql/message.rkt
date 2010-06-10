@@ -4,8 +4,8 @@
 
 #lang racket/base
 (require racket/match
-         "../generic/sql-data.ss"
-         "../generic/io.ss")
+         "../generic/sql-data.rkt"
+         "../generic/io.rkt")
 (provide (all-defined-out))
 
 (define-struct packet () #:transparent)

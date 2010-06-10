@@ -4,9 +4,9 @@
 
 #lang racket/base
 (require (for-syntax racket/base)
-         (for-syntax "../generic/unstable-syntax.ss")
-         "../generic/unstable-struct.ss"
-         "../generic/io.ss")
+         (for-syntax "../generic/unstable-syntax.rkt")
+         "../generic/unstable-struct.rkt"
+         "../generic/io.rkt")
 (provide (all-defined-out))
 
 (define-struct-property message-writer)

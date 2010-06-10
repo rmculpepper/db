@@ -9,13 +9,13 @@
 (require racket/class
          racket/match
          openssl/sha1
-         "../generic/interfaces.ss"
-         "../generic/sql-data.ss"
-         "../generic/query.ss"
-         "message.ss"
-         "exceptions.ss"
-         "dbsystem.ss"
-         "types.ss")
+         "../generic/interfaces.rkt"
+         "../generic/sql-data.rkt"
+         "../generic/query.rkt"
+         "message.rkt"
+         "exceptions.rkt"
+         "dbsystem.rkt"
+         "types.rkt")
 (provide connection%)
 
 ;; Debugging

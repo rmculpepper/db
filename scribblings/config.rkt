@@ -22,7 +22,7 @@
 (void
  (interaction-eval #:eval the-eval
                    (require racket/class
-                            "main.ss")))
+                            "main.rkt")))
 (void
  (interaction-eval #:eval the-eval
                    (define connection% (class object% (super-new)))))

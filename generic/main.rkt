@@ -3,10 +3,10 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "interfaces.ss"
-         "signatures.ss"
-         "sql-data.ss"
-         "procedures.ss")
+(require "interfaces.rkt"
+         "signatures.rkt"
+         "sql-data.rkt"
+         "procedures.rkt")
 (provide connection:admin<%>
          connection:query<%>
          connection:query/prepare<%>

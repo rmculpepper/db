@@ -6,7 +6,7 @@
 @(require scheme/sandbox)
 
 @(require (for-label scheme/base)
-          (for-label "../main.ss"))
+          (for-label "../main.rkt"))
 
 @title{Notes}
 

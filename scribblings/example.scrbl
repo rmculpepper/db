@@ -4,9 +4,9 @@
           scribble/eval
           scribble/struct
           scheme/sandbox
-          "config.ss")
+          "config.rkt")
 @(require (for-label scheme/base)
-          (for-label "../main.ss"))
+          (for-label "../main.rkt"))
 
 @title{Annotated example}
 

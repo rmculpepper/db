@@ -6,11 +6,11 @@
 (require racket/class
          racket/contract
          racket/tcp
-         "../generic/main.ss"
-         "../generic/socket.ss"
-         "../generic/find-socket.ss"
-         "connection.ss"
-         "dbsystem.ss")
+         "../generic/main.rkt"
+         "../generic/socket.rkt"
+         "../generic/find-socket.rkt"
+         "connection.rkt"
+         "dbsystem.rkt")
 (provide/contract
  [connect
   (->* (#:user string?

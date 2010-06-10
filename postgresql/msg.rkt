@@ -3,9 +3,9 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "../generic/sql-data.ss"
-         "../generic/io.ss"
-         "msg-util.ss")
+(require "../generic/sql-data.rkt"
+         "../generic/io.rkt"
+         "msg-util.rkt")
 (provide (all-defined-out))
 
 ;; The strange structures

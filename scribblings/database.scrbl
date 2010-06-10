@@ -1,9 +1,9 @@
 #lang scribble/doc
 @(require scribble/manual
           scribble/struct
-          "config.ss"
+          "config.rkt"
           (for-label scheme/base)
-          (for-label "../generic/main.ss"))
+          (for-label "../generic/main.rkt"))
 
 @title[#:version (package-version)]{db: Database connectivity}
 @author{Ryan Culpepper}

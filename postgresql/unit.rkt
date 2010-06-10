@@ -4,8 +4,8 @@
 
 #lang racket/base
 (require racket/unit
-         "../generic/signatures.ss"
-         "main.ss")
+         "../generic/signatures.rkt"
+         "main.rkt")
 (provide postgresql@)
 
 (define-unit-from-context postgresql@ database^)

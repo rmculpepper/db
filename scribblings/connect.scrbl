@@ -4,10 +4,10 @@
           scribble/eval
           scribble/struct
           scheme/sandbox
-          "config.ss"
+          "config.rkt"
           (for-label scheme/base
                      scheme/contract
-                     "../main.ss"))
+                     "../main.rkt"))
 
 @title{Connecting to a server}
 @(declare-exporting/this-package (main) ())

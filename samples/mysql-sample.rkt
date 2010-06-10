@@ -1,5 +1,5 @@
 #lang racket
-(require "../mysql/main.ss")
+(require "../mysql/main.rkt")
 
 (define c
   (connect #:socket "/var/run/mysqld/mysqld.sock"

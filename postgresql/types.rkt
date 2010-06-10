@@ -4,8 +4,8 @@
 
 #lang racket/base
 (require racket/unit
-         "../generic/sql-data.ss"
-         "../generic/sql-format.ss")
+         "../generic/sql-data.rkt"
+         "../generic/sql-format.rkt")
 (provide (all-defined-out))
 
 ;; Derived from 

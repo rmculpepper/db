@@ -4,8 +4,8 @@
 
 #lang racket/base
 (require racket/class
-         "../generic/interfaces.ss"
-         "types.ss")
+         "../generic/interfaces.rkt"
+         "types.rkt")
 (provide (all-defined-out))
 
 (define options

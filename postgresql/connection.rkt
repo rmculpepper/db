@@ -11,13 +11,13 @@
          racket/match
          file/md5
          openssl/mzssl
-         "../generic/interfaces.ss"
-         "../generic/sql-data.ss"
-         "../generic/query.ss"
-         "msg.ss"
-         "exceptions.ss"
-         "types.ss"
-         "dbsystem.ss")
+         "../generic/interfaces.rkt"
+         "../generic/sql-data.rkt"
+         "../generic/query.rkt"
+         "msg.rkt"
+         "exceptions.rkt"
+         "types.rkt"
+         "dbsystem.rkt")
 (provide pure-connection%
          connection%)
 

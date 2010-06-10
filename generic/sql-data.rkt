@@ -48,9 +48,7 @@
          marshal-time
          marshal-time-tz
          marshal-timestamp
-         marshal-timestamp-tz
-
-         quote-literal)
+         marshal-timestamp-tz)
 
 ;; SQL Data
 ;; Datatypes for things that have no appropriate corresponding Scheme datatype
@@ -427,25 +425,3 @@
 
 (define (marshal-timestamp-tz t)
   (srfi:date->string (sql-datetime->srfi-date t) "~Y-~m-~d ~k:~M:~S.~N~z"))
-
-;; SQL Code
-
-;; quote-literal : string -> string
-(define (quote-literal s)
-  (define in (open-input-string s))
-  (define out (open-output-string))
-  (define (loop)
-    (let ([c (read-char in)])
-      (unless (eof-object? c)
-        (cond 
-          [(or (eq? c #\') (eq? c #\\))
-           (write-char #\\ out)
-           (write-char c out)]
-          [else
-           (write-char c out)])
-        (loop))))
-  (write-char #\' out)
-  (loop)
-  (write-char #\' out)
-  (get-output-string out))
-

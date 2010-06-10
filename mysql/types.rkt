@@ -4,17 +4,14 @@
 
 #lang racket/base
 (require racket/unit
-         "../generic/sql-data.rkt"
-         "../generic/sql-format.rkt")
+         "../generic/sql-data.rkt")
 (provide wire-typeid->type
          known-types+aliases
          type-alias->type
          type->type-reader
          type->type-writer
-         escape-name
          sql-parse
-         sql-marshal
-         literal-expression)
+         sql-marshal)
 
 (define (wire-typeid->type id)
   (case id
@@ -114,12 +111,6 @@
     ;; geometry
     (else #f)))
 
-(define (escape-name preserve-case? s)
-  (let ([s (if preserve-case? s (string-downcase s))])
-    (if (regexp-match? #rx"^[A-Za-z]*$" s)
-        s
-        (escape-name* s))))
-
 (define (sql-parse type s)
   (let ([parser (type->type-reader type)])
     (unless parser
@@ -131,29 +122,3 @@
     (unless writer
       (raise-type-error 'sql-marshal "type symbol" type))
     (writer d)))
-
-;; escape-name : string -> string
-(define (escape-name* s)
-  (error 'mysql:escape-name* "don't know how to escape complicated names: ~e" s))
-
-;; literal-expression : string/symbol datum -> string
-(define (literal-expression type literal)
-  (define (cast typestring)
-    (format "CAST( ~a AS ~a)" (quote-literal literal) typestring))
-  (case (type-alias->type type)
-    ((decimal)
-     (cast "DECIMAL"))
-    ((tinyint smallint mediumint int bigint)
-     (cast "SIGNED INTEGER"))
-    ((float double)
-     (format "(~a + 0.0)" (quote-literal literal)))
-    ((date)
-     (cast "DATE"))
-    ((datetime)
-     (cast "DATETIME"))
-    ((time)
-     (cast "TIME"))
-    ((varchar varstring)
-     (quote-literal literal))
-    ((tinyblob mediumblob longblob blob)
-     (cast "BINARY"))))

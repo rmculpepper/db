@@ -3,9 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require racket/unit
-         ;; "sql-format.rkt"
-         )
+(require racket/unit)
 (provide database^)
 
 (define-signature database^

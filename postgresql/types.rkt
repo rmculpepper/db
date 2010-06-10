@@ -4,8 +4,7 @@
 
 #lang racket/base
 (require racket/unit
-         "../generic/sql-data.rkt"
-         "../generic/sql-format.rkt")
+         "../generic/sql-data.rkt")
 (provide (all-defined-out))
 
 ;; Derived from 
@@ -151,19 +150,6 @@
     ((numeric) 1700)
     (else #f)))
 
-;; escape-name : boolean string -> string
-(define (escape-name preserve-case? s)
-  (let ([s (if preserve-case? s (string-downcase s))])
-    (if (regexp-match? #rx"^[A-Za-z]*$" s)
-        s
-        (escape-name* s))))
-
-;; escape-name* : string -> string
-(define (escape-name* s)
-  (string-append "\""
-                 (regexp-replace #rx"\"" s "\"\"")
-                 "\""))
-
 (define (sql-parse type s)
   (let ([parser (type->type-reader (type-alias->type type))])
     (unless parser
@@ -175,7 +161,3 @@
     (unless writer
       (raise-type-error 'sql-marshal "type symbol" type))
     (writer d)))
-
-;; literal-expression : string datum -> string
-(define (literal-expression cast-type literal)
-  (format "CAST( E~a AS ~a)" (quote-literal literal) cast-type))

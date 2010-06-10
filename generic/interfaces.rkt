@@ -158,13 +158,6 @@
     ;; get-type-writer : symbol #:options [any #f] -> (string -> any)
     get-type-writer
 
-    ;; sql:escape-name : string #:preserve-case [boolean #f] -> string
-    sql:escape-name
-
-    ;; sql:literal-expression : string/symbol any -> string
-    ;; Constructs SQL expression evaluating to given value
-    sql:literal-expression
-
     ;; has-support? : any -> boolean?
     has-support?))
 

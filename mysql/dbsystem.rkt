@@ -42,14 +42,6 @@
               (raise-type-error 'default-type-writer "string" s))
             s)))
 
-    (define/public (sql:escape-name name
-                                    #:preserve-case? [preserve-case? #f])
-      (escape-name preserve-case? name))
-
-    (define/public (sql:literal-expression type value
-                                           #:options [options null])
-      (literal-expression type value))
-
     (define/public (has-support? option)
       (let ([v (hash-ref options option 'notfound)])
         (when (eq? v 'notfound)

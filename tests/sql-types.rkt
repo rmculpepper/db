@@ -1,19 +1,19 @@
-;; Copyright 2000-2007 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require (planet "test.ss" ("schematics" "schemeunit.plt" 2 7))
-         scheme/class
-         scheme/unit
+#lang racket/base
+(require rackunit
+         racket/class
+         racket/unit
          (prefix-in srfi: srfi/19)
-         "../generic/main.ss"
-         "../generic/sql-format.ss"
-         "../generic/signatures.ss"
-         "config.ss")
+         "../generic/main.rkt"
+         "../generic/signatures.rkt"
+         "config.rkt")
 (provide sql-types-test@)
 
-(require scheme/gui)
+#;
+(require racket/gui)
 
 (define-unit sql-types-test@
   (import config^ database^)
@@ -25,7 +25,7 @@
        (let ([type type-expr])
          (if (memq type (send dbsystem get-known-types))
              (test-case (format "~s" type) . contents)
-             (test-case (format "unsupported: ~s" type))))]))
+             (test-case (format "unsupported: ~s" type) (void))))]))
 
   (define-syntax check-roundtrip
     (syntax-rules ()
@@ -34,10 +34,6 @@
       [(check-roundtrip c type expr check)
        (begin
          (let ([value expr])
-           (when #f
-             (check (let ([q (format-sql c "select ~a" [type value])])
-                      (send c query-value q))
-                    value))
            (case (send dbsystem get-short-name)
              ((postgresql)
               ;; only valid Postgreql syntax!

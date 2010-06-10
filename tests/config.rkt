@@ -1,11 +1,11 @@
-;; Copyright 2000-2007 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require scheme/class
-         scheme/unit
-         "../generic/signatures.ss")
+#lang racket/base
+(require racket/class
+         racket/unit
+         "../generic/signatures.rkt")
 (provide test^
          config^
          config@)
@@ -30,8 +30,8 @@
   (define testing-connection-mixin (make-parameter values))
 
   (define (connect-for-test)
-    (connect #:user "ryan"
-             #:database "ryan"
+    (connect #:user (getenv "DBUSER")
+             #:database (or (getenv "DBDB") (getenv "DBUSER"))
              #:password (getenv "DBPASSWORD")
              #:mixin (testing-connection-mixin)))
 

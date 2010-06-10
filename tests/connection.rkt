@@ -1,14 +1,14 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require (for-syntax scheme/base)
-         (planet schematics/schemeunit:2:7/test)
-         scheme/class
-         scheme/unit
-         "config.ss"
-         "../generic/main.ss")
+#lang racket/base
+(require (for-syntax racket/base)
+         rackunit
+         racket/class
+         racket/unit
+         "config.rkt"
+         "../generic/main.rkt")
 (provide query-test@)
 
 (define (t? x) (and x #t))
@@ -186,7 +186,7 @@
 
       (query-tests #f)
       (query-tests #t)
-      
+
       (test-suite "misc correctness"
         (test-case "noninterference of nested queries"
           (call-with-connection

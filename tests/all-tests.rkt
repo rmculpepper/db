@@ -1,20 +1,19 @@
-;; Copyright 2000-2009 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require (planet "test.ss" ("schematics" "schemeunit.plt" 2 7))
-         (planet "graphical-ui.ss" ("schematics" "schemeunit.plt" 2 7))
-         (planet "text-ui.ss" ("schematics" "schemeunit.plt" 2 7))
-         scheme/unit
-         scheme/class
-         "../generic/signatures.ss"
-         "../postgresql/unit.ss"
-         "../mysql/unit.ss"
-         "config.ss"
-         "connection.ss"
-         "sql-types.ss"
-         "concurrent.ss")
+#lang racket/base
+(require rackunit
+         rackunit/gui
+         racket/unit
+         racket/class
+         "../generic/signatures.rkt"
+         "../postgresql/unit.rkt"
+         "../mysql/unit.rkt"
+         "config.rkt"
+         "connection.rkt"
+         "sql-types.rkt"
+         "concurrent.rkt")
 
 (define-unit all-tests@
   (import (tag query (prefix query: test^))
@@ -23,12 +22,13 @@
   (export test^)
 
   (define test
-    (test-suite "All tests"
-      query:test
-      sql-types:test
-      concurrent:test)))
+    (make-test-suite
+     "All tests"
+     (list query:test
+           sql-types:test
+           concurrent:test))))
 
-(define (specialize-test db@ #;db-specific-test@)
+(define (specialize-test db@)
   (compound-unit
     (import)
     (export ALL-TESTS)
@@ -50,11 +50,17 @@
   (import)
   (export (prefix mysql: test^)))
 
-;; (putenv "DBPASSWORD" ???)
-;; (test/graphical-ui postgresql:test)
-;; (test/graphical-ui mysql:test)
+#|
+;; Normal testing:
+(putenv "DBUSER" "ryan")  ;; or whoever you are
+(putenv "DBDB" "ryan")    ;; or any db that exists
+(putenv "DBPASSWORD" ???)
+(test/gui postgresql:test)
+(test/gui mysql:test)
+|#
 
 #|
+;; For debugging:
 (begin (define-values/invoke-unit postgresql@ (import) (export database^))
        (define-values/invoke-unit config@ (import database^) (export config^))
        (define c (connect-and-setup)))

@@ -1,12 +1,12 @@
-;; Copyright 2000-2007 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require (planet "test.ss" ("schematics" "schemeunit.plt" 2 7))
-         scheme/class
-         scheme/unit
-         "config.ss")
+#lang racket/base
+(require rackunit
+         racket/class
+         racket/unit
+         "config.rkt")
 (provide concurrent-test@)
 
 (define-unit concurrent-test@

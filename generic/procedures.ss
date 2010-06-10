@@ -1,9 +1,9 @@
-;; Copyright 2009 Ryan Culpepper
+;; Copyright 2009-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require scheme/class
+#lang racket/base
+(require racket/class
          "interfaces.ss")
 (provide (except-out (all-defined-out)
                      defproc*
@@ -11,6 +11,7 @@
 
 (define-syntax-rule (defproc* ifc def ...)
   (begin (defproc ifc . def) ...))
+
 (define-syntax defproc
   (syntax-rules ()
     [(_ ifc [proc method] . formals)

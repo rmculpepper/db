@@ -1,5 +1,9 @@
-#lang scheme/base
-(require scheme/class
+;; Copyright 2009-2010 Ryan Culpepper
+;; Released under the terms of the modified BSD license (see the file
+;; COPYRIGHT for terms).
+
+#lang racket/base
+(require racket/class
          "../generic/interfaces.ss"
          "types.ss")
 (provide (all-defined-out))

@@ -1,15 +1,14 @@
-;; Copyright 2000-2009 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
 ;; Implementation of connections, which communicate with a backend through
 ;; structured messages.
 
-#lang scheme/base
-(require scheme/class
-         scheme/match
-         (only-in (planet "digest.ss" ("soegaard" "digest.plt" 1 2))
-                  sha1-bytes)
+#lang racket/base
+(require racket/class
+         racket/match
+         openssl/sha1
          "../generic/interfaces.ss"
          "../generic/sql-data.ss"
          "../generic/query.ss"
@@ -216,9 +215,9 @@
 (define (scramble-password scramble password)
   (and scramble password
        (let* ([password (string->bytes/latin-1 password)]
-              [stage1 (sha1-bytes password)]
-              [stage2 (sha1-bytes stage1)]
-              [stage3 (sha1-bytes (bytes-append scramble stage2))]
+              [stage1 (sha1-bytes (open-input-bytes password))]
+              [stage2 (sha1-bytes (open-input-bytes stage1))]
+              [stage3 (sha1-bytes (open-input-bytes (bytes-append scramble stage2)))]
               [reply (bytes-xor stage1 stage3)])
          reply)))
 

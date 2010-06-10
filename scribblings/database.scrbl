@@ -5,7 +5,7 @@
           (for-label scheme/base)
           (for-label "../generic/main.ss"))
 
-@title[#:version (package-version)]{database: Database connectivity}
+@title[#:version (package-version)]{db: Database connectivity}
 @author{Ryan Culpepper}
 
 @section-index["postgresql"]

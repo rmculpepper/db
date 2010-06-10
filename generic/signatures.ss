@@ -1,6 +1,9 @@
+;; Copyright 2009-2010 Ryan Culpepper
+;; Released under the terms of the modified BSD license (see the file
+;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require scheme/unit
+#lang racket/base
+(require racket/unit
          ;; "sql-format.ss"
          )
 (provide database^)

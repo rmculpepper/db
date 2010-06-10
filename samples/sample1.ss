@@ -1,11 +1,11 @@
-;; Copyright 2000-2007 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
 ;; The following program demonstrates how to connect to a PostgreSQL backend
 ;; perform simple queries on the connection.
 
-(require scheme
+(require racket
          "../main.ss")
 
 ;; Replace these values with the appropriate values for your 

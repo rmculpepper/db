@@ -1,11 +1,11 @@
-;; Copyright 2000-2009 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require (for-syntax scheme/base)
-         (for-syntax (planet "stx.ss" ("ryanc" "macros.plt" 1 1)))
-         (planet "struct.ss" ("ryanc" "macros.plt" 1 1))
+#lang racket/base
+(require (for-syntax racket/base)
+         (for-syntax "../generic/unstable-syntax.ss")
+         "../generic/unstable-struct.ss"
          "../generic/io.ss")
 (provide (all-defined-out))
 
@@ -14,7 +14,7 @@
 (define-struct-property message-parser)
 
 ;; Structures for messages
-(define-struct* msg () #:transparent)
+(define-struct msg () #:transparent)
 
 (define-for-syntax stx@ datum->syntax)
 
@@ -32,21 +32,15 @@
                [(header c) #'c]
                [_ #f]))
            stxs))
-  (define (join sym stx)
-    (datum->syntax
-     stx
-     (string->symbol 
-      (string-append (symbol->string sym)
-                     (symbol->string (syntax-e stx))))))
   (syntax-case stx ()
     [(_ name clause ...)
      (let [(fields (apply append 
                           (map gather-fields 
                                (syntax-e #'(clause ...)))))]
        (with-syntax ([(field ...) fields]
-                     [parse:name (stx@ #'name (symbol-append 'parse: #'name))]
-                     [write:name (stx@ #'name (symbol-append 'write: #'name))]
-                     [constructor (stx@ #'name (symbol-append 'make- #'name))])
+                     [parse:name (format-id #'name "parse:~a" #'name)]
+                     [write:name (format-id #'name "write:~a" #'name)]
+                     [constructor (format-id #'name "make-~a" #'name)])
          #`(begin 
              (define (parse:name p)
                (msg-parser constructor p () clause ...))
@@ -62,28 +56,27 @@
     [(define-msg-struct name (field ...))
      #'(define-msg-struct name (field ...) #f)]
     [(define-msg-struct name (field ...) descriminator)
-     (with-syntax ([parser (stx@ #'name (symbol-append 'parse: #'name))]
-                   [writer (stx@ #'name (symbol-append 'write: #'name))])
+     (with-syntax ([parser (format-id #'name "parse:~a" #'name)]
+                   [writer (format-id #'name "write:~a" #'name)])
        #'(define-msg-struct name (field ...) descriminator parser writer))]
     [(define-msg-struct name (field ...) descriminator parser writer)
-     #'(define-struct* name (field ...)
-         (#:super msg)
+     #'(define-struct (name msg) (field ...)
          #:transparent
-         (#:property message-parser parser)
-         (#:property message-writer writer)
-         (#:property message-parser-descrim descriminator))]))
+         #:property message-parser parser
+         #:property message-writer writer
+         #:property message-parser-descrim descriminator)]))
 
 ;; Message writers should never call flush-output directly.
 
 (define-syntax (msg-writer stx)
   (define (build-accessor struct field)
-    (stx@ struct (symbol-append struct '- field)))
+    (format-id struct "~a-~a" struct field))
   (define (++ a b) (and a b (+ a b)))
   (define (compute-length clauses)
     (cond [(null? clauses) 4]  ;; the length field itself
           [else
            (syntax-case* (car clauses) (header literal field sequence)
-             literal-identifier=?
+               (lambda (x y) (eq? (syntax-e x) (syntax-e y)))
              [(literal type value)
               (case (syntax-e #'type)
                 ((#:int16) (++ 2 (compute-length (cdr clauses))))
@@ -100,7 +93,8 @@
                 ((#:byte #:byte/char) (++ 1 (compute-length (cdr clauses))))
                 (else #f))]
              [(sequence . _) #f])]))
-  (syntax-case* stx (header literal field sequence) literal-identifier=?
+  (syntax-case* stx (header literal field sequence)
+      (lambda (x y) (eq? (syntax-e x) (syntax-e y)))
     [(_ n v p)
      #'(void)]
     [(_ n v p (header c) clause ...)
@@ -233,7 +227,7 @@
   (syntax-case stx ()
     [(_ msg-name)
      (identifier? #'msg-name)
-     (let [(struct-type (stx@ #'msg-name (symbol-append 'struct: #'msg-name)))]
+     (let ([struct-type (format-id #'msg-name "struct:~a" #'msg-name)])
        #`(cons (char->integer (message-parser-descrim-value #,struct-type))
                (message-parser-value #,struct-type)))]
     [(_ [char parser])

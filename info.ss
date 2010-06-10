@@ -3,7 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang setup/infotab
-(define name "database")
+(define name "db")
 (define compile-omit-paths
   '("samples"
     "tests"))
@@ -14,4 +14,4 @@
 (define scribblings '(("scribblings/database.scrbl" (multi-page))))
 (define categories '(net))
 (define can-be-loaded-with 'all)
-(define required-core-version "4.1")
+(define required-core-version "5.0")

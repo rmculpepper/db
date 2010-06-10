@@ -1,15 +1,14 @@
-;; Copyright 2000-2007 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-
-(require scheme/match
+#lang racket/base
+(require racket/match
          (prefix-in srfi: srfi/19))
 
 (provide sql-null
          sql-null?
-         
+
          (struct-out sql-date)
          (struct-out sql-time)
          (struct-out sql-timestamp)
@@ -50,7 +49,7 @@
          marshal-time-tz
          marshal-timestamp
          marshal-timestamp-tz
-         
+
          quote-literal)
 
 ;; SQL Data

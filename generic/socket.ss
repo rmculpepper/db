@@ -1,11 +1,10 @@
-;; Copyright 2007-2008 Ryan Culpepper
+;; Copyright 2007-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require scheme/foreign
-         mzlib/etc)
-(unsafe!)
+#lang racket/base
+(require racket/block
+         ffi/unsafe)
 (provide unix-socket-connect)
 
 ;; The solaris code is untested (and thus disabled).
@@ -13,25 +12,25 @@
 ;; unix-socket-connect : pathlike -> input-port output-port
 ;; Connects to the unix domain socket associated with the given path.
 (define (unix-socket-connect path0)
-  (begin-with-definitions
-    (define path (check-pathlike 'unix-socket-connect path0))
-    (define s (make-socket))
-    (unless (positive? s)
-      (error 'unix-socket-connect
-             "failed to create socket"))
-    (define addr (make-unix-sockaddr path))
-    (define addrlen (+ (ctype-sizeof _short) (bytes-length path)))
-    (define ce (_connect s addr addrlen))
-    (unless (zero? ce)
-      (_close s)
-      (raise-user-error
-       'unix-socket-connect
-       "failed to connect socket to path: ~s" path))
-    (with-handlers ([(lambda (e) #t)
-                     (lambda (e)
-                       (_close s)
-                       (raise e))])
-      (_make_fd_output_port s 'socket #f #f #t))))
+  (block
+   (define path (check-pathlike 'unix-socket-connect path0))
+   (define s (make-socket))
+   (unless (positive? s)
+     (error 'unix-socket-connect
+            "failed to create socket"))
+   (define addr (make-unix-sockaddr path))
+   (define addrlen (+ (ctype-sizeof _short) (bytes-length path)))
+   (define ce (_connect s addr addrlen))
+   (unless (zero? ce)
+     (_close s)
+     (raise-user-error
+      'unix-socket-connect
+      "failed to connect socket to path: ~s" path))
+   (with-handlers ([(lambda (e) #t)
+                    (lambda (e)
+                      (_close s)
+                      (raise e))])
+     (_make_fd_output_port s 'socket #f #f #t))))
 
 (define platform
   (let ([os (system-type 'os)]

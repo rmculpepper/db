@@ -1,7 +1,9 @@
-;; Copyright 2007-2009 Ryan Culpepper
+;; Copyright 2007-2010 Ryan Culpepper
+;; Released under the terms of the modified BSD license (see the file
+;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require scheme/match
+#lang racket/base
+(require racket/match
          "../generic/sql-data.ss"
          "../generic/io.ss")
 (provide (all-defined-out))

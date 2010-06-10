@@ -1,7 +1,11 @@
-#lang scheme/base
-(require (for-syntax scheme/base)
-         scheme/unit
-         scheme/class
+;; Copyright 2009-2010 Ryan Culpepper
+;; Released under the terms of the modified BSD license (see the file
+;; COPYRIGHT for terms).
+
+#lang racket/base
+(require (for-syntax racket/base)
+         racket/unit
+         racket/class
          "interfaces.ss"
          "sql-data.ss")
 (provide format-sql

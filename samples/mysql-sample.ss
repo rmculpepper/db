@@ -1,6 +1,5 @@
-#lang scheme
-(require scheme/class
-         "../mysql/main.ss")
+#lang racket
+(require "../mysql/main.ss")
 
 (define c
   (connect #:socket "/var/run/mysqld/mysqld.sock"

@@ -1,11 +1,11 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require scheme/class
-         scheme/contract
-         scheme/tcp
+#lang racket/base
+(require racket/class
+         racket/contract
+         racket/tcp
          "../generic/main.ss"
          "../generic/socket.ss"
          "../generic/find-socket.ss"

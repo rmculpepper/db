@@ -1,11 +1,11 @@
-;; Copyright 2000-2009 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
-#lang scheme/base
-(require scheme/contract
-         scheme/class
-         scheme/tcp
+#lang racket/base
+(require racket/contract
+         racket/class
+         racket/tcp
          "../generic/main.ss"
          "../generic/socket.ss"
          "../generic/find-socket.ss"
@@ -65,7 +65,6 @@
                (send c attach-to-ports in out)))])
     (send c start-connection-protocol database user password)
     c))
-
 
 (define socket-paths
   '("/var/run/mysqld/mysqld.sock"))

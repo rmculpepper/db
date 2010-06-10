@@ -1,15 +1,14 @@
-;; Copyright 2000-2008 Ryan Culpepper
+;; Copyright 2000-2010 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
 ;; Implementation of connections, which communicate with a backend through
 ;; structured messages.
 
-#lang scheme/base
-
+#lang racket/base
 (require mzlib/etc
-         scheme/class
-         scheme/match
+         racket/class
+         racket/match
          file/md5
          openssl/mzssl
          "../generic/interfaces.ss"

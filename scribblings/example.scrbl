@@ -4,7 +4,6 @@
           scribble/eval
           scribble/struct
           scheme/sandbox
-          (planet cce/scheme:3)
           "config.ss")
 @(require (for-label scheme/base)
           (for-label "../main.ss"))

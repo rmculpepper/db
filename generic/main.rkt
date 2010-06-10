@@ -31,4 +31,4 @@
          srfi-date->sql-timestamp
          srfi-date->sql-timestamp-tz
 
-         (all-from-out "procedures.ss"))
+         (all-from-out "procedures.rkt"))

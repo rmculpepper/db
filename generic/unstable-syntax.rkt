@@ -25,3 +25,23 @@
          [str (apply format fmt args)]
          [sym (string->symbol str)])
     (datum->syntax lctx sym src props cert)))
+
+(define (restricted-format-string? fmt)
+  (regexp-match? #rx"^(?:[^~]|~[aAn~%])*$" fmt))
+
+(define (check-restricted-format-string who fmt)
+  (unless (restricted-format-string? fmt)
+    (raise-type-error who
+                      "format string using only ~a placeholders"
+                      fmt)))
+
+(define (->atom x err)
+  (cond [(string? x) x]
+        [(symbol? x) x]
+        [(identifier? x) (syntax-e x)]
+        [(keyword? x) (keyword->string x)]
+        [(number? x) x]
+	[(char? x) x]
+        [else (raise-type-error err
+                                "string, symbol, identifier, keyword, character, or number"
+                                x)]))

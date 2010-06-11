@@ -167,9 +167,11 @@
 (define (parse-packet in expect param-types)
   (let* ([len (io:read-le-int24 in)]
          [num (io:read-byte in)]
+         #|
+         [_ (fprintf (current-error-port) "** Received packet #~s, length ~s\n" num len)]
+         |#
          [inp (subport in len)]
          [msg (parse-packet/1 inp expect len param-types)])
-    #|(printf "Received packet #~s, length ~s\n" num len)|#
     (when (port-has-bytes? inp)
       (error 'parse-packet "bytes left over after parsing ~s; bytes were: ~s" 
              msg (io:read-bytes-to-eof inp)))

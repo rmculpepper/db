@@ -12,9 +12,6 @@
          "config.rkt")
 (provide sql-types-test@)
 
-#;
-(require racket/gui)
-
 (define-unit sql-types-test@
   (import config^ database^)
   (export test^)
@@ -77,9 +74,6 @@
 
   (define (supported? option)
     (send dbsystem has-support? option))
-
-  (define (halt n)
-    ' (message-box "halt" (format "got to step ~s" n)))
 
   (define test
     (test-suite "SQL types"
@@ -201,25 +195,27 @@
         (type-test-case 'varchar
           (call-with-connection
            (lambda (c)
-             (halt 1)
              (check-roundtrip c varchar "this is the time to remember")
-             (halt 2)
              (check-roundtrip c varchar "that's the way it is")
-             (halt 3)
              (check-roundtrip c varchar (string #\\))
-             (halt 4)
              (check-roundtrip c varchar (string #\'))
-             (halt 5)
              (check-roundtrip c varchar (string #\\ #\'))
-             (halt 6)
              (check-roundtrip c varchar "λ the ultimate")
-             (halt 7)
-             (check-roundtrip c varchar
-                              (list->string
-                               (build-list 800
-                                           (lambda (n)
-                                             (integer->char (add1 n))))))
-             (halt 8))))
+             (check-roundtrip c varchar (make-string 800 #\a))
+             (check-roundtrip 
+              c varchar
+              (string-append "αβψδεφγηιξκλμνοπρστθωςχυζ"
+                             "अब्च्देघिज्क्ल्म्नोप्र्स्तुव्य्"
+                             "شﻻؤيثبلاهتنمةىخحضقسفعرصءغئ"
+                             "阿あでいおうわぁ"
+                             "абцдефгхиклмнопљрстувњџзѕЋч"))
+             ;; Following might not produce valid string (??)
+             (when #t
+               (check-roundtrip c varchar
+                                (list->string
+                                 (build-list 800
+                                             (lambda (n)
+                                               (integer->char (add1 n))))))))))
         (type-test-case 'date
           (call-with-connection
            (lambda (c)

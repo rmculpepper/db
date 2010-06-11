@@ -294,7 +294,7 @@
       (error 'io:read-le-intN "unexpected eof; got ~s" b))
     (let loop ([pos 0])
       (if (< pos count)
-          (+ (arithmetic-shift (loop (add1 pos)) -8)
+          (+ (arithmetic-shift (loop (add1 pos)) 8)
              (bytes-ref b pos))
           0))))
 

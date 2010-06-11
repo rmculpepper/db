@@ -23,9 +23,9 @@ examples):
 
 @schemeinput[
   (define psql-c
-    (postgresql-connect #:user "ryan"
-                        #:database "ryan"
-                        #:password (getenv "DBPASSWORD")))
+    (postgresql-connect #:user user
+                        #:database db
+                        #:password password))
 ]
 @(my-interaction
   [psql-c (new connection%)])
@@ -180,8 +180,9 @@ But if there are no numbers less than the one given, @tt{max} returns NULL.
   [(next-largest2 0)
    sql-null])
 
-If you like, you can declare cursors to fetch data incrementally.
-Usually, you must be inside of a transaction to create a cursor.
+@bold{PostgreSQL only:} You can declare cursors to fetch data
+incrementally.  You must be inside of a transaction to create a
+cursor.
 
 @schemeinput[
 (query-exec psql-c

@@ -13,7 +13,7 @@
 @(declare-exporting/this-package (main) ())
 
 Connections are made using the @scheme[postgresql-connect] and
-@scheme[mysql-connect] procedures. The connection classes are not
+@scheme[mysql-connect] procedures. The connection datatypes are not
 exposed, so they cannot be instantiated directly.
 
 @section{Connecting to a PostgreSQL server}

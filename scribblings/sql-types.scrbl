@@ -68,8 +68,8 @@ values to SQL @tt{numeric}, exact rational values representable by
 finite decimal strings are converted without loss of precision. Other
 real values are converted to decimals with a loss of precision.
 
-PostgreSQL defines other datatypes, such as network addresses and
-various geometric concepts. These are not converted.
+PostgreSQL defines many other datatypes, such as network addresses and
+various geometric types. These are not converted.
 
 Array types are also not currently supported. Support may be added in
 a future version.
@@ -117,8 +117,9 @@ SQL NULL values are always translated into the unique @scheme[sql-null] value.
 @defproc[(sql-null? [val any/c])
          boolean?]{
 
-A special value and predicate used to represent NULL values in
-query results.
+A special value and predicate used to represent NULL values in query
+results. The @scheme[sql-null] value may be recognized using
+@scheme[eq?].
 
 @(examples/results
   [(query-value psql-c "select NULL")

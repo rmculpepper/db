@@ -53,10 +53,13 @@
 ;; SQL Data
 ;; Datatypes for things that have no appropriate corresponding Scheme datatype
 
-(define-values (sql-null sql-null?)
+(define sql-null
   (let ()
     (define-struct sql-null ())
-    (values (make-sql-null) sql-null?)))
+    (make-sql-null)))
+
+(define (sql-null? x)
+  (eq? x sql-null))
 
 (define-struct sql-date (year month day) #:transparent)
 (define-struct sql-time (hour minute second nanosecond tz) #:transparent)

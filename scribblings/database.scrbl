@@ -20,8 +20,8 @@ spgsql.
 
 The database package provides a high-level interface to PostgreSQL and
 MySQL database servers. It does not rely on any locally-installed
-client libraries; this package is everything you need to connect PLT
-Scheme to a PostgreSQL or MySQL server.
+client libraries; this package is everything you need to connect
+Racket to a PostgreSQL or MySQL server.
 
 The query operations are functional in spirit. Queries return results;
 they do not stow them away in the connection for later manipulation
@@ -43,7 +43,7 @@ and later and MySQL servers version 5 and later.
 @include-section["connect.scrbl"]
 @include-section["query.scrbl"]
 @include-section["sql-types.scrbl"]
-@include-section["class-api.scrbl"]
+@;@include-section["class-api.scrbl"]
 @include-section["notes.scrbl"]
 @include-section["example.scrbl"]
 

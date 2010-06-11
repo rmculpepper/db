@@ -25,24 +25,24 @@ types.
 
 @section{Administrative API}
 
-@defproc[(connection:admin? [x any])
+@defproc[(connection? [x any])
          boolean?]{
 
-Predicate for connections supporting the administrative procedures
-documented in this section.
+Predicate for connections.
 
 }
 
-@defproc[(disconnect [connection connection:admin?])
+@defproc[(disconnect [connection connection?])
          void?]{
 Disconnects from the server.
 }
-@defproc[(connected? [connection connection:admin?])
+
+@defproc[(connected? [connection connection?])
          boolean?]{
 Indicates whether the connection is connected.
 }
 
-@defproc[(get-system [connection connection:admin?])
+@defproc[(connection-dbsystem [connection connection?])
          dbsystem?]{
 
 Gets an object encapsulating information about the database system of
@@ -52,9 +52,16 @@ the connection.
 @defproc[(dbsystem? [x any/c])
          boolean?]{
 
-Predicate for objects representing database systems. See
-@scheme[dbsystem<%>].
+Predicate for objects representing database systems.
 }
+
+@defproc[(dbsystem-name [sys dbsystem?])
+         symbol?]{
+
+Returns a symbol that names the database system. Currently either
+@scheme['postrgresql] or @scheme['mysql].
+}
+
 
 @section{Query API}
 
@@ -65,10 +72,12 @@ query caused an error, raises an exception. Different query procedures
 impose different constraints on the query results and offer different
 mechanisms for processing the results.
 
+@;{
 The query API does not expose any low-level machinery. Programmers who
 want cursors may use SQL-language cursors via the @tt{DECLARE CURSOR},
 @tt{MOVE}, and @tt{FETCH} statements if they are available in their
 database's SQL dialect.
+}
 
 A @deftech{Statement} is either a string containing a single SQL
 statement or a @scheme[StatementBinding] value returned by
@@ -98,28 +107,30 @@ such as a @tt{SELECT} query.
 Represents the name of a column.
 }
 
+@;{
 @defproc[(connection:query? [x any])
          boolean?]{
 
 Predicate for connections implementing the query API.
 }
+}
 
 @deftogether[[
-@defproc[(query [connection connection:query?]
+@defproc[(query [connection connection?]
                 [stmt (unsyntax @techlink{Statement})])
          #, @tech{QueryResult}]
-@defproc[(query-multiple [connection connection:query?]
+@defproc[(query-multiple [connection connection?]
                          [stmts (listof #, @tech{Statement})])
          (listof #, @techlink{QueryResult})]]]{
 
   Executes queries, returning structures that describe the
-  results. Unlike more specialized query procedures,
+  results. Unlike the more specialized query procedures,
   @scheme[query-multiple] supports a mixture of recordset-returning
   queries and effect-only queries.
 
 }
 
-@defproc[(query-exec [connection connection:query?]
+@defproc[(query-exec [connection connection?]
                      [stmt #, @tech{Statement}] ...)
          void?]{
 
@@ -141,7 +152,7 @@ Predicate for connections implementing the query API.
 
 }
 
-@defproc[(query-rows [connection connection:query?]
+@defproc[(query-rows [connection connection?]
                      [stmt #, @tech{Statement}])
          (listof (vectorof _field))]{
 
@@ -149,7 +160,7 @@ Predicate for connections implementing the query API.
   list of rows (as vectors) from the query.
 }
 
-@defproc[(query-list [connection connection:query?]
+@defproc[(query-list [connection connection?]
                      [stmt #, @tech{Statement}])
          (listof _field)]{
 
@@ -157,7 +168,7 @@ Predicate for connections implementing the query API.
   column. Returns the list of values from the query.
 }
 
-@defproc[(query-row [connection connection:query?]
+@defproc[(query-row [connection connection?]
                     [stmt #, @tech{Statement}])
          (vectorof _field)]{
 
@@ -165,7 +176,7 @@ Predicate for connections implementing the query API.
   row. Returns its (single) row result as a vector.
 }
 
-@defproc[(query-maybe-row [connection connection:query?]
+@defproc[(query-maybe-row [connection connection?]
                           [stmt #, @tech{Statement}])
          (or/c (vectorof _field) false/c)]{
 
@@ -173,7 +184,7 @@ Predicate for connections implementing the query API.
   case, @scheme[#f] is returned.
 }
 
-@defproc[(query-value [connection connection:query?]
+@defproc[(query-value [connection connection?]
                       [stmt #, @tech{Statement}])
          _field]{
 
@@ -181,7 +192,7 @@ Predicate for connections implementing the query API.
   column and exactly one row. Returns its single value result.
 }
 
-@defproc[(query-maybe-value [connection connection:query?]
+@defproc[(query-maybe-value [connection connection?]
                             [stmt #, @tech{Statement}])
          (or/c _field false/c)]{
 
@@ -189,7 +200,7 @@ Predicate for connections implementing the query API.
   that case, @scheme[#f] is returned.
 }
 
-@defproc[(query-map [connection connection:query?]
+@defproc[(query-map [connection connection?]
                     [stmt #, @tech{Statement}]
                     [proc (_field _... -> _alpha)])
          (listof _alpha)]{
@@ -199,7 +210,7 @@ Predicate for connections implementing the query API.
   must include the number of columns returned by the query.
 }
 
-@defproc[(query-for-each [connection connection:query?]
+@defproc[(query-for-each [connection connection?]
                          [stmt #, @tech{Statement}]
                          [proc (_field _... -> any)])
          void?]{
@@ -209,7 +220,7 @@ Predicate for connections implementing the query API.
   include the number of columns returned by the query.
 }
 
-@defproc[(query-mapfilter [connection connection:query?]
+@defproc[(query-mapfilter [connection connection?]
                           [stmt #, @tech{Statement}]
                           [map-proc (_field _... -> _alpha)]
                           [filter-proc (_field _... -> boolean?)])
@@ -221,7 +232,7 @@ Predicate for connections implementing the query API.
   of columns returned by the query.
 }
 
-@defproc[(query-fold [connection connection:query?]
+@defproc[(query-fold [connection connection?]
                      [stmt #, @tech{Statement}]
                      [fold-proc (_alpha _field _... -> _alpha)]
                      [init _alpha])
@@ -250,20 +261,23 @@ PostgreSQL:
 MySQL:
 @verbatim{select * from the_numbers where num > ?;}
 
+@;{
 The following procedures provide a convenient functional interface for
 common uses of parameterized prepared statements:
-
+}
+@;{
 @defproc[(connection:query/prepare? [x any])
          boolean?]{
 
 Predicate for connections supporting the prepared query API.
 }
+}
 
 @deftogether[[
-@defproc[(prepare [connection connection:query/prepare?]
+@defproc[(prepare [connection connection?]
                   [prep string?])
          #, @tech{PreparedStatement}]
-@defproc[(prepare-multiple [connection connection:query/prepare?]
+@defproc[(prepare-multiple [connection connection?]
                            [preps (listof string?)])
          (listof #, @tech{PreparedStatement})]]]{
 
@@ -278,7 +292,7 @@ Predicate for connections supporting the prepared query API.
 }
 
 @defproc[(bind-prepared-statement
-            [connection connection:query/prepare?]
+            [connection connection?]
             [pst #, @tech{PreparedStatement}]
             [params (listof any/c)])
          #, @tech{Statement}]{
@@ -315,7 +329,7 @@ resulting procedure should be called with zero arguments.
 Prepared-statement procedures hold their associated connections
 strongly.
 
-@defproc[(prepare-query-exec [connection connection:query/prepare?]
+@defproc[(prepare-query-exec [connection connection?]
                              [prep string?])
          (_param _... -> void?)]{
 
@@ -324,7 +338,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-rows [connection connection:query/prepare?]
+@defproc[(prepare-query-rows [connection connection?]
                              [prep string?])
          (_param _... -> (listof (vectorof _field)))]{
 
@@ -332,7 +346,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-list [connection connection:query/prepare?]
+@defproc[(prepare-query-list [connection connection?]
                              [prep string?])
          (_param _... -> (listof _field))]{
 
@@ -340,7 +354,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-row [connection connection:query/prepare?]
+@defproc[(prepare-query-row [connection connection?]
                             [prep string?])
          (_param _... -> (vectorof _field))]{
 
@@ -348,7 +362,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-maybe-row [connection connection:query/prepare?]
+@defproc[(prepare-query-maybe-row [connection connection?]
                                   [prep string?])
          (_param _... -> (or/c (vectorof _field) false?))]{
 
@@ -356,7 +370,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-value [connection connection:query/prepare?]
+@defproc[(prepare-query-value [connection connection?]
                               [prep string?])
          (_param _... -> _field)]{
 
@@ -364,7 +378,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-maybe-value [connection connection:query/prepare?]
+@defproc[(prepare-query-maybe-value [connection connection?]
                                     [prep string?])
          (_param _... -> (or/c _field false?))]{
 
@@ -372,7 +386,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-map [connection connection:query/prepare?]
+@defproc[(prepare-query-map [connection connection?]
                             [prep string?]
                             [proc (_field _... -> _alpha)])
          (_param _... -> (listof _alpha))]{
@@ -381,7 +395,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-for-each [connection connection:query/prepare?]
+@defproc[(prepare-query-for-each [connection connection?]
                                  [prep string?]
                                  [proc (_field _... -> void?)])
          (_param _... -> void?)]{
@@ -390,7 +404,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-mapfilter [connection connection:query/prepare?]
+@defproc[(prepare-query-mapfilter [connection connection?]
                                   [prep string?]
                                   [map-proc (_field _... -> _alpha)]
                                   [filter-proc (_field _... -> boolean?)])
@@ -400,7 +414,7 @@ strongly.
 
 }
 
-@defproc[(prepare-query-fold [connection connection:query/prepare?]
+@defproc[(prepare-query-fold [connection connection?]
                              [prep string?]
                              [proc (_alpha _field _... -> _alpha)]
                              [init _alpha])

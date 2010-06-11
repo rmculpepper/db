@@ -34,8 +34,8 @@
     ;; disconnect : -> void
     disconnect
 
-    ;; get-system : -> (is-a/c dbsystem<%>)
-    get-system
+    ;; connection-dbsystem : -> (is-a/c dbsystem<%>)
+    connection-dbsystem
     ))
 
 ;; connection:query<%>

@@ -287,7 +287,7 @@
 ;; Abstract method 'query*/no-conversion'
 (define primitive-query-base-mixin
   (mixin (connection:admin<%>) (primitive-query<%>)
-    (inherit get-system)
+    (inherit connection-dbsystem)
     (super-new)
 
     ;; query*/no-conversion : symbol (list-of Statement) Collector
@@ -299,11 +299,11 @@
     ;; Overridden to automatically use type conversion
     (define/public-final (query* fsym stmts collector)
       (query*/no-conversion fsym stmts
-                            (compose-with-converters (get-system) collector)))
+                            (compose-with-converters (connection-dbsystem) collector)))
 
     ;; datum->external-representation : TypeID datum -> string
     (define/public (datum->external-representation typeid datum)
-      (let* ([sys (get-system)]
+      (let* ([sys (connection-dbsystem)]
              [type (send sys typeid->type typeid)]
              [convert (send sys get-type-writer type)])
         (cond [convert (convert datum)]

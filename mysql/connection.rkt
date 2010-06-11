@@ -202,7 +202,7 @@
 
     ;; System
 
-    (define/public (get-system)
+    (define/public (connection-dbsystem)
       dbsystem)
 
     ;; Initialization

@@ -24,13 +24,18 @@
     [(_ ifc proc . formals)
      (defproc ifc [proc proc] . formals)]))
 
+(define (connection? x)
+  (and (is-a? x connection:admin<%>)
+       (is-a? x connection:query<%>)
+       (is-a? x connection:query/prepare<%>)))
+
 (define (connection:admin? x)
   (is-a? x connection:admin<%>))
 
 (defproc* connection:admin<%>
   (connected?)
   (disconnect)
-  (get-system))
+  (connection-dbsystem))
 
 (define (connection:query? x)
   (is-a? x connection:query<%>))
@@ -71,3 +76,6 @@
 
 (define (dbsystem? x)
   (is-a? x dbsystem<%>))
+
+(define (dbsystem-name x)
+  (send x get-short-name))

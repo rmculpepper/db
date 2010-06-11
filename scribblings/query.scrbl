@@ -292,25 +292,22 @@ Predicate for connections supporting the prepared query API.
 }
 
 @defproc[(bind-prepared-statement
-            [connection connection?]
             [pst #, @tech{PreparedStatement}]
             [params (listof any/c)])
          #, @tech{Statement}]{
 
   Fill in a parameterized prepared query with its parameters. The
-  @tech{PreparedStatement} must have been prepared with the same
-  connection. The resulting @tech{Statement} can be executed with
-  @scheme[query], @scheme[query-multiple], or any of the high-level
-  query procedures, but it must be used with the same connection that
-  created it.
+  resulting @tech{Statement} can be executed with @scheme[query],
+  @scheme[query-multiple], or any of the high-level query procedures,
+  but it must be used with the same connection that created it.
 
   @(examples/results
     [(let* ([get-name-pst
             (prepare c "select name from the_numbers where n = $1")]
             [get-name1
-             (bind-prepared-statement c get-name-pst (list 1))]
+             (bind-prepared-statement get-name-pst (list 1))]
             [get-name2
-             (bind-prepared-statement c get-name-pst (list 2))])
+             (bind-prepared-statement get-name-pst (list 2))])
        (list (query-value c get-name1)
              (query-value c get-name2)))
      (list "one" "two")])

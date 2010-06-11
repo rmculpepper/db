@@ -226,8 +226,7 @@
              query-for-each
              query-mapfilter
              query-fold)
-    (inherit prepare-multiple
-             bind-prepared-statement)
+    (inherit prepare-multiple)
     (super-new)
 
     ;; prepare : string -> PreparedStatement
@@ -244,7 +243,7 @@
          (define/public (name sql arg ...)
            (let ([pst (prepare sql)])
              (check 'name pst sql) ...
-             (lambda args (method (bind-prepared-statement pst args) arg ...))))]))
+             (lambda args (method (send pst bind args) arg ...))))]))
 
     (prepare-query-method prepare-query-exec query-exec)
     (prepare-query-method prepare-query-rows query-rows)
@@ -258,7 +257,7 @@
                           [#:check check-results/one-column])
     (prepare-query-method prepare-query-maybe-value query-maybe-value
                           [#:check check-results/one-column])
-    
+
     (prepare-query-method prepare-query-map query-map
                           [#:check check-results]
                           [#:arg proc])
@@ -274,14 +273,15 @@
     ))
 
 (define (check-results name pst stmt)
-  (unless (PreparedStatement-results pst)
+  (unless (send pst get-result-count)
     (raise-user-error name "query does not return records")))
 (define (check-results/one-column name pst stmt)
   (check-results name pst stmt)
-  (unless (equal? (PreparedStatement-results pst) 1)
-    (raise-user-error name
-                      "query does not return a single column (returns ~a columns)"
-                      (PreparedStatement-results pst))))
+  (let ([results (send pst get-result-count)])
+    (unless (equal? results 1)
+      (raise-user-error name
+                        "query does not return a single column (returns ~a columns)"
+                        (or results "no")))))
 
 ;; primitive-query-base-mixin
 ;; Abstract method 'query*/no-conversion'

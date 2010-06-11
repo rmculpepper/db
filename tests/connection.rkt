@@ -273,8 +273,7 @@
                 (printf "connections: ~s, ~s\n" c1 c)
                 (let ([pst (prepare c1 "select 5")])
                   (printf "prepared stmt: ~s\n" pst)
-                  (check-exn exn:fail? (lambda () (bind-prepared-statement c pst null)))
-                  (let ([stmt (bind-prepared-statement c1 pst null)])
+                  (let ([stmt (send pst bind null)])
                     (check-exn exn:fail? (lambda () (query c stmt))))))))
           (test-case "query errors - nonfatal"
             (with-connection c

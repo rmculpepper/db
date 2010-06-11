@@ -25,13 +25,55 @@
 (define DEBUG-RESPONSES #f)
 (define DEBUG-SENT-MESSAGES #f)
 
-;; A PreparedStatement is:
-;;   (make-PostgresPreparedStatement number
-;;                                   string
-;;                                   (list-of number)
-;;                                   (weak-box connection))
-(define-struct (PostgresPreparedStatement PreparedStatement)
-  (name param-types wcx))
+;; prepared-statement%
+(define prepared-statement%
+  (class* object% (prepared-statement<%>)
+    (init name)
+    (init param-types)
+    (init result-count)
+    (init owner)
+
+    (define -name name)
+    (define -param-types param-types)
+    (define -result-count result-count)
+    (define -owner (make-weak-box owner))
+
+    (define/public-final (get-name) -name)
+    (define/public-final (get-result-count) -result-count)
+
+    (define/public-final (check-owner c)
+      (eq? c (weak-box-value -owner)))
+
+    (define/public-final (bind params)
+      (unless (list? params)
+        (raise-type-error 'bind-prepared-statement "list" params))
+      (check-params params -param-types)
+      (let* ([owner (weak-box-value -owner)]
+             ;; If the owner if #f, we can't use it to call datum->external-representation.
+             ;; But that's okay, just put 'invalid as params;
+             ;; query methods check ownership before looking at params.
+             [params
+              (cond [owner
+                     (map (lambda (t p)
+                            (if (sql-null? p)
+                                sql-null
+                                (send owner datum->external-representation t p)))
+                          -param-types
+                          params)]
+                    [else
+                     'invalid])])
+        (make-StatementBinding this params)))
+
+    (define/private (check-params params param-types)
+      (define len (length params))
+      (define tlen (length param-types))
+      (when (not (= len tlen))
+        (raise-user-error
+         'bind-prepared-statement
+         "prepared statement requires ~s parameters, given ~s" tlen len)))
+
+    (super-new)))
+
 
 ;; base<%>
 ;; Manages communication
@@ -608,11 +650,11 @@
         (raise-type-error fsym "string or StatementBinding" stmt))
       (when (StatementBinding? stmt)
         (let ([pst (StatementBinding-pst stmt)])
-          (unless (PostgresPreparedStatement? pst)
+          (unless (is-a? pst prepared-statement%)
             (raise-type-error 
              fsym
              "StatementBinding containing prepared statement" stmt))
-          (unless (eq? this (weak-box-value (PostgresPreparedStatement-wcx pst)))
+          (unless (send pst check-owner this)
             (raise-mismatch-error 
              fsym
              "prepared statement owned by another connection" stmt)))))
@@ -623,7 +665,7 @@
           (begin (buffer-message (make-Parse "" stmt null))
                  (buffer-message (make-Bind "" "" null null null)))
           (let* ([pst (StatementBinding-pst stmt)]
-                 [pst-name (PostgresPreparedStatement-name pst)]
+                 [pst-name (send pst get-name)]
                  [params (StatementBinding-params stmt)])
             (buffer-message (make-Bind "" pst-name null params null))))
       (buffer-message (begin-lifted (make-Describe 'portal "")))
@@ -750,40 +792,13 @@
     (define/private (prepare1:error mg r stmt)
       (error 'prepare* "unexpected message processing ~s: ~s" stmt r))
     (define/private (prepare1:finish mg name stmt param-types result-fields)
-      (values 
-       (make-PostgresPreparedStatement result-fields name param-types
-                                       (make-weak-box this))
+      (values
+       (new prepared-statement%
+            (name name)
+            (param-types param-types)
+            (result-count result-fields)
+            (owner this))
        mg))
-
-    ;; bind-prepared-statement : PreparedStatement (list-of value) -> StatementBinding
-    (define/public (bind-prepared-statement pst params)
-      (unless (PostgresPreparedStatement? pst)
-        (raise-type-error 'bind-prepared-statement "prepared statement" pst))
-      (unless (eq? this (weak-box-value (PostgresPreparedStatement-wcx pst)))
-        (raise-mismatch-error 'bind-prepared-statement
-                              "prepared statement is owned by another connection"
-                              pst))
-      (unless (list? params)
-        (raise-type-error 'bind-prepared-statement "list" params))
-      (match pst
-        [(struct PostgresPreparedStatement (result? pst-name param-types pst-wcx))
-         (check-params params param-types)
-         (let ([params
-                (map (lambda (p t)
-                       (if (sql-null? p)
-                           sql-null
-                           (datum->external-representation t p)))
-                     params 
-                     param-types)])
-           (make-StatementBinding pst params))]))
-
-    (define/private (check-params params param-types)
-      (define len (length params))
-      (define tlen (length param-types))
-      (when (not (= len tlen))
-        (raise-user-error
-         'bind-prepared-statement
-         "prepared statement requires ~s parameters, given ~s" tlen len)))
     ))
 
 ;; pure-connection%

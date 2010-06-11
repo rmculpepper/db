@@ -24,13 +24,57 @@
 
 (define MAX-PACKET-LENGTH #x1000000)
 
-;; A PreparedStatement is:
-;;   (make-MySQLPreparedStatement int int
-;;                                int (list-of FieldInfo)
-;;                                int (list-of FieldInfo)
-;;                                (weak-box connection))
-(define-struct (MySQLPreparedStatement PreparedStatement)
-  (id params paraminfos fields fieldinfos wcx))
+(define prepared-statement%
+  (class* object% (prepared-statement<%>)
+    (init id           ;; int
+          params       ;; int
+          paraminfos   ;; (listof FieldInfo)
+          fields       ;; int
+          fieldinfos   ;; (listof FieldInfo)
+          owner)       ;; (weak-box connection)
+
+    (define -id id)
+    (define -params params)
+    (define -paraminfos paraminfos)
+    (define -fields fields)
+    (define -fieldinfos fieldinfos)
+    (define -owner (make-weak-box owner))
+
+    (define/public-final (get-id) -id)
+    (define/public-final (get-result-count) -fields)
+    (define/public-final (get-paraminfos) -paraminfos)
+    (define/public-final (get-fieldinfos) -fieldinfos)
+
+    (define/public-final (check-owner c)
+      (eq? c (weak-box-value -owner)))
+
+    (define/public-final (bind params)
+      (unless (list? params)
+        (raise-type-error 'bind-prepared-statement "list" params))
+      (check-params params -paraminfos)
+      (let* ([owner (weak-box-value -owner)]
+             ;; See comment in postgresql/connection.rkt
+             [params
+              (cond [owner
+                     (map (lambda (t p)
+                            (if (sql-null? p)
+                                #f
+                                (send owner datum->external-representation t p)))
+                          (map get-type -paraminfos)
+                          params)]
+                    [else
+                     'invalid])])
+        (make-StatementBinding this params)))
+
+    (define/private (check-params params paraminfos)
+      (define len (length params))
+      (define tlen (length paraminfos))
+      (when (not (= len tlen))
+        (raise-user-error
+         'bind-prepared-statement
+         "prepared statement requires ~s parameters, given ~s" tlen len)))
+
+    (super-new)))
 
 (define mysql-base<%>
   (interface ()
@@ -360,10 +404,10 @@
 
     ;; check-prepared-statement : symbol any -> void
     (define/private (check-prepared-statement fsym pst)
-      (unless (MySQLPreparedStatement? pst)
+      (unless (is-a? pst prepared-statement%)
         (raise-type-error fsym
                           "StatementBinding containing prepared statement"))
-      (unless (eq? this (weak-box-value (MySQLPreparedStatement-wcx pst)))
+      (unless (send pst check-owner this)
         (raise-mismatch-error 
          fsym
          "prepared statement owned by another connection"
@@ -376,11 +420,11 @@
          (send-message (make-command-packet 'query stmt))]
         [(StatementBinding? stmt)
          (let* ([pst (StatementBinding-pst stmt)]
-                [id (MySQLPreparedStatement-id pst)]
+                [id (send pst get-id)]
                 [params (StatementBinding-params stmt)]
                 [null-map (map not params)]
                 [param-types
-                 (map get-type (MySQLPreparedStatement-paraminfos pst))])
+                 (map get-type (send pst get-paraminfos))])
            #|
            (define (send-param pos data)
              (when data
@@ -402,7 +446,7 @@
          (query1:result #f collector)]
         [(StatementBinding? stmt)
          (let* ([pst (StatementBinding-pst stmt)]
-                [fieldinfos (MySQLPreparedStatement-fieldinfos pst)]
+                [fieldinfos (send pst get-fieldinfos)]
                 [types (map get-type fieldinfos)])
            (query1:result types collector))]))
 
@@ -461,11 +505,13 @@
                   (if (zero? params) null (prepare1:get-params))]
                  [fieldinfos
                   (if (zero? fields) null (prepare1:get-fields))])
-             (make-MySQLPreparedStatement fields
-                                          id
-                                          params paraminfos
-                                          fields fieldinfos
-                                          (make-weak-box this)))])))
+             (new prepared-statement%
+                  (id id)
+                  (params params)
+                  (paraminfos paraminfos)
+                  (fields fields)
+                  (fieldinfos fieldinfos)
+                  (owner this)))])))
 
     (define/private (prepare1:get-params)
       (let ([r (recv 'prepare* 'field)])
@@ -482,45 +528,6 @@
            null]
           [(? field-packet?)
            (cons (parse-field-info r) (prepare1:get-fields))])))
-
-    ;; bind-prepared-statement : PreparedStatement (list-of value)
-    ;;                        -> StatementBinding
-    (define/public (bind-prepared-statement pst params)
-      #|
-      (printf "wcx = ~s\n"
-              (MySQLPreparedStatement-wcx pst))
-      (printf "owner = this? : ~s\n"
-              (eq? this (weak-box-value (MySQLPreparedStatement-wcx pst))))
-      |#
-      (unless (MySQLPreparedStatement? pst)
-        (raise-type-error 'bind-prepared-statement "prepared statement" pst))
-      (unless (eq? this (weak-box-value (MySQLPreparedStatement-wcx pst)))
-        (raise-mismatch-error 'bind-prepared-statement
-                              "prepared statement is owned by another connection"
-                              pst))
-      (unless (list? params)
-        (raise-type-error 'bind-prepared-statement "list" params))
-      (match pst
-        [(struct MySQLPreparedStatement
-                 (results id paramc paraminfos fields fieldinfos wcx))
-         (check-params params paraminfos)
-         (let* ([param-types (map get-type paraminfos)]
-                [params
-                 (map (lambda (p t)
-                        (if (sql-null? p)
-                            #f
-                            (datum->external-representation t p)))
-                      params 
-                      param-types)])
-           (make-StatementBinding pst params))]))
-
-    (define/private (check-params params paraminfos)
-      (define len (length params))
-      (define tlen (length paraminfos))
-      (when (not (= len tlen))
-        (raise-user-error
-         'bind-prepared-statement
-         "prepared statement requires ~s parameters, given ~s" tlen len)))
     ))
 
 ;; connection%

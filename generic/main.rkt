@@ -31,7 +31,4 @@
          srfi-date->sql-timestamp
          srfi-date->sql-timestamp-tz
 
-         (except-out (all-from-out "procedures.rkt")
-                     connection:admin?
-                     connection:query?
-                     connection:query/prepare?))
+         (all-from-out "procedures.rkt"))

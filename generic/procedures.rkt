@@ -3,11 +3,9 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require racket/class
+(require racket/contract
+         racket/class
          "interfaces.rkt")
-(provide (except-out (all-defined-out)
-                     defproc*
-                     defproc))
 
 (define-syntax-rule (defproc* ifc def ...)
   (begin (defproc ifc . def) ...))
@@ -16,10 +14,12 @@
   (syntax-rules ()
     [(_ ifc [proc method] . formals)
      (begin (define (proc c . formals)
+              #|
               (unless (is-a? c ifc)
                 (raise-type-error 'proc
                                   (format "instance of ~s" 'ifc)
                                   c))
+              |#
               (send c method . formals)))]
     [(_ ifc proc . formals)
      (defproc ifc [proc proc] . formals)]))
@@ -61,7 +61,6 @@
 (defproc* connection:query/prepare<%>
   (prepare stmt)
   (prepare-multiple stmts)
-  (bind-prepared-statement prep params)
   (prepare-query-exec stmt)
   (prepare-query-rows stmt)
   (prepare-query-list stmt)
@@ -79,3 +78,88 @@
 
 (define (dbsystem-name x)
   (send x get-short-name))
+
+(define (statement? x)
+  (or (string? x) (StatementBinding? x)))
+
+(define (prepared-statement? x)
+  (is-a? x prepared-statement<%>))
+
+(define (bind-prepared-statement pst params)
+  (send pst bind params))
+
+(provide/contract
+ [connection?
+  (-> any/c any)]
+ [disconnect
+  (-> connection? any)]
+ [connected?
+  (-> connection? any)]
+ [connection-dbsystem
+  (-> connection? dbsystem?)]
+ [dbsystem?
+  (-> any/c any)]
+ [dbsystem-name
+  (-> dbsystem? symbol?)]
+
+ [statement?
+  (-> any/c any)]
+ [prepared-statement?
+  (-> any/c any)]
+
+ [query
+  (-> connection? statement? any)]
+ [query-multiple
+  (-> connection? (listof statement?) any)]
+ [query-exec
+  (->* (connection?) () #:rest (listof statement?) any)]
+ [query-rows
+  (-> connection? statement? any)]
+ [query-list
+  (-> connection? statement? any)]
+ [query-row
+  (-> connection? statement? any)]
+ [query-maybe-row
+  (-> connection? statement? any)]
+ [query-value
+  (-> connection? statement? any)]
+ [query-maybe-value
+  (-> connection? statement? any)]
+ [query-map
+  (-> connection? statement? procedure? any)]
+ [query-for-each
+  (-> connection? statement? procedure? any)]
+ [query-mapfilter
+  (-> connection? statement? procedure? procedure? any)]
+ [query-fold
+  (-> connection? statement? procedure? any/c any)]
+
+ [prepare
+  (-> connection? string? any)]
+ [prepare-multiple
+  (-> connection? (listof string?) any)]
+ [bind-prepared-statement
+  (-> prepared-statement? list? any)]
+
+ [prepare-query-exec
+  (-> connection? string? any)]
+ [prepare-query-rows
+  (-> connection? string? any)]
+ [prepare-query-list
+  (-> connection? string? any)]
+ [prepare-query-row
+  (-> connection? string? any)]
+ [prepare-query-maybe-row
+  (-> connection? string? any)]
+ [prepare-query-value
+  (-> connection? string? any)]
+ [prepare-query-maybe-value
+  (-> connection? string? any)]
+ [prepare-query-map
+  (-> connection? string? procedure? any)]
+ [prepare-query-for-each
+  (-> connection? string? procedure? any)]
+ [prepare-query-mapfilter
+  (-> connection? string? procedure? procedure? any)]
+ [prepare-query-fold
+  (-> connection? string? procedure? any/c any)])

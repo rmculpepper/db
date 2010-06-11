@@ -15,7 +15,7 @@
          (struct-out Recordset)
          (struct-out FieldInfo)
 
-         (struct-out PreparedStatement)
+         prepared-statement<%>
          (struct-out StatementBinding)
 
          connector<%>
@@ -90,9 +90,6 @@
     ;; prepare-multiple : (list-of Preparable) -> (list-of PreparedStatement)
     prepare-multiple
 
-    ;; bind-prepared-statement : PreparedStatement (list-of param) -> Statement
-    bind-prepared-statement
-
     ;; prepare-query-exec : Preparable -> datum ... -> void
     prepare-query-exec
 
@@ -163,14 +160,19 @@
 
 ;; ==== Auxiliary Interfaces & Structures
 
-;; A PreparedStatement is:
-;;   (make-PreparedStatement number/#f)
-(define-struct PreparedStatement (results))
+;; prepared-statement<%>
+(define prepared-statement<%>
+  (interface ()
+    ;; get-result-count : -> number/#f
+    get-result-count
+
+    ;; bind : (listof param) -> StatementBinding
+    bind))
 
 ;; A Statement is one of:
 ;;   - string
 ;;   - (make-StatementBinding PreparedStatement (list-of string))
-(define-struct StatementBinding (pst params) #:transparent)
+(define-struct StatementBinding (pst params))
 
 ;; A YesNoOptional is one of 'yes, 'no, 'optional
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls
@@ -235,7 +237,4 @@
   (interface (primitive-query<%>)
     ;; prepare-multiple : (listof Preparable) -> (listof PreparedStatement)
     prepare-multiple
-
-    ;; bind-prepared-statement : PreparedStatement (list-of value) -> Statement
-    bind-prepared-statement
     ))

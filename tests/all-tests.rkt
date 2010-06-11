@@ -6,7 +6,6 @@
 (require rackunit
          rackunit/gui
          racket/unit
-         racket/class
          "../generic/signatures.rkt"
          "../postgresql/unit.rkt"
          "../mysql/unit.rkt"

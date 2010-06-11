@@ -36,11 +36,11 @@
               ;; only valid Postgreql syntax!
               (check (let ([q (format "select $1::~a"
                                       (send dbsystem typealias->type 'type))])
-                       ((send c prepare-query-value q) value))
+                       ((prepare-query-value c q) value))
                      value))
              ((mysql)
               (when (eq? 'type 'varchar)
-                (check ((send c prepare-query-value "select ?") value) value))))))]))
+                (check ((prepare-query-value c "select ?") value) value))))))]))
 
   (define (check-string-length c value len)
     (define psql
@@ -50,7 +50,7 @@
         ((mysql)
          "select char_length(?)")))
     (when (string? psql)
-      (check-equal? ((send c prepare-query-value psql) value)
+      (check-equal? ((prepare-query-value c psql) value)
                     (string-length value))))
 
   (define (check-timestamptz-equal? a b)

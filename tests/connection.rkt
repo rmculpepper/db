@@ -26,8 +26,8 @@
                                        (string->symbol
                                         (format "~a-~a" "prepare" (syntax-e #'method))))])
            #'(if use-prepared?
-                 ((send obj prepared . args))
-                 (send obj method . args)))]))
+                 ((prepared obj . args))
+                 (method obj . args)))]))
     (test-suite (string-append "high-level" (if use-prepared? " (prepared)" ""))
       (test-case "query-list"
         (call-with-connection
@@ -149,9 +149,9 @@
         (test-case "query-multiple"
           (call-with-connection
            (lambda (c)
-             (let [(q (send c query-multiple
-                            (list "select N from the_numbers"
-                                  "select 5 as N")))]
+             (let [(q (query-multiple c
+                                      (list "select N from the_numbers"
+                                            "select 5 as N")))]
                (check-pred list? q)
                (check-equal? 2 (length q))
                (check-true (andmap Recordset? q))
@@ -173,7 +173,7 @@
         (test-case "query - select"
           (call-with-connection
            (lambda (c)
-             (let [(q (send c query "select N from the_numbers"))]
+             (let [(q (query c "select N from the_numbers"))]
                (check-pred Recordset? q)
                (check-true (set-equal? (map car test-data)
                                        (map (lambda (v) (vector-ref v 0))
@@ -181,7 +181,7 @@
         (test-case "query - update"
           (call-with-connection
            (lambda (c)
-             (let [(q (send c query "update the_numbers set N = -1 where N = 1"))]
+             (let [(q (query c "update the_numbers set N = -1 where N = 1"))]
                (check-pred SimpleResult? q))))))
 
       (query-tests #f)
@@ -192,14 +192,14 @@
           (call-with-connection
            (lambda (c)
              (define q
-               (send c query-map
-                     "select N from the_numbers where N > 0 and N < 3 order by N"
-                     (lambda (a)
-                       (send c query-value 
-                             (format "select description from the_numbers where N = ~s" a)))))
+               (query-map c
+                          "select N from the_numbers where N > 0 and N < 3 order by N"
+                          (lambda (a)
+                            (query-value c 
+                                  (format "select description from the_numbers where N = ~s" a)))))
              (define q2 
-               (send c query-list 
-                     "select description from the_numbers where N > 0 and N < 3 order by N"))
+               (query-list c 
+                           "select description from the_numbers where N > 0 and N < 3 order by N"))
              (check-equal? q q2))))
         (test-case "continuation safety"
           (call-with-connection
@@ -222,7 +222,7 @@
                              (k2 #t))))
                     (q 
                      (let/cc return
-                       (send c query-for-each "select N from the_numbers order by N asc"
+                       (query-for-each c "select N from the_numbers order by N asc"
                              (lambda (id)
                                (let/cc k
                                  (set! k2 k1)
@@ -242,14 +242,14 @@
         (test-case "nulls arrive in correct order"
           (call-with-connection
            (lambda (c)
-             (check-equal? (send c query-row "select null, 1, null")
+             (check-equal? (query-row c "select null, 1, null")
                            (vector sql-null 1 sql-null))
-             (check-equal? (send c query-row "select 1, null")
+             (check-equal? (query-row c "select 1, null")
                            (vector 1 sql-null))
-             (check-equal? (send c query-row "select null, 1")
+             (check-equal? (query-row c "select null, 1")
                            (vector sql-null 1))
              (check-equal?
-              (send c query-row 
+              (query-row c 
                     "select 1, 2, 3, 4, null, 6, null, 8, 9, 10, 11, 12, null, 14, 15, null, null, 18, 19, 20, null, null, null, null, null, null, 27, 28, 29, 30, null, 32, 33, null, 35")
               (vector 1 2 3 4 sql-null 6 sql-null 8 9 10 11 12 sql-null 14 15 sql-null sql-null 18 19 20 sql-null sql-null sql-null sql-null sql-null sql-null 27 28 29 30 sql-null 32 33 sql-null 35))))))
       
@@ -258,26 +258,26 @@
         (test-suite "low-level"
           (test-case "query-multiple - not a statement list"
             (with-connection c
-              (check-exn exn:fail? (lambda () (send c query-multiple 5)))
-              (check-exn exn:fail? (lambda () (send c query-multiple "select 5")))
-              (check-exn exn:fail? (lambda () (send c query-multiple (list 5))))))
+              (check-exn exn:fail? (lambda () (query-multiple c 5)))
+              (check-exn exn:fail? (lambda () (query-multiple c "select 5")))
+              (check-exn exn:fail? (lambda () (query-multiple c (list 5))))))
           (test-case "query - not a statement"
             (with-connection c
-              (check-exn exn:fail? (lambda () (send c query 5)))))
+              (check-exn exn:fail? (lambda () (query c 5)))))
           (test-case "query - multiple statements in string"
             (with-connection c
-              (check-exn exn:fail? (lambda () (send c query "select 3; select 4;")))))
+              (check-exn exn:fail? (lambda () (query c "select 3; select 4;")))))
           (test-case "query - unowned prepared stmt"
             (with-connection c1 
               (with-connection c
                 (printf "connections: ~s, ~s\n" c1 c)
-                (let ([pst (send c1 prepare "select 5")])
+                (let ([pst (prepare c1 "select 5")])
                   (printf "prepared stmt: ~s\n" pst)
-                  (check-exn exn:fail? (lambda () (send c bind-prepared-statement pst null)))
-                  (let ([stmt (send c1 bind-prepared-statement pst null)])
-                    (check-exn exn:fail? (lambda () (send c query stmt))))))))
+                  (check-exn exn:fail? (lambda () (bind-prepared-statement c pst null)))
+                  (let ([stmt (bind-prepared-statement c1 pst null)])
+                    (check-exn exn:fail? (lambda () (query c stmt))))))))
           (test-case "query errors - nonfatal"
             (with-connection c
-              (check-exn exn:fail? (lambda () (send c query-value "select nonsuch")))
-              (check-equal? (send c query-value "select 17") 17)))
+              (check-exn exn:fail? (lambda () (query-value c "select nonsuch")))
+              (check-equal? (query-value c "select 17") 17)))
           )))))

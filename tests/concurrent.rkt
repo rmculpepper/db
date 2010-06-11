@@ -6,6 +6,7 @@
 (require rackunit
          racket/class
          racket/unit
+         "../generic/procedures.rkt"
          "config.rkt")
 (provide concurrent-test@)
 
@@ -24,25 +25,25 @@
 
   (define (((mk-worker c iterations) tid))
     (define insert
-      (send c prepare-query-exec "insert into play_numbers (n) values ($1)"))
+      (prepare-query-exec c "insert into play_numbers (n) values ($1)"))
     (define (add-to-max n)
-      (insert (+ n (send c query-value "select max(n) from play_numbers"))))
+      (insert (+ n (query-value c "select max(n) from play_numbers"))))
     (for-each insert (build-list iterations add1))
     (for-each add-to-max (build-list iterations add1))
     (printf "~s: ~s\n"
             tid
-            (send c query-value "select max(n) from play_numbers"))
-    #;(send c query "select * from pg_type"))
+            (query-value c "select max(n) from play_numbers")))
 
   (define test
     (test-suite "Concurrency"
       (test-case "lots of threads"
         (call-with-connection
          (lambda (c)
-           (send c query-exec "create temporary table play_numbers (n integer)")
+           (query-exec c "create temporary table play_numbers (n integer)")
            (for-each thread-wait
                      (map thread
                           (map (mk-worker c 100) (build-list 20 add1)))))))
+      #|
       (test-case "threads with pausing ports"
         (parameterize ((testing-connection-mixin
                         (lambda (%)
@@ -54,10 +55,11 @@
                             (super-new)))))
           (call-with-connection
            (lambda (c)
-             (send c query-exec "create temporary table play_numbers (n integer)")
+             (query-exec c "create temporary table play_numbers (n integer)")
              (for-each thread-wait
                        (map thread
                             (map (mk-worker c 5) (build-list 4 add1))))))))
+      |#
       (test-case "threads with small-chunk ports"
         (parameterize ((testing-connection-mixin
                         (lambda (%)
@@ -69,7 +71,7 @@
                             (super-new)))))
           (call-with-connection
            (lambda (c)
-             (send c query-exec "create temporary table play_numbers (n integer)")
+             (query-exec c "create temporary table play_numbers (n integer)")
              (for-each thread-wait
                        (map thread
                             (map (mk-worker c 5) (build-list 4 add1)))))))))))

@@ -37,6 +37,8 @@
     (define -param-types param-types)
     (define -result-count result-count)
     (define -owner (make-weak-box owner))
+    (define -type-writers
+      (send owner get-type-writers -param-types))
 
     (define/public-final (get-name) -name)
     (define/public-final (get-result-count) -result-count)
@@ -45,23 +47,14 @@
       (eq? c (weak-box-value -owner)))
 
     (define/public-final (bind params)
-      (unless (list? params)
-        (raise-type-error 'bind-prepared-statement "list" params))
       (check-params params -param-types)
-      (let* ([owner (weak-box-value -owner)]
-             ;; If the owner if #f, we can't use it to call datum->external-representation.
-             ;; But that's okay, just put 'invalid as params;
-             ;; query methods check ownership before looking at params.
-             [params
-              (cond [owner
-                     (map (lambda (t p)
-                            (if (sql-null? p)
-                                sql-null
-                                (send owner datum->external-representation t p)))
-                          -param-types
-                          params)]
-                    [else
-                     'invalid])])
+      (let* ([params
+              (map (lambda (tw p)
+                     (if (sql-null? p)
+                         sql-null
+                         (tw p)))
+                   -param-types
+                   params)])
         (make-StatementBinding this params)))
 
     (define/private (check-params params param-types)
@@ -606,8 +599,7 @@
              buffer-message
              flush-message-buffer
              new-exchange
-             end-exchange
-             datum->external-representation)
+             end-exchange)
     (super-new)
 
     ;; name-counter : number

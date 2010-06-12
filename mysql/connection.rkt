@@ -35,35 +35,29 @@
 
     (define -id id)
     (define -params params)
-    (define -paraminfos paraminfos)
     (define -fields fields)
     (define -fieldinfos fieldinfos)
     (define -owner (make-weak-box owner))
+    (define -param-types (map get-type paraminfos))
+    (define -type-writers (send owner get-type-writers -param-types))
 
     (define/public-final (get-id) -id)
     (define/public-final (get-result-count) -fields)
-    (define/public-final (get-paraminfos) -paraminfos)
+    (define/public-final (get-param-types) -param-types)
     (define/public-final (get-fieldinfos) -fieldinfos)
 
     (define/public-final (check-owner c)
       (eq? c (weak-box-value -owner)))
 
     (define/public-final (bind params)
-      (unless (list? params)
-        (raise-type-error 'bind-prepared-statement "list" params))
-      (check-params params -paraminfos)
-      (let* ([owner (weak-box-value -owner)]
-             ;; See comment in postgresql/connection.rkt
-             [params
-              (cond [owner
-                     (map (lambda (t p)
-                            (if (sql-null? p)
-                                #f
-                                (send owner datum->external-representation t p)))
-                          (map get-type -paraminfos)
-                          params)]
-                    [else
-                     'invalid])])
+      (check-params params -param-types)
+      (let* ([params
+              (map (lambda (ts p)
+                     (if (sql-null? p)
+                         #f
+                         (tw p)))
+                   -type-writers
+                   params)])
         (make-StatementBinding this params)))
 
     (define/private (check-params params paraminfos)
@@ -177,7 +171,7 @@
 
 ;; mysql-base%
 (define mysql-base%
-  (class* object% (connection:admin<%> mysql-base<%>)
+  (class* object% (mysql-base<%> connection:admin<%>)
     (init-field [backend-link disconnected-backend-link])
     (super-new)
 
@@ -246,7 +240,7 @@
 
     ;; System
 
-    (define/public (connection-dbsystem)
+    (define/public (get-dbsystem)
       dbsystem)
 
     ;; Initialization
@@ -374,8 +368,7 @@
   (mixin (mysql-base<%> primitive-query<%>) (primitive-query/prepare<%>)
     (inherit recv
              send-message
-             fresh-exchange
-             datum->external-representation)
+             fresh-exchange)
     (super-new)
 
     ;; name-counter : number
@@ -424,7 +417,7 @@
                 [params (StatementBinding-params stmt)]
                 [null-map (map not params)]
                 [param-types
-                 (map get-type (send pst get-paraminfos))])
+                 (send pst get-param-types)])
            #|
            (define (send-param pos data)
              (when data

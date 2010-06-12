@@ -10,9 +10,7 @@
 ;; == Administrative procedures
 
 (define (connection? x)
-  (and (is-a? x connection:admin<%>)
-       (is-a? x connection:query<%>)
-       (is-a? x connection:query/prepare<%>)))
+  (is-a? x connection<%>))
 
 (define (connected? x)
   (send x connected?))
@@ -49,7 +47,7 @@
 
 ;; query1 : connection symbol Statement Collector -> QueryResult
 (define (query1 c fsym stmt collector)
-  (car (query* c fsym (list stmt) collector)))
+  (car (send c query* fsym (list stmt) collector)))
 
 ;; query/recordset : connection symbol Statement collector -> void
 (define (query/recordset c fsym sql collector)
@@ -141,7 +139,7 @@
 
 ;; query-multiple : connection (list-of Statement) -> (list-of QueryResult)
 (define (query-multiple c stmts)
-  (query* c 'query-multiple stmts vectorlist-collector/fieldinfo))
+  (send c query* 'query-multiple stmts vectorlist-collector/fieldinfo))
 
 ;; query-rows : connection Statement -> (listof (vectorof 'a))
 (define (query-rows c sql)
@@ -191,8 +189,8 @@
    sql))
 
 ;; query-exec : connection Statement ... -> void
-(define (query-exec . sqls)
-  (query* c 'query-exec sqls void-collector)
+(define (query-exec c . sqls)
+  (send c query* 'query-exec sqls void-collector)
   (void))
 
 ;; query-fold : connection Statement ('a field ... -> 'a) 'a -> 'a
@@ -239,7 +237,7 @@
      (define (name c sql arg ...)
        (let ([pst (prepare c sql)])
          (check 'name pst sql) ...
-         (lambda args (method (send pst bind args) arg ...))))]))
+         (lambda args (method c (send pst bind args) arg ...))))]))
 
 (define (check-results name pst stmt)
   (unless (send pst get-result-count)

@@ -7,13 +7,7 @@
          "signatures.rkt"
          "sql-data.rkt"
          "procedures.rkt")
-(provide connection:admin<%>
-         connection:query<%>
-         connection:query/prepare<%>
-
-         dbsystem<%>
-
-         (struct-out SimpleResult)
+(provide (struct-out SimpleResult)
          (struct-out Recordset)
          (struct-out FieldInfo)
 

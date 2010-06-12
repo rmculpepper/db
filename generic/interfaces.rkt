@@ -5,9 +5,7 @@
 #lang racket/base
 (require racket/class)
 
-(provide connection:admin<%>
-         connection:query<%>
-         connection:query/prepare<%>
+(provide connection<%>
 
          dbsystem<%>
 
@@ -20,8 +18,8 @@
 
          connector<%>
          ssl-connector<%>
-         primitive-query<%>
-         primitive-query/prepare<%>)
+         connection:admin<%>
+         primitive-query<%>)
 
 ;; ==== Connection Interfaces
 

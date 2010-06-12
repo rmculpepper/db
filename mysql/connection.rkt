@@ -52,7 +52,7 @@
     (define/public-final (bind params)
       (check-params params -param-types)
       (let* ([params
-              (map (lambda (ts p)
+              (map (lambda (tw p)
                      (if (sql-null? p)
                          #f
                          (tw p)))
@@ -360,12 +360,12 @@
 
     ))
 
-;; primitive-query-mixin
+;; query-mixin
 ;; Handles the mechanics of connection creations, queries, etc.
 ;; Provides functionality, not usability. See connection% for friendly 
 ;; interface.
-(define primitive-query-mixin
-  (mixin (mysql-base<%> primitive-query<%>) (primitive-query/prepare<%>)
+(define query-mixin
+  (mixin (mysql-base<%> primitive-query<%>) ()
     (inherit recv
              send-message
              fresh-exchange)
@@ -525,16 +525,17 @@
 
 ;; connection%
 (define connection% 
-  (class (prepare-query-mixin
-          (query-mixin
-           (primitive-query-mixin
-            (primitive-query-base-mixin
-             (connector-mixin
-              mysql-base%)))))
+  (class (query-mixin
+          (primitive-query-mixin
+           (connector-mixin
+            mysql-base%)))
     (super-new)
-    (inherit query-exec)
+    (inherit query*)
 
     ;; Set connection to use utf8 encoding
     (define/override (after-connect)
       (super after-connect)
-      (query-exec "set names 'utf8'"))))
+      (query* 'after-connect (list "set names 'utf8'")
+              (lambda (fields binary?)
+                (values #f void void #f)))
+      (void))))

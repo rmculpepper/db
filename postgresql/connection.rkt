@@ -369,7 +369,7 @@
 
     ;; System
 
-    (define/public (connection-dbsystem)
+    (define/public (get-dbsystem)
       dbsystem)
 
     ;; Initialization
@@ -584,12 +584,12 @@
          (t (md5 (bytes-append s salt)))]
     (bytes-append #"md5" t)))
 
-;; primitive-query-mixin
+;; query-mixin
 ;; Handles the mechanics of connection creations, queries, etc.
 ;; Provides functionality, not usability. See connection% for friendly 
 ;; interface.
-(define primitive-query-mixin
-  (mixin (base<%> primitive-query<%>) (primitive-query/prepare<%>)
+(define query-mixin
+  (mixin (base<%> primitive-query<%>) ()
     (inherit-field protocol
                    process-id
                    secret-key)
@@ -795,12 +795,10 @@
 
 ;; pure-connection%
 (define pure-connection% 
-  (class (prepare-query-mixin
-          (query-mixin
-           (primitive-query-mixin
-            (primitive-query-base-mixin
-             (connector-mixin
-              base%)))))
+  (class (query-mixin
+          (primitive-query-mixin
+           (connector-mixin
+            base%)))
     (super-new)))
 
 ;; connection%

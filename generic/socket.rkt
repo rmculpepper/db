@@ -36,7 +36,7 @@
   (let ([os (system-type 'os)]
         [machine (system-type 'machine)])
     (cond [(eq? os 'macosx) 'macosx]
-          [(regexp-match #rx"Linux.*i.86" machine) 'linux86]
+          [(regexp-match #rx"Linux.*86" machine) 'linux86]
           [(regexp-match #rx"SunOS" machine) #f #;'solaris]
           [else #f])))
 

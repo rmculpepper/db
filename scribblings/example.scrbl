@@ -17,15 +17,15 @@ backend and perform simple queries.
 (require #, @(schememodname/this-package))
 ]
 
-Replace these values with the appropriate values for your
-configuration (see @scheme[postgresql-connect] for other connection
-examples):
+Replace @racket[_user], @racket[_db], and @racket[_password] below
+with the appropriate values for your configuration (see
+@scheme[postgresql-connect] for other connection examples):
 
 @schemeinput[
   (define psql-c
-    (postgresql-connect #:user user
-                        #:database db
-                        #:password password))
+    (postgresql-connect #:user _user
+                        #:database _db
+                        #:password _password))
 ]
 @(my-interaction
   [psql-c (new connection%)])
@@ -181,8 +181,8 @@ But if there are no numbers less than the one given, @tt{max} returns NULL.
    sql-null])
 
 @bold{PostgreSQL only:} You can declare cursors to fetch data
-incrementally.  You must be inside of a transaction to create a
-cursor.
+incrementally.  Cursors can be created and used only within a
+transaction.
 
 @schemeinput[
 (query-exec psql-c

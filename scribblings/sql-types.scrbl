@@ -138,7 +138,7 @@ no close analogues in Scheme.
             [minute exact-nonnegative-integer?]
             [second exact-nonnegative-integer?]
             [nanosecond exact-nonnegative-integer?]
-            [tz (or/c exact-nonnegative-integer? false/c)])]
+            [tz (or/c exact-integer? #f)])]
 @defstruct[sql-timestamp
            ([year exact-nonnegative-integer?]
             [month exact-nonnegative-integer?]
@@ -147,7 +147,7 @@ no close analogues in Scheme.
             [minute exact-nonnegative-integer?]
             [second exact-nonnegative-integer?]
             [nanosecond exact-nonnegative-integer?]
-            [tz (or/c exact-nonnegative-integer? false/c)])]{
+            [tz (or/c exact-integer? #f)])]{
 
   Representations of SQL dates, times, and timestamps. The @scheme[tz]
   field may be @scheme[#f] to indicate no time zone information.

@@ -477,7 +477,7 @@
       (define data (query1:get-data binary?))
       (let loop ([init init] [data data])
         (if (pair? data)
-            (loop (apply combine init (car data)) (cdr data))
+            (loop (combine init (list->vector (car data))) (cdr data))
             (make-Recordset info (finalize init)))))
 
     ;; prepare-multiple : (list-of string) -> (list-of PreparedStatement)
@@ -525,10 +525,11 @@
 
 ;; connection%
 (define connection% 
-  (class (query-mixin
-          (primitive-query-mixin
-           (connector-mixin
-            mysql-base%)))
+  (class* (query-mixin
+           (primitive-query-mixin
+            (connector-mixin
+             mysql-base%)))
+      (connection<%>)
     (super-new)
     (inherit query*)
 

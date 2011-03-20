@@ -53,7 +53,7 @@
                      (if (sql-null? p)
                          sql-null
                          (tw p)))
-                   -param-types
+                   -type-writers
                    params)])
         (make-StatementBinding this params)))
 
@@ -696,7 +696,7 @@
         (match r
           [(struct DataRow (value))
            (query1:data-loop mg 
-                             (apply combine init value)
+                             (combine init (list->vector value))
                              combine
                              finalize
                              info)]
@@ -795,10 +795,11 @@
 
 ;; pure-connection%
 (define pure-connection% 
-  (class (query-mixin
-          (primitive-query-mixin
-           (connector-mixin
-            base%)))
+  (class* (query-mixin
+           (primitive-query-mixin
+            (connector-mixin
+             base%)))
+      (connection<%>)
     (super-new)))
 
 ;; connection%

@@ -5,7 +5,8 @@
 #lang racket/base
 (require racket/class
          racket/unit
-         "../generic/signatures.rkt")
+         "../generic/signatures.rkt"
+         "../generic/procedures.rkt")
 (provide test^
          config^
          config@)
@@ -45,12 +46,12 @@
 
   (define (connect-and-setup)
     (let [(cx (connect-for-test))]
-      (send cx query-exec
-            "create temporary table the_numbers (N integer primary key, description text)")
+      (query-exec cx
+                  "create temporary table the_numbers (N integer primary key, description text)")
       (for-each (lambda (p)
-                  (send cx query-exec
-                        (format "insert into the_numbers values (~a, '~a')"
-                                (car p) (cadr p))))
+                  (query-exec cx
+                              (format "insert into the_numbers values (~a, '~a')"
+                                      (car p) (cadr p))))
                 test-data)
       cx))
 
@@ -64,4 +65,4 @@
     (let [(c (connect-and-setup))]
       (dynamic-wind void
                     (lambda () (f c))
-                    (lambda () (send c disconnect))))))
+                    (lambda () (disconnect c))))))

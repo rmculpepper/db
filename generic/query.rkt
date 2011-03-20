@@ -4,6 +4,7 @@
 
 #lang racket/base
 (require racket/class
+         racket/vector
          "interfaces.rkt"
          "sql-data.rkt")
 
@@ -46,23 +47,25 @@
 ;;    -> 'a ('a field ... -> 'a) ('a -> 'b))
 (define (compose-with-converters sys f)
   (lambda (field-infos binary?)
-    (let* ([type-functions
-            (map (lambda (field-info)
-                   (send sys get-type-reader
-                         (send sys typeid->type
-                               (get-type field-info))))
-                 field-infos)]
+    (let* ([type-functionv
+            (list->vector
+             (map (lambda (field-info)
+                    (send sys get-type-reader
+                          (send sys typeid->type
+                                (get-type field-info))))
+                  field-infos))]
            [convert
-            (lambda (args)
-              (map (lambda (convert arg)
-                     (if (sql-null? arg) sql-null (convert arg)))
-                   type-functions
-                   args))])
+            (lambda (argv)
+              ;; FIXME: vector-map vs vector-map!... which is better?
+              (vector-map (lambda (arg convert)
+                            (if (sql-null? arg) sql-null (convert arg)))
+                          argv
+                          type-functionv))])
       (let-values ([(base combine finish info) (f field-infos binary?)])
         (values base 
                 (if binary?
                     combine
-                    (lambda (b . args) (apply combine b (convert args))))
+                    (lambda (b argv) (combine b (convert argv))))
                 finish
                 info)))))
 

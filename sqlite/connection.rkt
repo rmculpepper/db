@@ -35,17 +35,18 @@
       |#
       (make-StatementBinding this params))
 
-    (super-new)))
+    (super-new)
+    (send owner register-statement real-pst)))
 
 (define sqlite-dbsystem%
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'sqlite)
     (define/public (get-description) "SQLite")
-    (define/public (typeid->type x) #f)
-    (define/public (typealias->type x) #f)
-    (define/public (get-known-types) '())
-    (define/public (get-type-reader) #f)
-    (define/public (get-type-writer) #f)
+    (define/public (typeid->type x) x)
+    (define/public (typealias->type x) x)
+    (define/public (get-known-types) '(varchar integer real numeric))
+    (define/public (get-type-reader) values)
+    (define/public (get-type-writer) values)
     (define/public (has-support? x) #f)
     (super-new)))
 
@@ -59,15 +60,28 @@
     (init db)
 
     (define -db db)
+    (define -statements (make-hasheq))
 
-    (define/public (get-db) -db)
+    (define/public (get-db fsym)
+      (unless -db
+        (error fsym "not connected"))
+      -db)
 
     (define/public (get-dbsystem) dbsystem)
     (define/public (connected?) (and -db #t))
     (define/public (disconnect)
       (when -db
-        (close -db)
-        (set! -db #f)))
+        (let ([db -db]
+              [statements -statements])
+          (set! -db #f)
+          (set! -statements #f)
+          (for ([k (in-hash-keys statements)])
+            (when (open-statement? k)
+              (finalize k)))
+          (close db))))
+
+    (define/public (register-statement s)
+      (hash-set! -statements s #t))
 
     (super-new)))
 
@@ -76,7 +90,7 @@
     (inherit get-db)
 
     (define/public (query* fsym stmts collector)
-      (let ([db (get-db)])
+      (let ([db (get-db fsym)])
         (for/list ([stmt (in-list stmts)])
           (query1 db fsym stmt collector))))
 
@@ -112,12 +126,12 @@
            info
            (finalize
             (for/fold ([accum init]) ([row (in-list rows)])
-              (apply combine accum (vector->list row))))))))
+              (combine accum row)))))))
 
     (define/public (prepare-multiple stmts)
-      (let ([db (get-db)])
+      (let ([db (get-db 'prepare-multiple)])
         (for/list ([stmt stmts])
-          (let ([real-pst (prepare (get-db) stmt)])
+          (let ([real-pst (prepare db stmt)])
             (new prepared-statement%
                  (real-pst real-pst)
                  (owner this))))))

@@ -58,7 +58,7 @@
             fsym
             "query did not return recordset: " sql)])))
 
-;; -fold : connection symbol Statement ('a field ... -> 'a) 'a -> 'a
+;; -fold : connection symbol Statement ('a fieldv -> 'a) 'a -> 'a
 (define (-fold c function sql f base)
   (Recordset-data
    (query/recordset c
@@ -76,11 +76,17 @@
          => cdr]
         [else #f]))
 
+;; collector = ((listof ??) bool)
+;;          -> (values _a
+;;                     (_a (vectorof field) -> _a)
+;;                     (_a -> _a)
+;;                     _info
+
 ;; vectorlist-collector : collector
 (define vectorlist-collector
   (lambda (fields binary?)
     (values null
-            (lambda (b . fields) (cons (apply vector fields) b))
+            (lambda (b fieldv) (cons fieldv b))
             reverse
             #f)))
 
@@ -88,7 +94,7 @@
 (define vectorlist-collector/fieldinfo
   (lambda (fields binary?)
     (values null
-            (lambda (b . fields) (cons (apply vector fields) b))
+            (lambda (b fieldv) (cons fieldv b))
             reverse
             (standard-info fields))))
 
@@ -98,7 +104,8 @@
     (values #f void void #f)))
 
 (define (mk-folding-collector base f)
-  (lambda (fields binary?) (values base f values #f)))
+  (lambda (fields binary?)
+    (values base f values #f)))
 
 (define (mk-single-column-collector function sql)
   (lambda (fields binary?)
@@ -107,7 +114,7 @@
                             "query did not return exactly one column: "
                             sql))
     (values null
-            (lambda (b a) (cons a b))
+            (lambda (b av) (cons (vector-ref av 0) b))
             reverse
             #f)))
 
@@ -195,29 +202,33 @@
 
 ;; query-fold : connection Statement ('a field ... -> 'a) 'a -> 'a
 (define (query-fold c sql f base)
-  (-fold c 'query-fold sql f base))
+  (-fold c 'query-fold sql
+         (lambda (b av)
+           (apply f b (vector->list av)))
+         base))
 
 ;; query-map : connection Statement (field ... -> 'a) -> (listof 'a)
 (define (query-map c sql f)
   (reverse
    (-fold c 'query-map sql
-          (lambda (b . fields) (cons (apply f fields) b))
+          (lambda (b fieldv) (cons (apply f (vector->list fieldv)) b))
           null)))
 
 ;; query-mapfilter : connection Statement (field... -> 'a) (field... -> boolean)
 ;;                -> (listof 'a)
 (define (query-mapfilter c sql f keep?)
   (reverse (-fold c 'query-mapfilter sql
-                  (lambda (b . fields)
-                    (if (apply keep? fields)
-                        (cons (apply f fields) b)
-                        b))
+                  (lambda (b fieldv)
+                    (let ([fields (vector->list fieldv)])
+                      (if (apply keep? fields)
+                          (cons (apply f fields) b)
+                          b)))
                   null)))
 
 ;; query-for-each : connection Statement (field ... -> unspecified) -> unspecified
 (define (query-for-each c sql f)
   (-fold c 'query-for-each sql
-         (lambda (_ . fields) (apply f fields))
+         (lambda (_ fieldv) (apply f (vector->list fieldv)))
          #f)
   (void))
 

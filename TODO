@@ -1,0 +1,6 @@
+To do
+=====
+
+- sqlite error reporting, locking, memory management
+
+- permit types in param'd queries

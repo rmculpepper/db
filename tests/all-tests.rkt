@@ -9,7 +9,6 @@
          "../generic/signatures.rkt"
          "../postgresql/unit.rkt"
          "../mysql/unit.rkt"
-         "../sqlite/unit.rkt"
          "config.rkt"
          "connection.rkt"
          "sql-types.rkt"

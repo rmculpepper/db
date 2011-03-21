@@ -1,15 +1,12 @@
 To do
 =====
 
+- write tests for improved simple query functions
+
 - finish sqlite
 - sqlite error reporting, locking, memory management
 
 - eliminate CamelCase names?
-
-- permit immediate param'd queries, eg:
-    (query-value c "select x from y where z > ?" 12)
-
-- prune query functions (drop mapfilter ?, add in-query?)
 
 - permit types in param'd queries
 
@@ -19,4 +16,3 @@ To do
   also, connection option, defaults to void
   convenience function: print-notification takes notification, extracts string, prints
     also print-notification-to-error-port (?)
-

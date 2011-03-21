@@ -75,6 +75,7 @@
            (let [(q (sendq c query-maybe-value
                           "select N from the_numbers where N > 1000"))]
              (check-equal? q #f)))))
+      #|
       (test-case "query-map"
         (call-with-connection
          (lambda (c)
@@ -105,6 +106,7 @@
              (check-true 
               (set-equal? q
                           (filter (lambda (p) (odd? (car p))) test-data)))))))
+      |#
       (test-case "query-fold - sum"
         (call-with-connection 
          (lambda (c)
@@ -192,14 +194,13 @@
           (call-with-connection
            (lambda (c)
              (define q
-               (query-map c
-                          "select N from the_numbers where N > 0 and N < 3 order by N"
-                          (lambda (a)
-                            (query-value c 
-                                  (format "select description from the_numbers where N = ~s" a)))))
+               (for/list ([a (query-list c
+                               "select N from the_numbers where N > 0 and N < 3 order by N")])
+                 (query-value c 
+                   (format "select description from the_numbers where N = ~s" a))))
              (define q2 
                (query-list c 
-                           "select description from the_numbers where N > 0 and N < 3 order by N"))
+                 "select description from the_numbers where N > 0 and N < 3 order by N"))
              (check-equal? q q2))))
         (test-case "continuation safety"
           (call-with-connection
@@ -222,15 +223,16 @@
                              (k2 #t))))
                     (q 
                      (let/cc return
-                       (query-for-each c "select N from the_numbers order by N asc"
-                             (lambda (id)
-                               (let/cc k
-                                 (set! k2 k1)
-                                 (printf "saw ~s~n" id)
-                                 (when (= id search-id)
-                                   (set! k1 k)
-                                   (printf "found ~s~n~n" id)
-                                   (return id)))))
+                       (for-each
+                        (lambda (id)
+                          (let/cc k
+                            (set! k2 k1)
+                            (printf "saw ~s~n" id)
+                            (when (= id search-id)
+                              (set! k1 k)
+                              (printf "found ~s~n~n" id)
+                              (return id))))
+                        (query-list c "select N from the_numbers order by N asc"))
                        (error 'search-failed "couldn't find ~s" search-id)))]
                (unless (null? todo)
                  (let [(t (car todo))]

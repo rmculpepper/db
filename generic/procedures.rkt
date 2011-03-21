@@ -137,67 +137,97 @@
                "query did not return zero or one rows: "
                sql)]))
 
+(define (compose-statement who c sql args)
+  (cond [(null? args)
+         sql]
+        [else ;; must prepare statement and bind
+         (unless (string? sql)
+           (error who "expected string for SQL statement with arguments, got ~e" sql))
+         (let ([pst (prepare c sql)])
+           (case checktype
+             ((recordset)
+              (check-results who pst sql))
+             ((column)
+              (check-results/one-column who pst sql))
+             (else (void)))
+           (send pst bind args))]))
+
 ;; Query API procedures
 
-;; query : connection Statement -> QueryResult
+;; query : connection Statement arg ... -> QueryResult
 ;; Uses the default 'vectorlist' collector
-(define (query c sql)
-  (query1 c 'query sql vectorlist-collector/fieldinfo))
+(define (query c sql . args)
+  (let ([sql (compose-statement 'query c sql args)])
+    (query1 c 'query sql vectorlist-collector/fieldinfo)))
+
+;; query-rows : connection Statement arg ... -> (listof (vectorof 'a))
+(define (query-rows c sql . args)
+  (let ([sql (compose-statement 'query-rows c sql args)])
+    (Recordset-data
+     (query/recordset c 'query-rows sql
+                      vectorlist-collector))))
+
+;; query-list : connection Statement arg ... -> (listof 'a)
+;; Expects to get back a recordset with one field per row.
+(define (query-list c sql . args)
+  (let ([sql (compose-statement 'query-list c sql args)])
+    (Recordset-data
+     (query/recordset c 'query-list sql
+                      (mk-single-column-collector 'query-list sql)))))
+
+;; query-maybe-row : connection Statement arg ... -> (vector-of 'a) or #f
+;; Expects to get back a recordset of zero or one rows.
+(define (query-maybe-row c sql . args)
+  (let ([sql (compose-statement 'query-maybe-row c sql args)])
+    (recordset->maybe-row 
+     'query-maybe-row
+     (query/recordset c 'query-maybe-row sql vectorlist-collector)
+     sql)))
+
+;; query-row : connection Statement arg ... -> (vector-of 'a)
+;; Expects to get back a recordset of zero or one rows.
+(define (query-row c sql . args)
+  (let ([sql (compose-statement 'query-row c sql args)])
+    (recordset->one-row 
+     'query-row
+     (query/recordset c 'query-row sql vectorlist-collector)
+     sql)))
+
+;; query-value : connection string arg ... -> value | raises error
+;; Expects to get back a recordset of exactly one row, exactly one column.
+(define (query-value c sql . args)
+  (let ([sql (compose-statement 'query-value c sql args)])
+    (recordset->one-row
+     'query-value
+     (query/recordset c 'query-value sql
+                      (mk-single-column-collector 'query-value sql))
+     sql)))
+
+;; query-maybe-value : connection Statement arg ... -> value/#f
+;; Expects to get back a recordset of zero or one rows, exactly one column.
+(define (query-maybe-value c sql . args)
+  (let ([sql (compose-statement 'query-maybe-value c sql args)])
+    (recordset->maybe-row
+     'query-maybe-value
+     (query/recordset c 'query-maybe-value sql
+                      (mk-single-column-collector 'query-maybe-value sql))
+     sql)))
+
+;; query-exec : connection Statement arg ... -> void
+(define (query-exec c sql . args)
+  (let ([sql (compose-statement 'query-exec c sql args)])
+    (send c query* 'query-exec (list sql) void-collector)
+    (void)))
+
+;; -- Functions without auto-prep --
 
 ;; query-multiple : connection (list-of Statement) -> (list-of QueryResult)
 (define (query-multiple c stmts)
   (send c query* 'query-multiple stmts vectorlist-collector/fieldinfo))
 
-;; query-rows : connection Statement -> (listof (vectorof 'a))
-(define (query-rows c sql)
-  (Recordset-data
-   (query/recordset c 'query-rows sql
-                    vectorlist-collector)))
-
-;; query-list : connection Statement -> (listof 'a)
-;; Expects to get back a recordset with one field per row.
-(define (query-list c sql)
-  (Recordset-data
-   (query/recordset c 'query-list sql
-                    (mk-single-column-collector 'query-list sql))))
-
-;; query-maybe-row : connection Statement -> (vector-of 'a) or #f
-;; Expects to get back a recordset of zero or one rows.
-(define (query-maybe-row c sql)
-  (recordset->maybe-row 
-   'query-maybe-row
-   (query/recordset c 'query-maybe-row sql vectorlist-collector)
-   sql))
-
-;; query-row : connection Statement -> (vector-of 'a)
-;; Expects to get back a recordset of zero or one rows.
-(define (query-row c sql)
-  (recordset->one-row 
-   'query-row
-   (query/recordset c 'query-row sql vectorlist-collector)
-   sql))
-
-;; query-value : connection string -> value | raises error
-;; Expects to get back a recordset of exactly one row, exactly one column.
-(define (query-value c sql)
-  (recordset->one-row
-   'query-value
-   (query/recordset c 'query-value sql
-                    (mk-single-column-collector 'query-value sql))
-   sql))
-
-;; query-maybe-value : connection Statement -> value/#f
-;; Expects to get back a recordset of zero or one rows, exactly one column.
-(define (query-maybe-value c sql)
-  (recordset->maybe-row
-   'query-maybe-value
-   (query/recordset c 'query-maybe-value sql
-                    (mk-single-column-collector 'query-maybe-value sql))
-   sql))
-
-;; query-exec : connection Statement ... -> void
-(define (query-exec c . sqls)
-  (send c query* 'query-exec sqls void-collector)
+;; query-exec* : connection Statement ... -> void
+(define (query-exec* c . sqls)
+  (send c query* 'query-exec* sqls void-collector)
   (void))
 
 ;; query-fold : connection Statement ('a field ... -> 'a) 'a -> 'a
@@ -270,8 +300,6 @@
 (define (prepare-multiple c stmts)
   (send c prepare-multiple stmts))
 
-(defprepare prepare-query-exec query-exec)
-
 (defprepare prepare-query-rows query-rows)
 
 (defprepare prepare-query-list query-list
@@ -288,6 +316,8 @@
 
 (defprepare prepare-query-maybe-value query-maybe-value
   [#:check check-results/one-column])
+
+(defprepare prepare-query-exec query-exec)
 
 (defprepare prepare-query-map query-map
   [#:check check-results]
@@ -330,36 +360,42 @@
   (-> prepared-statement? list? any)]
 
  [query
-  (-> connection? statement? any)]
- [query-multiple
-  (-> connection? (listof statement?) any)]
- [query-exec
-  (->* (connection?) () #:rest (listof statement?) any)]
+  (->* (connection? statement?) () #:rest list? QueryResult?)]
  [query-rows
-  (-> connection? statement? any)]
+  (->* (connection? statement?) () #:rest list? (listof vector?))]
  [query-list
-  (-> connection? statement? any)]
+  (->* (connection? statement?) () #:rest list? list?)]
  [query-row
-  (-> connection? statement? any)]
+  (->* (connection? statement?) () #:rest list? vector?)]
  [query-maybe-row
-  (-> connection? statement? any)]
+  (->* (connection? statement?) () #:rest list? (or/c #f vector?))]
  [query-value
-  (-> connection? statement? any)]
+  (->* (connection? statement?) () #:rest list? any)]
  [query-maybe-value
-  (-> connection? statement? any)]
- [query-map
-  (-> connection? statement? procedure? any)]
- [query-for-each
-  (-> connection? statement? procedure? any)]
- [query-mapfilter
-  (-> connection? statement? procedure? procedure? any)]
+  (->* (connection? statement?) () #:rest list? any)]
+
+ [query-exec*
+  (->* (connection?) () #:rest (listof statement?) any)]
  [query-fold
   (-> connection? statement? procedure? any/c any)]
 
+ #|
+ [query-multiple
+  (-> connection? (listof statement?) (listof QueryResult?))]
+ [query-map
+  (-> connection? statement? procedure? list?)]
+ [query-for-each
+  (-> connection? statement? procedure? any)]
+ [query-mapfilter
+  (-> connection? statement? procedure? procedure? list?)]
+ |#
+ 
  [prepare
   (-> connection? string? any)]
+ #|
  [prepare-multiple
   (-> connection? (listof string?) any)]
+ |#
  [prepare-query-exec
   (-> connection? string? any)]
  [prepare-query-rows
@@ -374,11 +410,13 @@
   (-> connection? string? any)]
  [prepare-query-maybe-value
   (-> connection? string? any)]
+ #|
  [prepare-query-map
   (-> connection? string? procedure? any)]
  [prepare-query-for-each
   (-> connection? string? procedure? any)]
  [prepare-query-mapfilter
   (-> connection? string? procedure? procedure? any)]
+ |#
  [prepare-query-fold
   (-> connection? string? procedure? any/c any)])

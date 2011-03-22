@@ -9,6 +9,7 @@
          "../generic/signatures.rkt"
          "../postgresql/unit.rkt"
          "../mysql/unit.rkt"
+         "../sqlite3/unit.rkt"
          "config.rkt"
          "connection.rkt"
          "sql-types.rkt"
@@ -48,6 +49,10 @@
 (define-values/invoke-unit (specialize-test mysql@)
   (import)
   (export (prefix mysql: test^)))
+
+(define-values/invoke-unit (specialize-test sqlite3@)
+  (import)
+  (export (prefix sqlite3: test^)))
 
 #|
 ;; Normal testing:

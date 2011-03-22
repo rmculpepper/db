@@ -58,8 +58,13 @@ Predicate for objects representing database systems.
 @defproc[(dbsystem-name [sys dbsystem?])
          symbol?]{
 
-Returns a symbol that names the database system. Currently either
-@scheme['postrgresql] or @scheme['mysql].
+Returns a symbol that names the database system. Currently one of the
+following:
+@itemization[
+@item[@racket['postgresql]]
+@item[@racket['mysql]]
+@item[@racket['sqlite3]]
+]
 }
 
 

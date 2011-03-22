@@ -31,10 +31,16 @@
   (define testing-connection-mixin (make-parameter values))
 
   (define (connect-for-test)
-    (connect #:user (getenv "DBUSER")
-             #:database (or (getenv "DBDB") (getenv "DBUSER"))
-             #:password (getenv "DBPASSWORD")
-             #:mixin (testing-connection-mixin)))
+    (case (dbsystem-name dbsystem)
+      ((postgresql mysql)
+       (connect #:user (getenv "DBUSER")
+                #:database (or (getenv "DBDB") (getenv "DBUSER"))
+                #:password (getenv "DBPASSWORD")
+                #:mixin (testing-connection-mixin)))
+      ((sqlite3)
+       (connect #:database 'memory))
+      (else
+       (error 'connect-for-test "unknown database system: ~e" dbsystem))))
 
   (define test-data
     '((0 "nothing")

@@ -4,6 +4,7 @@
 
 #lang racket/base
 (require racket/class
+         ffi/unsafe
          ffi/unsafe/atomic
          "../generic/query.rkt"
          "../generic/interfaces.rkt"
@@ -15,11 +16,11 @@
 
 (define sqlite-dbsystem%
   (class* object% (dbsystem<%>)
-    (define/public (get-short-name) 'sqlite)
-    (define/public (get-description) "SQLite")
+    (define/public (get-short-name) 'sqlite3)
+    (define/public (get-description) "SQLite 3")
     (define/public (typeid->type x) x)
     (define/public (typealias->type x) x)
-    (define/public (get-known-types) '(varchar integer real numeric))
+    (define/public (get-known-types) '())
     (define/public (get-type-reader) values)
     (define/public (get-type-writer) values)
     (define/public (has-support? x) #f)
@@ -120,7 +121,7 @@
                (query1/p fsym pst params collector))]))
 
     (define/private (query1/p fsym pst params collector)
-      (define-values (info rows)
+      (define-values (info0 rows)
         (with-lock
          (let ([db (get-db fsym)]
                [stmt (send pst get-stmt)])
@@ -138,8 +139,8 @@
              (handle-status fsym (sqlite3_clear_bindings stmt) db)
              (values info rows)))))
       (let-values ([(init combine finalize info)
-                    (collector info #f)])
-        (cond [(or (pair? info) (pair? rows))
+                    (collector info0 #f)])
+        (cond [(or (pair? info0) (pair? rows))
                (make-Recordset
                 info
                 (finalize
@@ -203,13 +204,14 @@
        (let-values ([(db) (get-db fsym)]
                     [(stmt prep-status tail)
                      (sqlite3_prepare_v2 (get-db fsym) sql)])
+         (define (free!) (sqlite3_finalize stmt))
          (when (string=? sql tail)
-           (error fsym "SQL syntax error in ~e" tail))
+           (free!) (error fsym "SQL syntax error in ~e" tail))
          (when (not (zero? (string-length tail)))
-           (error fsym "multiple SQL statements given: ~e" tail))
+           (free!) (error fsym "multiple SQL statements given: ~e" tail))
          (when (handle-status fsym prep-status db)
            (or stmt
-               (error fsym "internal error in prepare")))
+               (begin (free!) (error fsym "internal error in prepare"))))
          (let ([pst (new prepared-statement%
                          (stmt stmt)
                          (owner this))])
@@ -217,13 +219,6 @@
            (thread-resume statement-finalizer-thread)
            (will-register statement-will-executor pst (lambda (pst) (send pst finalize)))
            pst))))
-
-    (define custodian-ref
-      (scheme_add_managed (current-custodian)
-                          this
-                          (lambda (obj unused) (send obj disconnect))
-                          #f
-                          #t))
 
     (define/public (disconnect)
       (with-lock
@@ -234,13 +229,12 @@
            (set! statement-table #f)
            (for ([pst (in-list statements)])
              (send pst finalize))
-           (when custodian-ref
-             (scheme_remove_managed custodian-ref this)
-             (set! custodian-ref #f))
            (handle-status 'disconnect (sqlite3_close db))
            (void)))))
 
-    (super-new)))
+    (super-new)
+
+    (register-finalizer this (lambda (obj) (send obj disconnect)))))
 
 ;; ----------------------------------------
 

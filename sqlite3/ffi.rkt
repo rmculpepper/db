@@ -53,11 +53,10 @@
   (_fun _sqlite3_statement
         -> _int))
 
-(define-sqlite sqlite3_bind_parameter_count (_fun _sqlite3_statement -> _int))
-;;(define-sqlite sqlite3_bind_parameter_name (_fun _sqlite3_statement _int -> _string))
-;;(define-sqlite sqlite3_bind_parameter_index (_fun _sqlite3_statement _string -> _int))
+(define-sqlite sqlite3_bind_parameter_count
+  (_fun _sqlite3_statement
+        -> _int))
 
-;; Can these be called before first 'step'?
 (define-sqlite sqlite3_column_count
   (_fun _sqlite3_statement
         -> _int))
@@ -70,64 +69,69 @@
 
 ;; ----------------------------------------
 
-(define-sqlite sqlite3_last_insert_rowid (_fun _sqlite3_database -> _int64))
-(define-sqlite sqlite3_changes (_fun _sqlite3_database -> _int))
-(define-sqlite sqlite3_total_changes (_fun _sqlite3_database -> _int))
-(define-sqlite sqlite3_interrupt (_fun _sqlite3_database -> _void))
-(define-sqlite sqlite3_complete (_fun _string -> _int))
-;; sqlite3_busy_handler
-;; sqlite3_busy_timeout
-;; sqlite3_ printf functions
-;; sqlite3_set_authorizer
-;; sqlite3_trace
-;; sqlite3_progress_handler
-;; sqlite3_commit_hook
+(define-sqlite sqlite3_errcode
+  (_fun _sqlite3_database -> _int))
+(define-sqlite sqlite3_errmsg
+  (_fun _sqlite3_database -> _string))
 
-(define-sqlite sqlite3_errcode (_fun _sqlite3_database -> _int))
-(define-sqlite sqlite3_errmsg (_fun _sqlite3_database -> _string))
-;; sqlite3_bind functions
-(define-sqlite sqlite3_bind_int (_fun _sqlite3_statement _int _int -> _int))
-(define-sqlite sqlite3_bind_int64 (_fun _sqlite3_statement _int _int64 -> _int))
-(define-sqlite sqlite3_bind_double (_fun _sqlite3_statement _int _double -> _int))
-(define-sqlite sqlite3_bind_text (_fun (stmt col the-string) ::
-                                       (stmt : _sqlite3_statement)
-                                       (col : _int)
-                                       (string-ptr : _string = the-string)
-                                       (string-len : _int = (string-utf-8-length the-string))
-                                       (destructor : _pointer-number = SQLITE_TRANSIENT)
-                                       -> _int))
-(define-sqlite sqlite3_bind_blob (_fun (stmt col the-bytes) ::
-                                       (stmt : _sqlite3_statement)
-                                       (col : _int)
-                                       (byte-ptr : _bytes = the-bytes)
-                                       (byte-len : _int = (bytes-length the-bytes))
-                                       (destructor : _pointer-number = SQLITE_TRANSIENT)
-                                       -> _int))
-(define-sqlite sqlite3_bind_null (_fun _sqlite3_statement _int -> _int))
-;(_fun -> _void) -> _int))
+;; ----------------------------------------
 
-(define-sqlite sqlite3_clear_bindings (_fun _sqlite3_statement -> _int))
-
-(define-sqlite sqlite3_step (_fun _sqlite3_statement -> _int))
-(define-sqlite sqlite3_data_count (_fun _sqlite3_statement -> _int))
-; sqlite3_column functions
-(define-sqlite sqlite3_column_type
-  (_fun _sqlite3_statement _int
+(define-sqlite sqlite3_bind_int
+  (_fun _sqlite3_statement _int _int -> _int))
+(define-sqlite sqlite3_bind_int64
+  (_fun _sqlite3_statement _int _int64 -> _int))
+(define-sqlite sqlite3_bind_double
+  (_fun _sqlite3_statement _int _double -> _int))
+(define-sqlite sqlite3_bind_text
+  (_fun (stmt col the-string) ::
+        (stmt : _sqlite3_statement)
+        (col : _int)
+        (string-ptr : _string = the-string)
+        (string-len : _int = (string-utf-8-length the-string))
+        (destructor : _pointer-number = SQLITE_TRANSIENT)
         -> _int))
-(define-sqlite sqlite3_column_int (_fun _sqlite3_statement _int -> _int))
-(define-sqlite sqlite3_column_int64 (_fun _sqlite3_statement _int -> _int64))
-(define-sqlite sqlite3_column_double (_fun _sqlite3_statement _int -> _double))
-(define-sqlite sqlite3_column_text (_fun _sqlite3_statement _int -> _string))
-(define-sqlite sqlite3_column_bytes (_fun _sqlite3_statement _int -> _int))
-(define-sqlite sqlite3_column_blob (_fun (stmt : _sqlite3_statement)
-                                         (col : _int)
-                                         -> (blob : _bytes)
-                                         -> (let ([len (sqlite3_column_bytes stmt col)])
-                                              (bytes-copy (make-sized-byte-string blob len)))))
-(define-sqlite sqlite3_reset (_fun _sqlite3_statement -> _int))
-; sqlite3_ user-defined function functions
-(define-sqlite sqlite3_expired (_fun _sqlite3_database -> _int))
-;(define-sqlite sqlite3_global_recover (_fun -> _int))
+(define-sqlite sqlite3_bind_blob
+  (_fun (stmt col the-bytes) ::
+        (stmt : _sqlite3_statement)
+        (col : _int)
+        (byte-ptr : _bytes = the-bytes)
+        (byte-len : _int = (bytes-length the-bytes))
+        (destructor : _pointer-number = SQLITE_TRANSIENT)
+        -> _int))
+(define-sqlite sqlite3_bind_null
+  (_fun _sqlite3_statement _int -> _int))
+
+(define-sqlite sqlite3_reset
+  (_fun _sqlite3_statement -> _int))
+
+(define-sqlite sqlite3_clear_bindings
+  (_fun _sqlite3_statement -> _int))
+
+;; ----------------------------------------
+
+(define-sqlite sqlite3_step
+  (_fun _sqlite3_statement -> _int))
+
+(define-sqlite sqlite3_column_type
+  (_fun _sqlite3_statement _int -> _int))
+(define-sqlite sqlite3_column_int
+  (_fun _sqlite3_statement _int -> _int))
+(define-sqlite sqlite3_column_int64
+  (_fun _sqlite3_statement _int -> _int64))
+(define-sqlite sqlite3_column_double
+  (_fun _sqlite3_statement _int -> _double))
+(define-sqlite sqlite3_column_text
+  (_fun _sqlite3_statement _int -> _string))
+(define-sqlite sqlite3_column_bytes
+  (_fun _sqlite3_statement _int -> _int))
+(define-sqlite sqlite3_column_blob
+  (_fun (stmt : _sqlite3_statement)
+        (col : _int)
+        -> (blob : _bytes)
+        -> (let ([len (sqlite3_column_bytes stmt col)])
+             (bytes-copy (make-sized-byte-string blob len)))))
+
+;; ----------------------------------------
 
 (define status? exact-nonnegative-integer?)
 
@@ -139,12 +143,6 @@
   (c-> bytes? (values sqlite3_database? status?))]
  [sqlite3_close
   (c-> sqlite3_database? status?)]
- [sqlite3_last_insert_rowid
-  (c-> sqlite3_database? exact-nonnegative-integer?)]
- [sqlite3_changes
-  (c-> sqlite3_database? exact-nonnegative-integer?)]
- [sqlite3_total_changes
-  (c-> sqlite3_database? exact-nonnegative-integer?)]
  [sqlite3_prepare_v2
   (c-> sqlite3_database? string?
        (values (or/c sqlite3_statement? false/c) status? string?))]
@@ -186,26 +184,3 @@
   (c-> sqlite3_statement? status?)]
  [sqlite3_finalize
   (c-> sqlite3_statement? status?)])
-
-;; ----------------------------------------
-
-(define-ffi-definer define-mz #f)
-(define-cpointer-type _CustodianReference)
-
-(define-mz scheme_add_managed
-  (_fun _racket _racket
-        (_fun _racket _pointer -> _void)
-        _pointer
-        _bool
-        -> _CustodianReference))
-
-(define-mz scheme_remove_managed
-  (_fun _CustodianReference _racket
-        -> _void))
-
-(provide/contract
- [scheme_add_managed
-  (c-> custodian? any/c (c-> any/c any/c any) any/c boolean?
-       CustodianReference?)]
- [scheme_remove_managed
-  (c-> CustodianReference? any/c any)])

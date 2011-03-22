@@ -6,7 +6,7 @@
 (require racket/class
          racket/unit
          "../generic/signatures.rkt"
-         "../generic/procedures.rkt")
+         "../generic/functions.rkt")
 (provide test^
          config^
          config@)

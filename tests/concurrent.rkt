@@ -6,7 +6,7 @@
 (require rackunit
          racket/class
          racket/unit
-         "../generic/procedures.rkt"
+         "../generic/functions.rkt"
          "config.rkt")
 (provide concurrent-test@)
 

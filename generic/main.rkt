@@ -1,4 +1,4 @@
-;; Copyright 2009-2010 Ryan Culpepper
+;; Copyright 2009-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -6,7 +6,7 @@
 (require "interfaces.rkt"
          "signatures.rkt"
          "sql-data.rkt"
-         "procedures.rkt")
+         "functions.rkt")
 (provide (struct-out SimpleResult)
          (struct-out Recordset)
          (struct-out FieldInfo)
@@ -25,4 +25,4 @@
          srfi-date->sql-timestamp
          srfi-date->sql-timestamp-tz
 
-         (all-from-out "procedures.rkt"))
+         (all-from-out "functions.rkt"))

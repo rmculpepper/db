@@ -179,3 +179,24 @@
   (c-> sqlite3_statement? status?)]
  [sqlite3_finalize
   (c-> sqlite3_statement? status?)])
+
+;; ----------------------------------------
+
+(define-cpointer _CustodianReference)
+
+(define scheme_add_managed
+  (ffi #f (_fun _racket _racket
+                (_fun _racket _pointer/null -> _void)
+                _pointer/null
+                _boolean
+                -> _CustodianReference)))
+
+(define scheme_remove_managed
+  (ffi #f (_fun _CustodianReference _racket -> _void)))
+
+(provide/contract
+ [scheme_add_managed
+  (-> custodian? any/c (-> any/c any/c any) any/c boolean?
+      CustodianReference?)]
+ [scheme_remove_managed
+  (-> CustodianReference? any/c any)])

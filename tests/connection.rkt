@@ -156,35 +156,35 @@
                                             "select 5 as N")))]
                (check-pred list? q)
                (check-equal? 2 (length q))
-               (check-true (andmap Recordset? q))
-               (check-true (andmap (lambda (r) (list? (Recordset-data r))) q))
-               (check-true (andmap (lambda (r) (list? (Recordset-info r))) q))
+               (check-true (andmap recordset? q))
+               (check-true (andmap (lambda (r) (list? (recordset-data r))) q))
+               (check-true (andmap (lambda (r) (list? (recordset-info r))) q))
                (check-true (andmap (lambda (v) (= (vector-length v) 1))
-                                   (Recordset-data (car q))))
-               (check-true (list? (Recordset-info (cadr q))))
-               (check-equal? (length (Recordset-info (cadr q))) 1)
+                                   (recordset-data (car q))))
+               (check-true (list? (recordset-info (cadr q))))
+               (check-equal? (length (recordset-info (cadr q))) 1)
                ;; (postgresql returns "N", mysql returns "N")
-               #| (check-equal? (Recordset-info (cadr q))
-                                (list (make-FieldInfo "N"))) |#
-               (check-equal? (Recordset-data (cadr q))
+               #| (check-equal? (recordset-info (cadr q))
+                                (list (field-info "N"))) |#
+               (check-equal? (recordset-data (cadr q))
                              (list (vector 5)))
                (check-true 
                 (set-equal? (map car test-data)
                             (map (lambda (v) (vector-ref v 0) )
-                                 (Recordset-data (car q)))))))))
+                                 (recordset-data (car q)))))))))
         (test-case "query - select"
           (call-with-connection
            (lambda (c)
              (let [(q (query c "select N from the_numbers"))]
-               (check-pred Recordset? q)
+               (check-pred recordset? q)
                (check-true (set-equal? (map car test-data)
                                        (map (lambda (v) (vector-ref v 0))
-                                            (Recordset-data q))))))))
+                                            (recordset-data q))))))))
         (test-case "query - update"
           (call-with-connection
            (lambda (c)
              (let [(q (query c "update the_numbers set N = -1 where N = 1"))]
-               (check-pred SimpleResult? q))))))
+               (check-pred simple-result? q))))))
 
       (query-tests #f)
       (query-tests #t)

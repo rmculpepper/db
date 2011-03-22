@@ -7,12 +7,19 @@
          racket/class
          racket/unit
          "../generic/functions.rkt"
+         "../generic/signatures.rkt"
          "config.rkt")
 (provide concurrent-test@)
 
 (define-unit concurrent-test@
-  (import config^)
+  (import database^ config^)
   (export test^)
+
+  (define (sql pg my)
+    (case (dbsystem-name dbsystem)
+      ((postgresql) pg)
+      ((mysql sqlite3) my)
+      (else (error 'sql "unknown database system: ~e" dbsystem))))
 
   (define (make-slow-output-port out pause? limit)
     (make-output-port 'slow-port
@@ -23,9 +30,20 @@
                           (write-bytes-avail buf out start end)))
                       (lambda () (close-output-port out))))
 
+  (define (test-concurrency workers)
+    (test-case (format "lots of threads (~s)" workers)
+      (call-with-connection
+       (lambda (c)
+         (query-exec c "create temporary table play_numbers (n integer)")
+         (for-each thread-wait
+                   (map thread
+                        (map (mk-worker c 100) (build-list workers add1))))))))
+
   (define (((mk-worker c iterations) tid))
     (define insert
-      (prepare-query-exec c "insert into play_numbers (n) values ($1)"))
+      (prepare-query-exec c
+                          (sql "insert into play_numbers (n) values ($1)"
+                               "insert into play_numbers (n) values (?)")))
     (define (add-to-max n)
       (insert (+ n (query-value c "select max(n) from play_numbers"))))
     (for-each insert (build-list iterations add1))
@@ -36,31 +54,15 @@
 
   (define test
     (test-suite "Concurrency"
-      (test-case "lots of threads"
-        (call-with-connection
-         (lambda (c)
-           (query-exec c "create temporary table play_numbers (n integer)")
-           (for-each thread-wait
-                     (map thread
-                          (map (mk-worker c 100) (build-list 20 add1)))))))
-      #|
-      (test-case "threads with pausing ports"
-        (parameterize ((testing-connection-mixin
-                        (lambda (%)
-                          (class %
-                            (define/override (attach-to-ports in out)
-                              (super attach-to-ports
-                                     in 
-                                     (make-slow-output-port out #t 256)))
-                            (super-new)))))
-          (call-with-connection
-           (lambda (c)
-             (query-exec c "create temporary table play_numbers (n integer)")
-             (for-each thread-wait
-                       (map thread
-                            (map (mk-worker c 5) (build-list 4 add1))))))))
-      |#
+      ;; Tests whether connections are properly locked.
+      (test-concurrency 1)
+      (test-concurrency 2)
+      (test-concurrency 20)
+
       (test-case "threads with small-chunk ports"
+        ;; Tests whether connections work just as well if the connections
+        ;; dribble bytes slowly.
+        ;; Not sure this test is useful.
         (parameterize ((testing-connection-mixin
                         (lambda (%)
                           (class %

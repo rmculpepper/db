@@ -36,7 +36,7 @@
           (((CONFIG : config^)) config@ DB)
           (((QUERY-TEST : test^)) query-test@ CONFIG)
           (((SQL-TYPES-TEST : test^)) sql-types-test@ CONFIG DB)
-          (((CONCURRENT-TEST : test^)) concurrent-test@ CONFIG)
+          (((CONCURRENT-TEST : test^)) concurrent-test@ CONFIG DB)
           (((ALL-TESTS : test^)) all-tests@
                                  (tag query QUERY-TEST)
                                  (tag sql-types SQL-TYPES-TEST)
@@ -63,9 +63,7 @@
 (test/gui mysql:test)
 |#
 
-#|
-;; For debugging:
-(begin (define-values/invoke-unit postgresql@ (import) (export database^))
-       (define-values/invoke-unit config@ (import database^) (export config^))
-       (define c (connect-and-setup)))
-|#
+(define-syntax-rule (setup-debug db@ c)
+  (begin (define-values/invoke-unit db@ (import) (export database^))
+         (define-values/invoke-unit config@ (import database^) (export config^))
+         (define c (connect-and-setup))))

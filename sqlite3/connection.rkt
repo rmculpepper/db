@@ -64,7 +64,7 @@
         (raise-user-error 'bind-prepared-statement
                           "prepared statement requires ~s arguments, given ~s"
                           param-count (length params)))
-      (make-StatementBinding this params))
+      (statement-binding this params))
 
     (define/public (finalize)
       (call-as-atomic
@@ -110,9 +110,9 @@
              (let* ([pst (prepare1 fsym stmt)]
                     [sb (send pst bind null)])
                (query1 fsym sb collector))]
-            [(StatementBinding? stmt)
-             (let ([pst (StatementBinding-pst stmt)]
-                   [params (StatementBinding-params stmt)])
+            [(statement-binding? stmt)
+             (let ([pst (statement-binding-pst stmt)]
+                   [params (statement-binding-params stmt)])
                (unless (and (is-a? pst prepared-statement%)
                             (send pst check-owner this))
                  (raise-mismatch-error fsym
@@ -141,13 +141,13 @@
       (let-values ([(init combine finalize info)
                     (collector info0 #f)])
         (cond [(or (pair? info0) (pair? rows))
-               (make-Recordset
+               (recordset
                 info
                 (finalize
                  (for/fold ([accum init]) ([row (in-list rows)])
                    (combine accum row))))]
               [else
-               (make-SimpleResult "")])))
+               (simple-result "")])))
 
     (define/private (load-param fsym db stmt i param)
       (handle-status

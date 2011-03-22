@@ -7,9 +7,9 @@
          "signatures.rkt"
          "sql-data.rkt"
          "functions.rkt")
-(provide (struct-out SimpleResult)
-         (struct-out Recordset)
-         (struct-out FieldInfo)
+(provide (struct-out simple-result)
+         (struct-out recordset)
+         (struct-out field-info)
 
          sql-null
          sql-null?

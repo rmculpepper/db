@@ -127,35 +127,6 @@
 
 (define (parse-string s) s)
 
-(define (STUPID_parse-string s)
-  (define (decode in out)
-    (define (loop)
-      (let ([next (read-char in)])
-        (cond [(eof-object? next)
-               (void)]
-              [(eq? next #\\)
-               (escaped-loop)]
-              [else
-               (write-char next out)
-               (loop)])))
-    (define (escaped-loop)
-      (let ([next (peek-char in)])
-        (cond [(eq? next #\\)
-               (read-char in)
-               (write-char next out)]
-              [else
-               (let* ([s (read-string 3 in)]
-                      [n (string->number s 8)])
-                 (write-char (integer->char n) out))])
-        (loop)))
-    (loop))
-  (if (regexp-match? #rx"\\\\" s)
-      (let ([out (open-output-string)]
-            [in (open-input-string s)])
-        (decode in out)
-        (get-output-string out))
-      s))
-
 (define (parse-bytea s)
   (define (decode in out)
     (define (loop)
@@ -313,16 +284,6 @@
                         "string containing only ascii characters"
                         s)))
   s)
-
-(define (STUPID_marshal-string s)
-  (unless (string? s)
-    (raise-marshal-error "string" s))
-  (if (regexp-match? #rx"[\0\\\\]" s)
-      (let ([in (open-input-string s)]
-            [out (open-output-string)])
-        (encode in out #f)
-        (get-output-string out))
-      s))
 
 (define (marshal-bytea s)
   (unless (bytes? s)

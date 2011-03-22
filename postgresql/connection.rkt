@@ -55,7 +55,7 @@
                          (tw p)))
                    -type-writers
                    params)])
-        (make-StatementBinding this params)))
+        (statement-binding this params)))
 
     (define/private (check-params params param-types)
       (define len (length params))
@@ -638,15 +638,12 @@
 
     ;; check-statement : symbol any -> void
     (define/private (check-statement fsym stmt)
-      (unless (or (string? stmt) (StatementBinding? stmt))
-        (raise-type-error fsym "string or StatementBinding" stmt))
-      (when (StatementBinding? stmt)
-        (let ([pst (StatementBinding-pst stmt)])
-          (unless (is-a? pst prepared-statement%)
-            (raise-type-error 
-             fsym
-             "StatementBinding containing prepared statement" stmt))
-          (unless (send pst check-owner this)
+      (unless (or (string? stmt) (statement-binding? stmt))
+        (raise-type-error fsym "string or statement-binding" stmt))
+      (when (statement-binding? stmt)
+        (let ([pst (statement-binding-pst stmt)])
+          (unless (and (is-a? pst prepared-statement%)
+                       (send pst check-owner this))
             (raise-mismatch-error 
              fsym
              "prepared statement owned by another connection" stmt)))))
@@ -656,9 +653,9 @@
       (if (string? stmt)
           (begin (buffer-message (make-Parse "" stmt null))
                  (buffer-message (make-Bind "" "" null null null)))
-          (let* ([pst (StatementBinding-pst stmt)]
+          (let* ([pst (statement-binding-pst stmt)]
                  [pst-name (send pst get-name)]
-                 [params (StatementBinding-params stmt)])
+                 [params (statement-binding-params stmt)])
             (buffer-message (make-Bind "" pst-name null params null))))
       (buffer-message (begin-lifted (make-Describe 'portal "")))
       (buffer-message (begin-lifted (make-Execute "" 0)))
@@ -701,15 +698,15 @@
                              finalize
                              info)]
           [(struct CommandComplete (command))
-           (query1:finalize mg (make-Recordset info (finalize init)))]
+           (query1:finalize mg (recordset info (finalize init)))]
           [_ (query1:error-recovery r mg)])))
     (define/private (query1:expect-completion mg)
       (let-values ([(r mg) (split-messages 'query* mg)])
         (match r
           [(struct CommandComplete (command))
-           (query1:finalize mg (make-SimpleResult command))]
+           (query1:finalize mg (simple-result command))]
           [(struct EmptyQueryResponse ())
-           (query1:finalize mg (make-SimpleResult #f))]
+           (query1:finalize mg (simple-result #f))]
           [_ (query1:error-recovery r mg)])))
     (define/private (query1:finalize mg result)
       (let-values ([(r mg) (split-messages 'query* mg)])

@@ -28,9 +28,9 @@
   (class* object% (prepared-statement<%>)
     (init id           ;; int
           params       ;; int
-          paraminfos   ;; (listof FieldInfo)
+          paraminfos   ;; (listof field-info)
           fields       ;; int
-          fieldinfos   ;; (listof FieldInfo)
+          fieldinfos   ;; (listof field-info)
           owner)       ;; (weak-box connection)
 
     (define -id id)
@@ -58,7 +58,7 @@
                          (tw p)))
                    -type-writers
                    params)])
-        (make-StatementBinding this params)))
+        (statement-binding this params)))
 
     (define/private (check-params params paraminfos)
       (define len (length params))
@@ -390,17 +390,15 @@
 
     ;; check-statement : symbol any -> void
     (define/private (check-statement fsym stmt)
-      (unless (or (string? stmt) (StatementBinding? stmt))
-        (raise-type-error fsym "string or StatementBinding" stmt))
-      (when (StatementBinding? stmt)
-        (check-prepared-statement fsym (StatementBinding-pst stmt))))
+      (unless (or (string? stmt) (statement-binding? stmt))
+        (raise-type-error fsym "string or statement-binding" stmt))
+      (when (statement-binding? stmt)
+        (check-prepared-statement fsym (statement-binding-pst stmt))))
 
     ;; check-prepared-statement : symbol any -> void
     (define/private (check-prepared-statement fsym pst)
-      (unless (is-a? pst prepared-statement%)
-        (raise-type-error fsym
-                          "StatementBinding containing prepared statement"))
-      (unless (send pst check-owner this)
+      (unless (and (is-a? pst prepared-statement%)
+                   (send pst check-owner this))
         (raise-mismatch-error 
          fsym
          "prepared statement owned by another connection"
@@ -411,10 +409,10 @@
       (cond
         [(string? stmt)
          (send-message (make-command-packet 'query stmt))]
-        [(StatementBinding? stmt)
-         (let* ([pst (StatementBinding-pst stmt)]
+        [(statement-binding? stmt)
+         (let* ([pst (statement-binding-pst stmt)]
                 [id (send pst get-id)]
-                [params (StatementBinding-params stmt)]
+                [params (statement-binding-params stmt)]
                 [null-map (map not params)]
                 [param-types
                  (send pst get-param-types)])
@@ -437,8 +435,8 @@
       (cond
         [(string? stmt)
          (query1:result #f collector)]
-        [(StatementBinding? stmt)
-         (let* ([pst (StatementBinding-pst stmt)]
+        [(statement-binding? stmt)
+         (let* ([pst (statement-binding-pst stmt)]
                 [fieldinfos (send pst get-fieldinfos)]
                 [types (map get-type fieldinfos)])
            (query1:result types collector))]))
@@ -447,7 +445,7 @@
       (let ([r (recv 'query* 'result)])
         (match r
           [(struct ok-packet (affected-rows insert-id status warnings message))
-           (make-SimpleResult message)]
+           (simple-result message)]
           [(struct result-set-header-packet (fields extra))
            (query1:expect-fields binary? null collector)])))
 
@@ -478,7 +476,7 @@
       (let loop ([init init] [data data])
         (if (pair? data)
             (loop (combine init (list->vector (car data))) (cdr data))
-            (make-Recordset info (finalize init)))))
+            (recordset info (finalize init)))))
 
     ;; prepare-multiple : (list-of string) -> (list-of PreparedStatement)
     (define/public (prepare-multiple stmts)

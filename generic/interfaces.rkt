@@ -9,12 +9,12 @@
 
          dbsystem<%>
 
-         (struct-out SimpleResult)
-         (struct-out Recordset)
-         (struct-out FieldInfo)
+         (struct-out simple-result)
+         (struct-out recordset)
+         (struct-out field-info)
 
          prepared-statement<%>
-         (struct-out StatementBinding)
+         (struct-out statement-binding)
 
          connector<%>
          ssl-connector<%>
@@ -84,34 +84,31 @@
     ;; bind : (listof param) -> StatementBinding
     bind))
 
-;; A Statement is one of:
+;; A statement is one of:
 ;;   - string
-;;   - (make-StatementBinding PreparedStatement (list-of string))
-(define-struct StatementBinding (pst params))
+;;   - (statement-binding prepared-statement (list-of string))
+(struct statement-binding (pst params))
 
 ;; A YesNoOptional is one of 'yes, 'no, 'optional
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls
 
-;; A QueryResult is one of:
-;;  - (make-SimpleResult string)
-;;  - (make-Recordset Header value)
-(define-struct SimpleResult (command) #:transparent)
-(define-struct Recordset (info data) #:transparent)
+;; A query-result is one of:
+;;  - (simple-result string)
+;;  - (recordset Header value)
+(struct simple-result (command) #:transparent)
+(struct recordset (info data) #:transparent)
 
 ;; A Header is one of
-;;  - FieldInfo
-;;  - list of FieldInfo
+;;  - field-info
+;;  - list of field-info
 ;;  - #f
 
-;; A FieldInfo is (make-FieldInfo string)
-(define-struct FieldInfo (name) #:transparent)
+;; A field-info is (field-info string)
+(struct field-info (name) #:transparent)
 
 ;; A Statement is one of
 ;;  - string
-;;  - StatementBinding
-
-;; A Preparable is one of
-;;  - string
+;;  - statement-binding
 
 ;; A Collector = RowDescription boolean -> b (b a ... -> b) (b -> c) Header
 
@@ -147,8 +144,8 @@
     ;; query* entry point from connection<%>
     query*
 
-    ;; query*/no-conversion : (listof Statement) Collector
-    ;;                     -> (listof QueryResult)
+    ;; query*/no-conversion : (listof statement) Collector
+    ;;                     -> (listof query-result)
     ;; Hook method to be overridden.
     query*/no-conversion
 

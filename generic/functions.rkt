@@ -31,7 +31,7 @@
 ;; == Misc procedures
 
 (define (statement? x)
-  (or (string? x) (StatementBinding? x)))
+  (or (string? x) (statement-binding? x)))
 
 (define (prepared-statement? x)
   (is-a? x prepared-statement<%>))
@@ -52,7 +52,7 @@
 ;; query/recordset : connection symbol Statement collector -> void
 (define (query/recordset c fsym sql collector)
   (let [(result (query1 c fsym sql collector))]
-    (cond [(Recordset? result) result]
+    (cond [(recordset? result) result]
           [else
            (raise-mismatch-error
             fsym
@@ -60,15 +60,15 @@
 
 ;; -fold : connection symbol Statement ('a fieldv -> 'a) 'a -> 'a
 (define (-fold c function sql f base)
-  (Recordset-data
+  (recordset-data
    (query/recordset c
                     function
                     sql
                     (mk-folding-collector base f))))
 
-;; standard-info : (listof ???) -> (listof FieldInfo)
+;; standard-info : (listof ???) -> (listof field-info)
 (define (standard-info field-records)
-  (map (lambda (fr) (make-FieldInfo (get-field-name fr)))
+  (map (lambda (fr) (field-info (get-field-name fr)))
        field-records))
 
 (define (get-field-name alist)
@@ -119,7 +119,7 @@
             #f)))
 
 (define (recordset->one-row function rs sql)
-  (define rows (Recordset-data rs))
+  (define rows (recordset-data rs))
   (cond [(and (pair? rows) (null? (cdr rows)))
          (car rows)]
         [else (raise-mismatch-error 
@@ -128,7 +128,7 @@
                sql)]))
 
 (define (recordset->maybe-row function rs sql)
-  (define rows (Recordset-data rs))
+  (define rows (recordset-data rs))
   (cond [(null? rows) #f]
         [(and (pair? rows) (null? (cdr rows)))
          (car rows)]
@@ -144,7 +144,7 @@
                       [(prepared-statement? sql)
                        ;; Ownership check done later, by query* method.
                        sql]
-                      [(StatementBinding? sql)
+                      [(statement-binding? sql)
                        (error who
                               (string-append "expected string or prepared statement "
                                              "for SQL statement with arguments, got ~e")
@@ -165,7 +165,7 @@
 ;; query-rows : connection Statement arg ... -> (listof (vectorof 'a))
 (define (query-rows c sql . args)
   (let ([sql (compose-statement 'query-rows c sql args 'recordset)])
-    (Recordset-data
+    (recordset-data
      (query/recordset c 'query-rows sql
                       vectorlist-collector))))
 
@@ -173,7 +173,7 @@
 ;; Expects to get back a recordset with one field per row.
 (define (query-list c sql . args)
   (let ([sql (compose-statement 'query-list c sql args 'column)])
-    (Recordset-data
+    (recordset-data
      (query/recordset c 'query-list sql
                       (mk-single-column-collector 'query-list sql)))))
 

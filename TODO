@@ -3,8 +3,7 @@ To do
 
 - write tests for improved simple query functions
 
-- finish sqlite
-- sqlite error reporting, locking, memory management
+- sqlite locking?
 
 - eliminate CamelCase names?
 

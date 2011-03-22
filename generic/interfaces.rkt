@@ -19,7 +19,9 @@
          connector<%>
          ssl-connector<%>
          connection:admin<%>
-         primitive-query<%>)
+         primitive-query<%>
+
+         init-private)
 
 ;; ==== Connection Interfaces
 
@@ -153,3 +155,14 @@
     ;; For binding prepared statements.
     ;; Could be moved directly to dbsystem, bypass connections (???)
     get-type-writers))
+
+;; === Class Utilities
+
+;; Here just because ...
+
+(define-syntax-rule (init-private iid ...)
+  (begin (init-private1 iid) ...))
+
+(define-syntax-rule (init-private1 iid)
+  (begin (init ([private-iid iid]))
+         (define iid private-iid)))

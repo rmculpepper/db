@@ -16,3 +16,5 @@ To do
   also, connection option, defaults to void
   convenience function: print-notification takes notification, extracts string, prints
     also print-notification-to-error-port (?)
+
+- eliminate common code (eg, various prepared-statement%)

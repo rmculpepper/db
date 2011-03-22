@@ -4,8 +4,11 @@
 
 #lang racket/base
 (require racket/class
+         ffi/unsafe/atomic
          "../generic/query.rkt"
-         "../generic/interfaces.rkt")
+         "../generic/interfaces.rkt"
+         "../generic/sql-data.rkt"
+         "ffi.rkt")
 (provide connection%
          handle-status
          dbsystem)
@@ -28,11 +31,13 @@
 ;; ----
 
 (define statement-will-executor (make-will-executor))
-(thread
- (lambda ()
-   (let loop ()
-     (will-execute statement-will-executor)
-     (loop))))
+
+(define statement-finalizer-thread
+  (thread/suspend-to-kill
+   (lambda ()
+     (let loop ()
+       (will-execute statement-will-executor)
+       (loop)))))
 
 (define prepared-statement%
   (class* object% (prepared-statement<%>)
@@ -82,10 +87,10 @@
     (define lock (make-semaphore 1))
 
     (define-syntax-rule (with-lock . body)
-      (semaphore-wait lock)
-      (with-handlers ([values (lambda (e) (semaphore-post lock) (raise e))])
-        (begin0 (let () . body)
-          (semaphore-post lock))))
+      (begin (semaphore-wait lock)
+             (with-handlers ([values (lambda (e) (semaphore-post lock) (raise e))])
+               (begin0 (let () . body)
+                 (semaphore-post lock)))))
 
     (define/public (get-db fsym)
       (unless -db
@@ -103,7 +108,7 @@
       (cond [(string? stmt)
              (let* ([pst (prepare1 fsym stmt)]
                     [sb (send pst bind null)])
-               (query1 db fsym sb collector))]
+               (query1 fsym sb collector))]
             [(StatementBinding? stmt)
              (let ([pst (StatementBinding-pst stmt)]
                    [params (StatementBinding-params stmt)])
@@ -125,9 +130,9 @@
                  [param (in-list params)])
              (load-param fsym stmt i param))
            (let* ([info
-                   (for/list ([i (in-range (sqlite3_column_count handle))])
-                     `((name ,(sqlite3_column_name handle i))
-                       (decltype ,(sqlite3_column_decltype handle i))))]
+                   (for/list ([i (in-range (sqlite3_column_count stmt))])
+                     `((name ,(sqlite3_column_name stmt i))
+                       (decltype ,(sqlite3_column_decltype stmt i))))]
                   [rows (step* fsym stmt)])
              (handle-status fsym (sqlite3_reset stmt))
              (handle-status fsym (sqlite3_clear_bindings stmt))
@@ -147,28 +152,28 @@
       (handle-status
        fsym
        (cond [(integer? param)
-              (sqlite3_bind_int64 handle i param)]
+              (sqlite3_bind_int64 stmt i param)]
              [(number? param)
-              (sqlite3_bind_double handle i param)]
+              (sqlite3_bind_double stmt i param)]
              [(string? param)
-              (sqlite3_bind_text handle i param)]
+              (sqlite3_bind_text stmt i param)]
              [(bytes? param)
-              (sqlite3_bind_blob handle i param)]
+              (sqlite3_bind_blob stmt i param)]
              [(sql-null? param)
-              (sqlite3_bind_null handle i)]
+              (sqlite3_bind_null stmt i)]
              [else
               (error fsym "bad parameter: ~e" param)])))
 
     (define/private (step* fsym stmt)
-      (let ([c (step stmt)])
+      (let ([c (step fsym stmt)])
         (if c (cons c (step* fsym stmt)) null)))
 
     (define/private (step fsym stmt)
       (let ([s (sqlite3_step stmt)])
         (cond [(= s SQLITE_DONE) #f]
               [(= s SQLITE_ROW)
-               (let ([column-count (sqlite3_column_count stmt)]
-                     [vec (make-vector column-count)])
+               (let* ([column-count (sqlite3_column_count stmt)]
+                      [vec (make-vector column-count)])
                  (for ([i (in-range column-count)])
                    (vector-set! vec i
                                 (let ([type (sqlite3_column_type stmt i)])
@@ -177,7 +182,7 @@
                                         [(= type SQLITE_INTEGER)
                                          (sqlite3_column_int64 stmt i)]
                                         [(= type SQLITE_FLOAT)
-                                         (sqlite3_column double stmt i)]
+                                         (sqlite3_column_double stmt i)]
                                         [(= type SQLITE_TEXT)
                                          (sqlite3_column_text stmt i)]
                                         [(= type SQLITE_BLOB)
@@ -205,9 +210,9 @@
                (error fsym "internal error in prepare")))
          (let ([pst (new prepared-statement%
                          (stmt stmt)
-                         (counter statement-counter)
                          (owner this))])
-           (hash-set! statement-table s #t)
+           (hash-set! statement-table pst #t)
+           (thread-resume statement-finalizer-thread)
            (will-register statement-will-executor pst (lambda (pst) (send pst finalize)))
            pst))))
 
@@ -230,7 +235,8 @@
            (when custodian-ref
              (scheme_remove_managed custodian-ref this)
              (set! custodian-ref #f))
-           (close db)))))
+           (handle-status 'disconnect (sqlite3_close db))
+           (void)))))
 
     (super-new)))
 

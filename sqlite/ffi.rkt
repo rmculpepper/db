@@ -1,7 +1,10 @@
 ;; from Jay McCarthy
 
 #lang racket/base
-(require ffi/unsafe)
+(require (rename-in racket/contract
+                    [-> c->])
+         ffi/unsafe
+         ffi/unsafe/define)
 
 (require "ffi-constants.rkt")
 (provide (all-from-out "ffi-constants.rkt"))
@@ -102,7 +105,9 @@
                                        -> _int))
 (define-sqlite sqlite3_bind_null (_fun _sqlite3_statement _int -> _int))
 ;(_fun -> _void) -> _int))
-; sqlite3_clear_bindings
+
+(define-sqlite sqlite3_clear_bindings (_fun _sqlite3_statement -> _int))
+
 (define-sqlite sqlite3_step (_fun _sqlite3_statement -> _int))
 (define-sqlite sqlite3_data_count (_fun _sqlite3_statement -> _int))
 ; sqlite3_column functions
@@ -177,26 +182,30 @@
   (c-> sqlite3_statement? exact-nonnegative-integer? number?)]
  [sqlite3_reset
   (c-> sqlite3_statement? status?)]
+ [sqlite3_clear_bindings
+  (c-> sqlite3_statement? status?)]
  [sqlite3_finalize
   (c-> sqlite3_statement? status?)])
 
 ;; ----------------------------------------
 
-(define-cpointer _CustodianReference)
+(define-ffi-definer define-mz #f)
+(define-cpointer-type _CustodianReference)
 
-(define scheme_add_managed
-  (ffi #f (_fun _racket _racket
-                (_fun _racket _pointer/null -> _void)
-                _pointer/null
-                _boolean
-                -> _CustodianReference)))
+(define-mz scheme_add_managed
+  (_fun _racket _racket
+        (_fun _racket _pointer -> _void)
+        _pointer
+        _bool
+        -> _CustodianReference))
 
-(define scheme_remove_managed
-  (ffi #f (_fun _CustodianReference _racket -> _void)))
+(define-mz scheme_remove_managed
+  (_fun _CustodianReference _racket
+        -> _void))
 
 (provide/contract
  [scheme_add_managed
-  (-> custodian? any/c (-> any/c any/c any) any/c boolean?
-      CustodianReference?)]
+  (c-> custodian? any/c (c-> any/c any/c any) any/c boolean?
+       CustodianReference?)]
  [scheme_remove_managed
-  (-> CustodianReference? any/c any)])
+  (c-> CustodianReference? any/c any)])

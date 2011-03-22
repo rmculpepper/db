@@ -7,7 +7,7 @@
          racket/contract
          "../generic/main.rkt"
          "connection.rkt"
-         "dbsystem.rkt")
+         "ffi.rkt")
 (provide/contract
  [connect
   (-> #:database (or/c string? path? bytes? 'memory 'temporary)
@@ -29,4 +29,4 @@
     (let-values ([(db open-status)
                   (sqlite3_open path)])
       (handle-status 'sqlite3-connect open-status)
-      (new connection% (db db))
+      (new connection% (db db)))))

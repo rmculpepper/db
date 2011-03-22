@@ -5,8 +5,6 @@ To do
 
 - sqlite locking?
 
-- eliminate CamelCase names?
-
 - permit types in param'd queries
 
 - Scheme -> Racket in docs

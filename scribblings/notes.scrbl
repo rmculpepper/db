@@ -1,12 +1,9 @@
 #lang scribble/doc
-
-@(require scribble/manual)
-@(require scribble/eval)
-@(require scribble/struct)
-@(require scheme/sandbox)
-
-@(require (for-label scheme/base)
-          (for-label "../main.rkt"))
+@(require scribble/manual
+          scribble/eval
+          scribble/struct
+          racket/sandbox
+          "config.rkt")
 
 @title{Notes}
 

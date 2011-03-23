@@ -1,19 +1,17 @@
 #lang scribble/doc
-
 @(require scribble/manual
           scribble/eval
           scribble/struct
           scheme/sandbox
           "config.rkt"
-          (for-label scheme/base scheme/class scheme/contract)
-          (for-label "../main.rkt"))
-@(require "tabbing.rkt")
+          "tabbing.rkt")
 
 @(define-syntax-rule (qmeth meth) (method connection:query<%> meth))
 @(define-syntax-rule (pmeth meth) (method connection:query/prepare<%> meth))
 
 @title{SQL Types and Conversions}
-@(declare-exporting/this-package (main) ())
+
+@(my-declare-exporting)
 
 For most basic SQL types, connections automatically process query
 results and paramterized query parameters to convert between Scheme

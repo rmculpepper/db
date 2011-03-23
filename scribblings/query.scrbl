@@ -1,18 +1,13 @@
 #lang scribble/doc
-
 @(require scribble/manual
           scribble/eval
           scribble/struct
           scheme/sandbox
-          "config.rkt"
-          (for-label scheme/base scheme/class scheme/contract)
-          (for-label "../main.rkt"))
-
-@(define-syntax-rule (qmeth meth) (method connection:query<%> meth))
-@(define-syntax-rule (pmeth meth) (method connection:query/prepare<%> meth))
+          "config.rkt")
 
 @title[#:tag "query-api"]{Connections and Queries}
-@(declare-exporting/this-package (main) ())
+
+@(my-declare-exporting)
 
 Connection procedures are divided into three APIs of generic
 procedures: administrative procedures, query procedures, and prepared
@@ -60,7 +55,7 @@ Predicate for objects representing database systems.
 
 Returns a symbol that names the database system. Currently one of the
 following:
-@itemization[
+@itemize[
 @item[@racket['postgresql]]
 @item[@racket['mysql]]
 @item[@racket['sqlite3]]
@@ -156,7 +151,7 @@ be either a string or prepared-statement, not a statement-binding.
 @subsection{General query support}
 
 A @deftech{Statement} is either a string containing a single
-non-parameterized SQL statement or a @tech[statement-binding] value
+non-parameterized SQL statement or a statement-binding value
 returned by @scheme[bind-prepared-statement].
 
 A @deftech{QueryResult} is either a @scheme[SimpleResult] or a
@@ -324,7 +319,7 @@ MySQL:
      (list "one" "two")])
 }
 
-@defproc[(prepared-statement? x) boolean?]{
+@defproc[(prepared-statement? [x any/c]) boolean?]{
 
   Returns @racket[#t] if @racket[x] is a prepared statement created by
   @racket[prepare] or @racket[prepare-multiple], @racket[#f] otherwise.

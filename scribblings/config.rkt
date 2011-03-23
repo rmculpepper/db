@@ -6,15 +6,21 @@
 (require scribble/manual
          scribble/eval
          racket/sandbox
-         (for-syntax racket/base)
-         planet/util)
-(require (planet cce/scheme:7/scribble))
-
+         (for-label racket/base
+                    racket/contract
+                    (planet ryanc/db:1:0)))
 (provide (all-defined-out)
-         (all-from-out (planet cce/scheme:7/scribble)))
+         (for-label (all-from-out racket/base)
+                    (all-from-out racket/contract)
+                    (all-from-out (planet ryanc/db:1:0))))
 
-(define (package-version)
-  (format "~a.~a" (this-package-version-maj) (this-package-version-min)))
+(define-syntax-rule (my-defmodule)
+  (defmodule (planet ryanc/db:1:0)))
+(define-syntax-rule (my-declare-exporting)
+  (declare-exporting (planet ryanc/db:1:0)))
+
+(define (my-package-version) "1.0")
+(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:0)))))
 
 ;; ----
 

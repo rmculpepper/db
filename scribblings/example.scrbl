@@ -1,12 +1,9 @@
 #lang scribble/doc
-
 @(require scribble/manual
           scribble/eval
           scribble/struct
-          scheme/sandbox
+          racket/sandbox
           "config.rkt")
-@(require (for-label scheme/base)
-          (for-label "../main.rkt"))
 
 @title{Annotated example}
 
@@ -14,7 +11,7 @@ The following program demonstrates how to connect to a PostgreSQL
 backend and perform simple queries.
 
 @schemeinput[
-(require #, @(schememodname/this-package))
+#, @(my-require-form)
 ]
 
 Replace @racket[_user], @racket[_db], and @racket[_password] below

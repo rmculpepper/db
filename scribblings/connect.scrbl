@@ -1,16 +1,13 @@
 #lang scribble/doc
-
 @(require scribble/manual
           scribble/eval
           scribble/struct
           scheme/sandbox
-          "config.rkt"
-          (for-label scheme/base
-                     scheme/contract
-                     "../main.rkt"))
+          "config.rkt")
 
 @title{Connecting to a server}
-@(declare-exporting/this-package (main) ())
+
+@(my-declare-exporting)
 
 Connections are made using the @scheme[postgresql-connect] and
 @scheme[mysql-connect] procedures. The connection datatypes are not

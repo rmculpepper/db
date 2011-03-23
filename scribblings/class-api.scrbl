@@ -1,18 +1,17 @@
 #lang scribble/doc
-
 @(require scribble/manual
           scribble/eval
           scribble/struct
           scheme/sandbox
           "config.rkt"
-          (for-label scheme/base scheme/class scheme/contract)
-          (for-label "../main.rkt"))
+          (for-label racket/class))
 
 @(define-syntax-rule (qmeth meth) (method connection:query<%> meth))
 @(define-syntax-rule (pmeth meth) (method connection:query/prepare<%> meth))
 
 @title{Class-based APIs}
-@(declare-exporting/this-package (main) ())
+
+@(my-declare-exporting)
 
 Connections are @scheme[scheme/class] objects, and the connection
 procedures described in @secref{query-api} are implemented as

@@ -1,11 +1,9 @@
 #lang scribble/doc
 @(require scribble/manual
           scribble/struct
-          "config.rkt"
-          (for-label scheme/base)
-          (for-label "../generic/main.rkt"))
+          "config.rkt")
 
-@title[#:version (package-version)]{db: Database connectivity}
+@title[#:version (my-package-version)]{db: Database connectivity}
 @author{Ryan Culpepper}
 
 @section-index["postgresql"]
@@ -13,10 +11,10 @@
 @section-index["database"]
 
 This manual documents the database package version
-@(package-version). This package is the successor to
+@(my-package-version). This package is the successor to
 spgsql.
 
-@defmodule/this-package[]
+@(my-defmodule)
 
 The database package provides a high-level interface to PostgreSQL and
 MySQL database servers. It does not rely on any locally-installed

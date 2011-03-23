@@ -5,72 +5,38 @@
           scheme/sandbox
           "config.rkt")
 
-@title[#:tag "query-api"]{Connections and Queries}
+@title[#:tag "query-api"]{Queries}
 
 @(my-declare-exporting)
 
-This section describes the operations on connections, consisting of
-administrative functions and query functions.
-
-@section{Administrative functions}
-
-@defproc[(connection? [x any/c])
-         boolean?]{
-
-Returns @racket[#t] if @racket[x] is a connection, @racket[#f] otherwise.
-}
-
-@defproc[(disconnect [connection connection?])
-         void?]{
-Closes the connection.
-}
-
-@defproc[(connected? [connection connection?])
-         boolean?]{
-
-Returns @racket[#t] if @racket[connection] is connected, @racket[#f]
-otherwise.
-}
-
-@defproc[(connection-dbsystem [connection connection?])
-         dbsystem?]{
-
-Gets an object encapsulating information about the database system of
-@racket[connection].
-}
-
-@defproc[(dbsystem? [x any/c])
-         boolean?]{
-
-Predicate for objects representing database systems.
-}
-
-@defproc[(dbsystem-name [sys dbsystem?])
-         symbol?]{
-
-Returns a symbol that identifies the database system. Currently one of the
-following:
-@itemize[
-@item[@racket['postgresql]]
-@item[@racket['mysql]]
-@item[@racket['sqlite3]]
-]
-}
-
-
-@section{Query functions}
-
-The database package implements a high-level, functional query
-API. Once connected, connections are essentially stateless. When
-a query function is invoked, it either returns a result or, if the
-query caused an error, raises an exception. Different query functions
-impose different constraints on the query results and offer different
-mechanisms for processing the results.
+The database package implements a high-level functional query API,
+unlike many other database libraries, which present a stateful,
+iteration-based interface to queries. When a query function is
+invoked, it either returns a result or, if the query caused an error,
+raises an exception. Different query functions impose different
+constraints on the query results and offer different mechanisms for
+processing the results.
 
 In most cases, a query error does not cause the connection to be
-disconnected. 
+disconnected. Specifically, the following kinds of errors should never
+cause a connection to be disconnected:
+@itemize[
+@item{SQL syntax errors, including references to undefined tables,
+  columns, or operations, etc}
+@item{violations of a specialized query function's expectations, such
+  as @racket[query-value] getting a recordset with multiple columns}
+@item{supplying the wrong number of parameters to a prepared query,
+  executing a prepared query with the wrong connection, etc}
+]
+The following kinds of errors may cause a connection to be
+disconnected:
+@itemize[
+@item{changing communication settings, such as changing the encoding
+  to anything other than UTF-8}
+@item{communication failures and internal errors in the library}
+]
 
-@subsection{Simple queries}
+@section{Simple queries}
 
 The simple query API consists of a set of functions specialized to
 various types of queries. For example, @racket[query-value] is
@@ -80,7 +46,7 @@ and exactly one row.
 This API also provides a simple interface to parameterized queries:
 the statement's parameters are given after the SQL statement. If any
 parameter values are given, the SQL statement must be either a string
-or prepared-statement, not a statement-binding.
+or prepared statement, not a statement-binding.
 
 @defproc[(query-exec [connection connection?]
                      [stmt (or/c string? prepared-statement? statement-binding?)]
@@ -194,7 +160,7 @@ or prepared-statement, not a statement-binding.
 }
 
 
-@subsection{General query support}
+@section{General query support}
 
 A statement is either a string containing a single non-parameterized
 SQL statement or a statement-binding value returned by
@@ -204,10 +170,10 @@ A query result is either a @scheme[simple-result] or a
 @scheme[recordset].
 
 @defstruct*[simple-result
-            ([command string?])]{
+            ([command (or/c #f string?)])]{
 
 Represents the result of a SQL statement that does not return a
-relation.
+relation, such as a @tt{INSERT} or @tt{DELETE} statement.
 }
 
 @defstruct*[recordset
@@ -271,7 +237,7 @@ Represents the name of a column.
   of columns returned by the query.
 }
 
-@subsection{Prepared statements}
+@section{Prepared statements}
 
 This package also includes functions for preparing parameterized
 queries. A parameterized query may be executed any number of times
@@ -338,7 +304,7 @@ SQLite supports both syntaxes and possibly others.
   @racket[bind-prepared-statement], @racket[#f] otherwise.
 }
 
-@subsection{Prepared queries as functions}
+@section{Prepared queries as functions}
 
 The following functions prepare a parameterized SQL statement for
 later execution and and encapsulate it as a function. The

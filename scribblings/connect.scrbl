@@ -5,9 +5,14 @@
           racket/sandbox
           "config.rkt")
 
-@title{Creating a connection}
+@title{Connections}
 
 @(my-declare-exporting)
+
+This section describes functions for creating connections as well as
+administrative functions for managing connections.
+
+@section{Creating connections}
 
 Connections are made using the following functions.
 
@@ -164,4 +169,50 @@ Connections are made using the following functions.
     [(sqlite3-connect #:database "relpath/to/my.db"
                       #:mode 'read/write/create)
      (new connection%)])
+}
+
+
+@section{Mangaging connections}
+
+@defproc[(connection? [x any/c])
+         boolean?]{
+
+Returns @racket[#t] if @racket[x] is a connection, @racket[#f] otherwise.
+}
+
+@defproc[(disconnect [connection connection?])
+         void?]{
+Closes the connection.
+}
+
+@defproc[(connected? [connection connection?])
+         boolean?]{
+
+Returns @racket[#t] if @racket[connection] is connected, @racket[#f]
+otherwise.
+}
+
+@defproc[(connection-dbsystem [connection connection?])
+         dbsystem?]{
+
+Gets an object encapsulating information about the database system of
+@racket[connection].
+}
+
+@defproc[(dbsystem? [x any/c])
+         boolean?]{
+
+Predicate for objects representing database systems.
+}
+
+@defproc[(dbsystem-name [sys dbsystem?])
+         symbol?]{
+
+Returns a symbol that identifies the database system. Currently one of the
+following:
+@itemize[
+@item[@racket['postgresql]]
+@item[@racket['mysql]]
+@item[@racket['sqlite3]]
+]
 }

@@ -6,11 +6,20 @@ Docs
 - "procedure" => "function"
 - "Scheme" => "Racket"
 
+- variable c => pg-c to mark postgresql syntax and results
+
 --------------------
 
-- write tests for improved simple query functions
+- change simple-result to have unspecified alist instead of string...
+- change field-info to have additional alist (after name)
+
+- add operations on prepared-statement (expected param types, etc)
+
+- add security-guard path checks
 
 - clean up types, conversions, etc
+
+- write tests for improved simple query functions
 
 - permit types in param'd queries
 
@@ -22,3 +31,12 @@ Docs
 - eliminate common code (eg, various prepared-statement%)
 
 - sqlite locking?
+
+- sqlite disconnect on custodian shutdown
+
+- bug: create connection, shut down managing custodian, ask connected?
+       => output ports may not be shutdown, so says yes but really no
+       Solutions: check that ports are still open (?)
+                  wrap with custodian-box (?)
+
+- create abstraction that combined finalizer with custodian management (?)

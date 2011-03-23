@@ -29,9 +29,12 @@
 (define-sqlite sqlite3_libversion_number
   (_fun -> _int))
 
-(define-sqlite sqlite3_open
-  (_fun (filename) :: (filename : _bytes)
+(define-sqlite sqlite3_open_v2
+  (_fun (filename flags) ::
+        (filename : _bytes)
         (db : (_ptr o _sqlite3_database))
+        (flags : _int)
+        (vfs : _pointer = #f)
         -> (result : _int)
         -> (values db result)))
 
@@ -139,8 +142,9 @@
 (provide/contract
  [status?
   (c-> any/c boolean?)]
- [sqlite3_open
-  (c-> bytes? (values sqlite3_database? status?))]
+ [sqlite3_open_v2
+  (c-> bytes? exact-nonnegative-integer?
+       (values sqlite3_database? status?))]
  [sqlite3_close
   (c-> sqlite3_database? status?)]
  [sqlite3_prepare_v2

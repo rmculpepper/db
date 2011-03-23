@@ -6,9 +6,6 @@
           "config.rkt"
           "tabbing.rkt")
 
-@(define-syntax-rule (qmeth meth) (method connection:query<%> meth))
-@(define-syntax-rule (pmeth meth) (method connection:query/prepare<%> meth))
-
 @title{SQL Types and Conversions}
 
 @(my-declare-exporting)

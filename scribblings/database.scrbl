@@ -16,27 +16,24 @@ spgsql.
 
 @(my-defmodule)
 
-The database package provides a high-level interface to PostgreSQL and
-MySQL database servers. It does not rely on any locally-installed
-client libraries; this package is everything you need to connect
-Racket to a PostgreSQL or MySQL server.
+The database package provides a high-level interface to several
+database systems. The following database systems are currently
+supported:
+@itemize[
+@item{PostgreSQL, versions 7.4 and later}
+@item{MySQL, versions 5 and later}
+@item{SQLite, version 3}
+]
+Support for PostgreSQL and MySQL does not rely on any
+locally-installed client libraries; this package is everything you
+need to connect to a PostgreSQL or MySQL server. Connecting to a
+SQLite database requires the SQLite shared library to be installed.
 
 The query operations are functional in spirit. Queries return results;
 they do not stow them away in the connection for later manipulation
 and retrieval. In other words, connections do not contain query
-state. The higher-order query operatons are patterned after standard
-higher-order list processing functions.
-
-Since this package does not use foreign connectivity libraries, it
-works seamlessly with PLT Scheme's resource management systems. The
-library communicates with servers using normal, custodian-managed
-ports. Consequently, communication blocks only the thread performing
-the communication, unlike some FFI-based approaches. Connections are
-internally synchronized, so multiple threads can use a connection
-simultaneously.
-
-The database package is compatible with PostgreSQL servers version 7.4
-and later and MySQL servers version 5 and later.
+state. Connections are internally synchronized, so multiple threads
+can use a connection simultaneously.
 
 @include-section["connect.scrbl"]
 @include-section["query.scrbl"]

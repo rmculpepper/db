@@ -43,3 +43,14 @@
 
 (define SQLITE_STATIC     0)
 (define SQLITE_TRANSIENT -1)
+
+;; Open flags
+
+(define SQLITE_OPEN_READONLY         #x00000001)
+(define SQLITE_OPEN_READWRITE        #x00000002)
+(define SQLITE_OPEN_CREATE           #x00000004)
+
+(define SQLITE_OPEN_NOMUTEX          #x00008000)
+(define SQLITE_OPEN_FULLMUTEX        #x00010000)
+(define SQLITE_OPEN_SHAREDCACHE      #x00020000)
+(define SQLITE_OPEN_PRIVATECACHE     #x00040000)

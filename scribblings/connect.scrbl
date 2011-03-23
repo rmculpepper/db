@@ -2,20 +2,14 @@
 @(require scribble/manual
           scribble/eval
           scribble/struct
-          scheme/sandbox
+          racket/sandbox
           "config.rkt")
 
-@title{Connecting to a server}
+@title{Creating a connection}
 
 @(my-declare-exporting)
 
-Connections are made using the @scheme[postgresql-connect] and
-@scheme[mysql-connect] procedures. The connection datatypes are not
-exposed, so they cannot be instantiated directly.
-
-@section{Connecting to a PostgreSQL server}
-
-Use the following procedure to create a connection:
+Connections are made using the following functions.
 
 @defproc[(postgresql-connect [#:user user string?]
                   [#:database database string?]
@@ -29,38 +23,39 @@ Use the following procedure to create a connection:
          connection?]{
 
   Creates a connection to a PostgreSQL server. The
-  @scheme[postgresql-connect] procedure recognizes the keyword
-  arguments listed above. Only the @scheme[user] and @scheme[database]
+  @racket[postgresql-connect] function recognizes the keyword
+  arguments listed above. Only the @racket[user] and @racket[database]
   arguments are mandatory.
 
-  By default, the connection is made via TCP to @scheme["localhost"]
-  at port @scheme[5432]. To make a different TCP connection, specify
-  one or both of the @scheme[server] and @scheme[port] keyword
+  By default, the connection is made via TCP to @racket["localhost"]
+  at port @racket[5432]. To make a different TCP connection, specify
+  one or both of the @racket[server] and @racket[port] keyword
   arguments.
 
   To connect via a local socket, specify the socket path as the
-  @scheme[socket] argument. You must not supply the @scheme[socket]
+  @racket[socket] argument. You must not supply the @racket[socket]
   argument if you have also supplied either of the TCP arguments. See
-  also @secref{connecting-to-server} for notes the socket path.
-  Sockets are only available under Linux (x86) and Mac OS X.
+  also @secref{connecting-to-server} for notes the socket path, and
+  see @racket[postgresql-guess-socket-path] for a way of automatically
+  determining the socket path.  Sockets are only available under Linux
+  (x86) and Mac OS X.
 
   If the server requests password authentication, the
-  @scheme[password] argument must be present; otherwise an exception
+  @racket[password] argument must be present; otherwise an exception
   is raised. If the server does not request password authentication,
-  the @scheme[password] argument is ignored and may be omitted.
+  the @racket[password] argument is ignored and may be omitted.  A
+  connection normally only sends password hashes (using the @tt{md5}
+  authentication method). If the server requests a password sent as
+  cleartext (un-hashed), the connection is aborted unless a non-false
+  value was supplied for the optional
+  @racket[allow-cleartext-password?] argument.
 
-  A connection normally only sends password hashes (using the @tt{md5}
-  authentication method). If the server requests a password sent in
-  the clear (un-hashed), the connection is aborted unless a non-false
-  value is supplied for the optional
-  @scheme[allow-cleartext-password?] argument.
-
-  If the @scheme[ssl] argument is either @scheme['yes] or
-  @scheme['optional], the connection attempts to negotiate an SSL
+  If the @racket[ssl] argument is either @racket['yes] or
+  @racket['optional], the connection attempts to negotiate an SSL
   connection. If the server refuses SSL, the connection raises an
-  error if @scheme[ssl] was set to @scheme['yes] or continues with an
-  unencrypted connection if @scheme[ssl] was set to
-  @scheme['optional]. SSL may only be used with TCP connections, not
+  error if @racket[ssl] was set to @racket['yes] or continues with an
+  unencrypted connection if @racket[ssl] was set to
+  @racket['optional]. SSL may only be used with TCP connections, not
   with local sockets.
 
   If the connection cannot be made, an exception is raised.
@@ -91,18 +86,12 @@ Use the following procedure to create a connection:
          (or/c path? string?)]{
 
   Attempts to guess the path for the socket based on conventional
-  locations. This procedure returns the first such conventional path
+  locations. This function returns the first such conventional path
   that exists in the filesystem. It does not check that the path is a
   socket file, nor that the path is connected to a PostgreSQL server.
 
   If the socket file cannot be found, an error is raised.
-
 }
-
-
-@section{Connecting to a MySQL server}
-
-Use the following procedure to create a connection:
 
 @defproc[(mysql-connect [#:user user string?]
                   [#:database database string?]
@@ -113,8 +102,8 @@ Use the following procedure to create a connection:
          connection?]{
 
   Creates a connection to a MySQL server. The meaning of the keyword
-  arguments is similar to those of the @scheme[postgresql-connect]
-  procedure.
+  arguments is similar to those of the @racket[postgresql-connect]
+  function.
 
   The default port for MySQL databases is 3306.
 
@@ -144,10 +133,35 @@ Use the following procedure to create a connection:
          (or/c path? string?)]{
 
   Attempts to guess the path for the socket based on conventional
-  locations. This procedure returns the first such conventional path
+  locations. This function returns the first such conventional path
   that exists in the filesystem. It does not check that the path is a
   socket file, nor that the path is connected to a MySQL server.
 
   If the socket file cannot be found, an error is raised.
+}
 
+@defproc[(sqlite3-connect
+                [#:database database (or/c path? string? 'memory 'temporary)]
+                [#:mode mode (or/c 'read-only 'read/write 'read/write/create) 'read/write])
+         connection?]{
+
+  Opens the SQLite database at the file named by @racket[database], if
+  @racket[database] is a string or path. If @racket[database] is
+  @racket['temporary], a private disk-based database is created. If
+  @racket[database] is @racket['memory], a private memory-based
+  database is created.
+
+  If @racket[mode] is @racket['read-only], the database is opened in
+  read-only mode. If @racket[mode] is @racket['read/write] (the
+  default), the database is opened for reading and writing (if
+  filesystem permissions permit). The @racket['read/write/create] mode
+  is like @racket['read/write], except that if the given file does not
+  exist, it is created as a new database.
+
+  @(examples/results
+    [(sqlite3-connect #:database "/path/to/my.db")
+     (new connection%)]
+    [(sqlite3-connect #:database "relpath/to/my.db"
+                      #:mode 'read/write/create)
+     (new connection%)])
 }

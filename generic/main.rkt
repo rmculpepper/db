@@ -10,6 +10,7 @@
 (provide (struct-out simple-result)
          (struct-out recordset)
          (struct-out field-info)
+         statement-binding?
 
          sql-null
          sql-null?

@@ -9,39 +9,34 @@
 
 @(my-declare-exporting)
 
-Connection procedures are divided into three APIs of generic
-procedures: administrative procedures, query procedures, and prepared
-query procedures. The connections for PostgreSQL and MySQL servers
-support all three APIs, and both kinds of connections use the same
-procedures.
+This section describes the operations on connections, consisting of
+administrative functions and query functions.
 
-This section also documents several auxiliary interfaces and data
-types.
+@section{Administrative functions}
 
-@section{Administrative API}
-
-@defproc[(connection? [x any])
+@defproc[(connection? [x any/c])
          boolean?]{
 
-Predicate for connections.
-
+Returns @racket[#t] if @racket[x] is a connection, @racket[#f] otherwise.
 }
 
 @defproc[(disconnect [connection connection?])
          void?]{
-Disconnects from the server.
+Closes the connection.
 }
 
 @defproc[(connected? [connection connection?])
          boolean?]{
-Indicates whether the connection is connected.
+
+Returns @racket[#t] if @racket[connection] is connected, @racket[#f]
+otherwise.
 }
 
 @defproc[(connection-dbsystem [connection connection?])
          dbsystem?]{
 
 Gets an object encapsulating information about the database system of
-the connection.
+@racket[connection].
 }
 
 @defproc[(dbsystem? [x any/c])
@@ -53,7 +48,7 @@ Predicate for objects representing database systems.
 @defproc[(dbsystem-name [sys dbsystem?])
          symbol?]{
 
-Returns a symbol that names the database system. Currently one of the
+Returns a symbol that identifies the database system. Currently one of the
 following:
 @itemize[
 @item[@racket['postgresql]]
@@ -63,15 +58,17 @@ following:
 }
 
 
-@section{Query API}
+@section{Query functions}
 
 The database package implements a high-level, functional query
-API. Once connected, connections are relatively stateless. When
-a query procedure is invoked, it either returns a result or, if the
-query caused an error, raises an exception. Different query procedures
+API. Once connected, connections are essentially stateless. When
+a query function is invoked, it either returns a result or, if the
+query caused an error, raises an exception. Different query functions
 impose different constraints on the query results and offer different
 mechanisms for processing the results.
 
+In most cases, a query error does not cause the connection to be
+disconnected. 
 
 @subsection{Simple queries}
 
@@ -81,9 +78,9 @@ specialized to queries that return a recordset of exactly one column
 and exactly one row.
 
 This API also provides a simple interface to parameterized queries:
-the statement's parameters are simply given after the SQL
-statement. If any parameter values are given, the SQL statement must
-be either a string or prepared-statement, not a statement-binding.
+the statement's parameters are given after the SQL statement. If any
+parameter values are given, the SQL statement must be either a string
+or prepared-statement, not a statement-binding.
 
 @defproc[(query-exec [connection connection?]
                      [stmt (or/c string? prepared-statement? statement-binding?)]
@@ -91,6 +88,13 @@ be either a string or prepared-statement, not a statement-binding.
          void?]{
 
   Executes a SQL statement for effect.
+
+@examples/results[
+[(query-exec c "insert into some_table values (1, 'a')")
+ (void)]
+[(query-exec c "delete from some_table where n = $1" 42)
+ (void)]
+]
 }
 
 @defproc[(query-rows [connection connection?]
@@ -98,8 +102,15 @@ be either a string or prepared-statement, not a statement-binding.
                      [arg any/c] ...)
          (listof (vectorof _field))]{
 
-  Executes a SQL query, which must return a recordset. Returns the
+  Executes a SQL query, which must produce a recordset, and returns the
   list of rows (as vectors) from the query.
+
+@examples/results[
+[(query-rows c "select n, s from some_table where n = $1" 42)
+ (list (vector 42 "the answer to life, the universe, and everything"))]
+[(query-rows c "select 17")
+ (list (vector 17))]
+]
 }
 
 @defproc[(query-list [connection connection?]
@@ -107,8 +118,15 @@ be either a string or prepared-statement, not a statement-binding.
                      [arg any/c] ...)
          (listof _field)]{
 
-  Executes a SQL query, which must return a recordset of exactly one
-  column. Returns the list of values from the query.
+  Executes a SQL query, which must produce a recordset of exactly one
+  column, and returns the list of values from the query.
+
+@examples/results[
+[(query-list c "select n from some_table where n < 2")
+ (list 0 1)]
+[(query-list c "select 'hello'")
+ (list "hello")]
+]
 }
 
 @defproc[(query-row [connection connection?]
@@ -116,8 +134,15 @@ be either a string or prepared-statement, not a statement-binding.
                     [arg any/c] ...)
          (vectorof _field)]{
 
-  Executes a SQL query, which must return a recordset of exactly one
-  row. Returns its (single) row result as a vector.
+  Executes a SQL query, which must produce a recordset of exactly one
+  row, and returns its (single) row result as a vector.
+
+@examples/results[
+[(query-row c "select n, s from some_table where n = $1" 42)
+ (vector 42 "the answer to life, the universe, and everything")]
+[(query-row c "select 17")
+ (vector 17)]
+]
 }
 
 @defproc[(query-maybe-row [connection connection?]
@@ -125,8 +150,15 @@ be either a string or prepared-statement, not a statement-binding.
                           [arg any/c] ...)
          (or/c (vectorof _field) false/c)]{
 
-  Like @scheme[query-row], but the query may return zero rows; in that
-  case, @scheme[#f] is returned.
+  Like @scheme[query-row], but the query may produce zero rows; in
+  that case, @scheme[#f] is returned.
+
+@examples/results[
+[(query-maybe-row c "select n, s from some_table where n = $1" 43)
+ #f]
+[(query-maybe-row c "select 17")
+ (vector 17)]
+]
 }
 
 @defproc[(query-value [connection connection?]
@@ -134,8 +166,15 @@ be either a string or prepared-statement, not a statement-binding.
                       [arg any/c] ...)
          _field]{
 
-  Executes a SQL query, which must return a recordset of exactly one
-  column and exactly one row. Returns its single value result.
+  Executes a SQL query, which must produce a recordset of exactly one
+  column and exactly one row, and returns its single value result.
+
+@examples/results[
+[(query-value c "select timestamp 'epoch'")
+ (sql-timestamp 1970 1 1 0 0 0 0 #f)]
+[(query-value c "select s from some_table where n = $1" 42)
+ "the answer to life, the universe, and everything"]
+]
 }
 
 @defproc[(query-maybe-value [connection connection?]
@@ -143,58 +182,64 @@ be either a string or prepared-statement, not a statement-binding.
                             [arg any/c] ...)
          (or/c _field false/c)]{
 
-  Like @scheme[query-value], but the query may return zero rows; in
+  Like @scheme[query-value], but the query may produce zero rows; in
   that case, @scheme[#f] is returned.
+
+@examples/results[
+[(query-value c "select s from some_table where n = $1" 43)
+ #f]
+[(query-value c "select 17")
+ 17]
+]
 }
 
 
 @subsection{General query support}
 
-A @deftech{Statement} is either a string containing a single
-non-parameterized SQL statement or a statement-binding value
-returned by @scheme[bind-prepared-statement].
+A statement is either a string containing a single non-parameterized
+SQL statement or a statement-binding value returned by
+@scheme[bind-prepared-statement].
 
-A @deftech{QueryResult} is either a @scheme[SimpleResult] or a
-@scheme[Recordset].
+A query result is either a @scheme[simple-result] or a
+@scheme[recordset].
 
-@defstruct[SimpleResult
-           ([command string?])]{
+@defstruct*[simple-result
+            ([command string?])]{
 
 Represents the result of a SQL statement that does not return a
 relation.
 }
 
-@defstruct[Recordset
-           ([info (listof FieldInfo?)]
-            [data (listof (vectorof any/c))])]{
+@defstruct*[recordset
+            ([info (listof field-info?)]
+             [data (listof (vectorof any/c))])]{
 
 Represents the result of SQL statement that results in a relation,
 such as a @tt{SELECT} query.
 }
 
-@defstruct[FieldInfo
-           ([name string?])]{
+@defstruct*[field-info
+            ([name string?])]{
 
 Represents the name of a column.
 }
 
 @deftogether[[
 @defproc[(query [connection connection?]
-                [stmt (unsyntax @techlink{Statement})])
-         #, @tech{QueryResult}]
+                [stmt (or/c string? statement-binding?)])
+         (or/c simple-result? recordset?)]
 @defproc[(query-multiple [connection connection?]
-                         [stmts (listof #, @tech{Statement})])
-         (listof #, @techlink{QueryResult})]]]{
+                         [stmts (listof (or/c string? statement-binding?))])
+         (listof (or/c simple-result? recordset?))]]]{
 
   Executes queries, returning structures that describe the
-  results. Unlike the more specialized query procedures,
+  results. Unlike the more specialized query functions,
   @scheme[query-multiple] supports a mixture of recordset-returning
   queries and effect-only queries.
-
 }
 
 @defproc[(query-exec* [connection connection?]
-                      [stmt #, @tech{Statement}] ...)
+                      [stmt (or/c string? statement-binding?)] ...)
          void?]{
 
   Executes SQL statements for effect and discards the result(s).
@@ -215,43 +260,8 @@ Represents the name of a column.
 
 }
 
-@;{
-
-@defproc[(query-map [connection connection?]
-                    [stmt #, @tech{Statement}]
-                    [proc (_field _... -> _alpha)])
-         (listof _alpha)]{
-
-  Executes a SQL query and applies the given procedure to the contents
-  of each row, returning a list of results. The arity of @scheme[proc]
-  must include the number of columns returned by the query.
-}
-
-@defproc[(query-for-each [connection connection?]
-                         [stmt #, @tech{Statement}]
-                         [proc (_field _... -> any)])
-         void?]{
-
-  Executes a SQL query and applies the given function to the contents
-  of each row, discarding the results. The arity of @scheme[proc] must
-  include the number of columns returned by the query.
-}
-
-@defproc[(query-mapfilter [connection connection?]
-                          [stmt #, @tech{Statement}]
-                          [map-proc (_field _... -> _alpha)]
-                          [filter-proc (_field _... -> boolean?)])
-         (listof _alpha)]{
-
-  Like @scheme[query-map], but applies @scheme[map-proc] to only those
-  rows which satisfy @scheme[filter-proc]. The arities of both
-  @scheme[map-proc] and @scheme[filter-proc] must include the number
-  of columns returned by the query.
-}
-}
-
 @defproc[(query-fold [connection connection?]
-                     [stmt #, @tech{Statement}]
+                     [stmt (or/c string? statement-binding?)]
                      [fold-proc (_alpha _field _... -> _alpha)]
                      [init _alpha])
          _alpha]{
@@ -263,49 +273,46 @@ Represents the name of a column.
 
 @subsection{Prepared statements}
 
-Connections also support functions for preparing parameterized
+This package also includes functions for preparing parameterized
 queries. A parameterized query may be executed any number of times
 with different values for its parameters.
 
-A @deftech{PreparedStatement} is the result of a call to
+A @deftech{prepared statement} is the result of a call to
 @scheme[prepare] or @scheme[prepare-multiple].
 
 The syntax of parameterized queries varies depending on the database
-system.
+system. For example:
 
-PostgreSQL:
-@verbatim{select * from the_numbers where num > $1;}
+PostgreSQL: @verbatim{select * from the_numbers where num > $1;}
 
-MySQL:
-@verbatim{select * from the_numbers where num > ?;}
+MySQL: @verbatim{select * from the_numbers where num > ?;}
 
+SQLite supports both syntaxes and possibly others.
 
 @deftogether[[
 @defproc[(prepare [connection connection?]
                   [prep string?])
-         #, @tech{PreparedStatement}]
+         prepared-statement?]
 @defproc[(prepare-multiple [connection connection?]
                            [preps (listof string?)])
-         (listof #, @tech{PreparedStatement})]]]{
+         (listof prepared-statement?)]]]{
 
-  Prepares parameterized queries. The resulting
-  @tech{PreparedStatement}s are tied to the connection that prepared
-  them; it is an error to use them with any other connection. (The
-  @tech{PreparedStatement} holds its connection link weakly; a
-  reference to a @tech{PreparedStatement} will not keep a connection
-  from being garbage collected.)
-
+  Prepares parameterized queries. The resulting @tech{prepared
+  statement}s are tied to the connection that prepared them; it is an
+  error to use them with any other connection. (The prepared statement
+  holds its connection link weakly; a reference to a prepared
+  statement will not keep a connection from being garbage collected.)
 }
 
 @defproc[(bind-prepared-statement
-            [pst #, @tech{PreparedStatement}]
+            [pst prepared-statement?]
             [params (listof any/c)])
-         #, @tech{Statement}]{
+         statement-binding?]{
 
   Fills in the parameters of a parameterized prepared query. The
-  resulting @tech{Statement} can be executed with @scheme[query],
-  @scheme[query-multiple], or any of the other query procedures,
-  but it must be used with the same connection that created it.
+  resulting statement can be executed with @scheme[query],
+  @scheme[query-multiple], or any of the other query functions, but it
+  must be used with the same connection that created it.
 
   @(examples/results
     [(let* ([get-name-pst
@@ -325,19 +332,25 @@ MySQL:
   @racket[prepare] or @racket[prepare-multiple], @racket[#f] otherwise.
 }
 
-@subsection{Prepared Queries as Procedures}
+@defproc[(statement-binding? [x any/c]) boolean?]{
 
-The following procedures prepare the parameterized SQL statement for
-later execution and and encapsulate it as a procedure. The
-prepared-statement procedure accepts the parameter values and executes
+  Returns @racket[#t] if @racket[x] is a statement created by
+  @racket[bind-prepared-statement], @racket[#f] otherwise.
+}
+
+@subsection{Prepared queries as functions}
+
+The following functions prepare a parameterized SQL statement for
+later execution and and encapsulate it as a function. The
+prepared-statement function accepts the parameter values and executes
 the prepared statement, processing the results like the corresponding
-query procedures.
+query functions.
 
-A prepared-statement procedure may be executed any number of times.  It
+A prepared-statement function may be executed any number of times.  It
 is possible to prepare a statement that contains no parameters; the
-resulting procedure should be called with zero arguments.
+resulting function should be called with zero arguments.
 
-Prepared-statement procedures hold their associated connections
+Prepared-statement functions hold their associated connections
 strongly.
 
 @defproc[(prepare-query-exec [connection connection?]
@@ -387,33 +400,6 @@ strongly.
          (_param _... -> (or/c _field false?))]{
 
   Prepared version of @scheme[query-maybe-value].
-}
-
-@;{
-@defproc[(prepare-query-map [connection connection?]
-                            [prep string?]
-                            [proc (_field _... -> _alpha)])
-         (_param _... -> (listof _alpha))]{
-
-  Prepared version of @scheme[query-map].
-}
-
-@defproc[(prepare-query-for-each [connection connection?]
-                                 [prep string?]
-                                 [proc (_field _... -> void?)])
-         (_param _... -> void?)]{
-
-  Prepared version of @scheme[query-for-each].
-}
-
-@defproc[(prepare-query-mapfilter [connection connection?]
-                                  [prep string?]
-                                  [map-proc (_field _... -> _alpha)]
-                                  [filter-proc (_field _... -> boolean?)])
-         (_param _... -> (listof _alpha))]{
-
-  Prepared version of @scheme[query-mapfilter].
-}
 }
 
 @defproc[(prepare-query-fold [connection connection?]

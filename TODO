@@ -1,13 +1,18 @@
 To do
 =====
 
+Docs
+
+- "procedure" => "function"
+- "Scheme" => "Racket"
+
+--------------------
+
 - write tests for improved simple query functions
 
 - clean up types, conversions, etc
 
 - permit types in param'd queries
-
-- Scheme -> Racket in docs
 
 - connection-set-notify-callback!, etc; notification struct types
   also, connection option, defaults to void

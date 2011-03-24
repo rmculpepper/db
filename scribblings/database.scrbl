@@ -43,5 +43,4 @@ predecessor of this package.
 @include-section["sql-types.scrbl"]
 @include-section["notes.scrbl"]
 
-@;@include-section["class-api.scrbl"]
 @;@include-section["example.scrbl"]

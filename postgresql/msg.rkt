@@ -3,7 +3,8 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "../generic/sql-data.rkt"
+(require racket/match
+         "../generic/sql-data.rkt"
          "../generic/io.rkt"
          "msg-util.rkt")
 (provide (all-defined-out))
@@ -220,7 +221,7 @@
          transaction-status->char))
 
 (define-msg RowDescription (header #\T)
-  (sequence rows
+  (sequence fields
             (#:string name)
             (#:int32 table-oid)
             (#:int16 column-attid)
@@ -322,6 +323,14 @@
   `((name . ,(list-ref info 0))
     (type-oid . ,(list-ref info 3))
     (*type* . ,(list-ref info 3))))
+
+(define (field-description->alist fi)
+  (match fi
+    [(list name table column type-oid type-size type-mod format-code)
+     `((name . ,name)
+       (*type* . ,type-oid)
+       (type-size . ,type-size)
+       (type-mod . ,type-mod))]))
 
 ;; ----
 

@@ -272,7 +272,7 @@
 ;; == Prepared query procedures
 
 ;; Prepare auxiliaries
-;; Relies on prepare-multiple method
+;; Relies on prepare* method
 
 (define-syntax defprepare
   (syntax-rules ()
@@ -282,7 +282,7 @@
      (defprepare name method [#:check check ...] [#:arg])]
     [(defprepare name method [#:check check ...] [#:arg arg ...])
      (define (name c sql arg ...)
-       (let ([pst (prepare c sql)])
+       (let ([pst (car (send c prepare* 'name (list sql)))])
          (check 'name pst sql) ...
          (lambda args (method c (send pst bind args) arg ...))))]))
 
@@ -301,10 +301,10 @@
 ;; Prepared query API procedures
 
 (define (prepare c stmt)
-  (car (prepare-multiple c (list stmt))))
+  (car (send c prepare* 'prepare (list stmt))))
 
 (define (prepare-multiple c stmts)
-  (send c prepare-multiple stmts))
+  (send c prepare* 'prepare-multiple stmts))
 
 (defprepare prepare-query-rows query-rows)
 
@@ -387,14 +387,6 @@
   (-> connection? (listof statement?) any)]
  [query-exec*
   (->* (connection?) () #:rest (listof statement?) any)]
- #|
- [query-map
-  (-> connection? statement? procedure? list?)]
- [query-for-each
-  (-> connection? statement? procedure? any)]
- [query-mapfilter
-  (-> connection? statement? procedure? procedure? list?)]
- |#
  [query-fold
   (-> connection? statement? procedure? any/c any)]
 
@@ -419,13 +411,5 @@
   (-> connection? string? any)]
  [prepare-query-maybe-value
   (-> connection? string? any)]
- #|
- [prepare-query-map
-  (-> connection? string? procedure? any)]
- [prepare-query-for-each
-  (-> connection? string? procedure? any)]
- [prepare-query-mapfilter
-  (-> connection? string? procedure? procedure? any)]
- |#
  [prepare-query-fold
   (-> connection? string? procedure? any/c any)])

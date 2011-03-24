@@ -1,4 +1,4 @@
-;; Copyright 2000-2010 Ryan Culpepper
+;; Copyright 2000-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -19,7 +19,6 @@
          connector<%>
          ssl-connector<%>
          connection:admin<%>
-         primitive-query<%>
 
          init-private)
 
@@ -37,11 +36,11 @@
     ;; get-dbsystem : -> (is-a/c dbsystem<%>)
     get-dbsystem
 
-    ;; query* : (listof Statement) Collector -> (listof QueryResult)
+    ;; query* : symbol (listof Statement) Collector -> (listof QueryResult)
     query*
 
-    ;; prepare-multiple : (listof Preparable) -> (listof PreparedStatement)
-    prepare-multiple))
+    ;; prepare* : symbol (listof Preparable) -> (listof PreparedStatement)
+    prepare*))
 
 
 ;; ==== DBSystem Interface
@@ -53,24 +52,15 @@
     ;; get-short-name : -> symbol
     get-short-name
 
-    ;; get-description : -> string
-    get-description
-
-    ;; typeid->type : TypeID -> symbol
-    typeid->type
-
-    ;; typealias->type : TypeAlias -> symbol
-    typealias->type
-
     ;; get-known-types : #:can-read? [bool #t] #:can-write? [bool #t]
     ;;                -> (listof symbol)
     get-known-types
 
-    ;; get-type-reader : symbol #:options [any #f] -> (string -> any)
-    get-type-reader
+    ;; typeids->type-readers : (listof typeid) -> (listof (U #f (-> string datum)))
+    typeids->type-readers
 
-    ;; get-type-writer : symbol #:options [any #f] -> (string -> any)
-    get-type-writer
+    ;; typeids->type-writers : (listof typeid) -> (listof (-> datum string))
+    typeids->type-writers
 
     ;; has-support? : any -> boolean?
     has-support?))
@@ -80,16 +70,27 @@
 ;; prepared-statement<%>
 (define prepared-statement<%>
   (interface ()
+
+    ;; get-param-count : -> nat/#f
+    get-param-count
+
+    ;; get-param-types : -> (listof type) or #f
+    get-param-types
+
     ;; get-result-count : -> number/#f
     get-result-count
+
+    ;; get-result-types : -> (listof type) or #f
+    get-result-types
 
     ;; bind : (listof param) -> StatementBinding
     bind))
 
 ;; A statement is one of:
 ;;   - string
-;;   - (statement-binding prepared-statement (list-of string))
-(struct statement-binding (pst params))
+;;   - (statement-binding prepared-statement ??? (listof ???))
+;;     meta might include information such as text vs binary format
+(struct statement-binding (pst meta params))
 
 ;; A YesNoOptional is one of 'yes, 'no, 'optional
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls
@@ -108,7 +109,15 @@
 ;; A field-info is (field-info string alist)
 (struct field-info (name info) #:transparent)
 
-;; A Collector = RowDescription boolean -> b (b a ... -> b) (b -> c) Header
+;; A Collector is
+;;   (-> (listof alist) boolean
+;;       (values b (b vector -> b) (b -> c) Header))
+;;
+;; (collector row-descriptions binary?)
+;;   = (values init-accum (accum row -> accum) (accum -> final) header)
+
+;; FIXME: in collector, why binary? flag?
+;;   - not used by generic/functions
 
 
 ;; == Internal staging interfaces
@@ -136,21 +145,6 @@
     connected?
     disconnect
     get-dbsystem))
-
-(define primitive-query<%>
-  (interface ()
-    ;; query* entry point from connection<%>
-    query*
-
-    ;; query*/no-conversion : (listof statement) Collector
-    ;;                     -> (listof query-result)
-    ;; Hook method to be overridden.
-    query*/no-conversion
-
-    ;; get-type-writers : (listof TypeId) -> (listof (datum -> string))
-    ;; For binding prepared statements.
-    ;; Could be moved directly to dbsystem, bypass connections (???)
-    get-type-writers))
 
 ;; === Class Utilities
 

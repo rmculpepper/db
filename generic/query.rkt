@@ -1,4 +1,4 @@
-;; Copyright 2000-2010 Ryan Culpepper
+;; Copyright 2000-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -7,73 +7,82 @@
          racket/vector
          "interfaces.rkt"
          "sql-data.rkt")
+(provide compose-collector-with-conversions
+         get-fi-name
+         get-fi-type
+         prepared-statement-base%)
 
-(provide get-type
-         primitive-query-mixin)
+(define (get-fi-name alist)
+  (cond [(assq 'name alist)
+         => cdr]
+        [else #f]))
 
-(define (get-type alist)
+(define (get-fi-type alist)
   (cond [(assq '*type* alist)
          => cdr]
         [else #f]))
 
-;; primitive-query-mixin : connection:admin<%> -> primitive-query<%>
-;; Abstract method 'query*/no-conversion'
-(define primitive-query-mixin
-  (mixin (connection:admin<%>) (primitive-query<%>)
-    (inherit get-dbsystem)
-    (super-new)
-
-    ;; query*/no-conversion : symbol (list-of Statement) Collector
-    ;;                     -> (list-of QueryResult)
-    (define/public (query*/no-conversion fsym stmts collector)
-      (error 'query*/no-conversion "unimplemented"))
-
-    ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
-    ;; Overridden to automatically use type conversion
-    (define/public-final (query* fsym stmts collector)
-      (query*/no-conversion fsym stmts
-                            (compose-with-converters (get-dbsystem) collector)))
-
-    (define/public (get-type-writers typeids)
-      (let* ([sys (get-dbsystem)])
-        (for/list ([typeid (in-list typeids)])
-          (let* ([type (send sys typeid->type typeid)]
-                 [convert (send sys get-type-writer type)])
-            (or convert (mk-default-convert type))))))))
-
-;; compose-with-converters
-;;     : (FieldInfo -> 'a ('a field ... -> 'a) ('a -> 'b))
-;;    -> (list-of FieldInfo)
-;;    -> 'a ('a field ... -> 'a) ('a -> 'b))
-(define (compose-with-converters sys f)
+;; compose-collector-with-conversions : dbsystem Collector -> Collector
+(define (compose-collector-with-conversions dbsystem collector)
   (lambda (field-infos binary?)
-    (let* ([type-functionv
+    (let* ([type-function-v
             (list->vector
-             (map (lambda (field-info)
-                    (send sys get-type-reader
-                          (send sys typeid->type
-                                (get-type field-info))))
-                  field-infos))]
-           [convert
-            (lambda (argv)
-              ;; FIXME: vector-map vs vector-map!... which is better?
-              (vector-map (lambda (arg convert)
-                            (if (sql-null? arg) sql-null (convert arg)))
-                          argv
-                          type-functionv))])
-      (let-values ([(base combine finish info) (f field-infos binary?)])
+             (send dbsystem typeids->type-readers (map get-fi-type field-infos)))]
+           [convert-row
+            (lambda (row)
+              ;; FIXME: vector-map vs vector-map! ... which is better?
+              (vector-map! (lambda (field type-reader)
+                             (cond [(sql-null? field) sql-null]
+                                   [type-reader (type-reader field)]
+                                   [else field]))
+                           row ;; vector-map! mutates and returns this vector
+                           type-function-v))])
+      (let-values ([(base combine finish info) (collector field-infos binary?)])
         (values base 
                 (if binary?
                     combine
-                    (lambda (b argv) (combine b (convert argv))))
+                    (lambda (b argv) (combine b (convert-row argv))))
                 finish
                 info)))))
 
-;; mk-default-convert : Type -> datum -> string
-(define ((mk-default-convert type) datum)
-  (cond [(string? datum) datum]
-        [else
-         (raise-user-error 'convert-datum->net-representation
-                           "cannot convert to type ~a datum: ~s"
-                           type
-                           datum)]))
+
+;; ========================================
+
+;; prepared-statement-base%
+(define prepared-statement-base%
+  (class* object% (prepared-statement<%>)
+    (init-private param-infos
+                  result-infos)
+    (init ([-owner owner]))
+
+    (define owner (make-weak-box -owner))
+    (define type-writers
+      (send (send -owner get-dbsystem)
+            typeids->type-writers (map get-fi-type param-infos)))
+
+    (define/public (get-param-count) (length param-infos))
+    (define/public (get-param-types) (map get-fi-type param-infos))
+    (define/public (get-result-count) (length result-infos))
+    (define/public (get-result-types) (map get-fi-type result-infos))
+
+    (define/public (check-owner c)
+      (eq? c (weak-box-value owner)))
+
+    (define/public (bind params)
+      (check-param-count params param-infos)
+      (let* ([params
+              (map (lambda (tw p)
+                     (cond [(sql-null? p) sql-null]
+                           [else (tw p)]))
+                   type-writers
+                   params)])
+        (statement-binding this #f params)))
+
+    (define/private (check-param-count params param-infos)
+      (define len (length params))
+      (define tlen (length param-infos))
+      (when (not (= len tlen))
+        (error 'bind-prepared-statement
+               "prepared statement requires ~s parameters, given ~s" tlen len)))
+
+    (super-new)))

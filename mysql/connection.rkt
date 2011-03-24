@@ -1,9 +1,6 @@
-;; Copyright 2000-2010 Ryan Culpepper
+;; Copyright 2000-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
-
-;; Implementation of connections, which communicate with a backend through
-;; structured messages.
 
 #lang racket/base
 (require racket/class
@@ -14,8 +11,7 @@
          "../generic/query.rkt"
          "message.rkt"
          "exceptions.rkt"
-         "dbsystem.rkt"
-         "types.rkt")
+         "dbsystem.rkt")
 (provide connection%)
 
 ;; Debugging
@@ -25,49 +21,9 @@
 (define MAX-PACKET-LENGTH #x1000000)
 
 (define prepared-statement%
-  (class* object% (prepared-statement<%>)
-    (init id           ;; int
-          params       ;; int
-          paraminfos   ;; (listof field-info)
-          fields       ;; int
-          fieldinfos   ;; (listof field-info)
-          owner)       ;; (weak-box connection)
-
-    (define -id id)
-    (define -params params)
-    (define -fields fields)
-    (define -fieldinfos fieldinfos)
-    (define -owner (make-weak-box owner))
-    (define -param-types (map get-type paraminfos))
-    (define -type-writers (send owner get-type-writers -param-types))
-
-    (define/public-final (get-id) -id)
-    (define/public-final (get-result-count) -fields)
-    (define/public-final (get-param-types) -param-types)
-    (define/public-final (get-fieldinfos) -fieldinfos)
-
-    (define/public-final (check-owner c)
-      (eq? c (weak-box-value -owner)))
-
-    (define/public-final (bind params)
-      (check-params params -param-types)
-      (let* ([params
-              (map (lambda (tw p)
-                     (if (sql-null? p)
-                         #f
-                         (tw p)))
-                   -type-writers
-                   params)])
-        (statement-binding this params)))
-
-    (define/private (check-params params paraminfos)
-      (define len (length params))
-      (define tlen (length paraminfos))
-      (when (not (= len tlen))
-        (raise-user-error
-         'bind-prepared-statement
-         "prepared statement requires ~s parameters, given ~s" tlen len)))
-
+  (class prepared-statement-base%
+    (init-private id) ;; int
+    (define/public (get-id) id)
     (super-new)))
 
 (define mysql-base<%>
@@ -365,10 +321,11 @@
 ;; Provides functionality, not usability. See connection% for friendly 
 ;; interface.
 (define query-mixin
-  (mixin (mysql-base<%> primitive-query<%>) ()
+  (mixin (mysql-base<%> connection:admin<%>) ()
     (inherit recv
              send-message
-             fresh-exchange)
+             fresh-exchange
+             get-dbsystem)
     (super-new)
 
     ;; name-counter : number
@@ -376,11 +333,13 @@
 
     ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
     ;; The single point of control for the query engine
-    (define/override (query*/no-conversion fsym stmts collector)
-      (for ([stmt stmts])
-        (check-statement fsym stmt))
-      (for/list ([stmt stmts])
-        (query1 fsym stmt collector)))
+    (define/public (query* fsym stmts collector)
+      (let ([collector
+             (compose-collector-with-conversions (get-dbsystem) collector)])
+        (for ([stmt stmts])
+          (check-statement fsym stmt))
+        (for/list ([stmt stmts])
+          (query1 fsym stmt collector))))
 
     ;; query1 : symbol Statement Collector -> QueryResult
     (define/private (query1 fsym stmt collector)
@@ -438,7 +397,7 @@
         [(statement-binding? stmt)
          (let* ([pst (statement-binding-pst stmt)]
                 [fieldinfos (send pst get-fieldinfos)]
-                [types (map get-type fieldinfos)])
+                [types (map get-fi-type fieldinfos)])
            (query1:result types collector))]))
 
     (define/private (query1:result binary? collector)
@@ -481,12 +440,8 @@
             (loop (combine init (list->vector (car data))) (cdr data))
             (recordset info (finalize init)))))
 
-    ;; prepare-multiple : (list-of string) -> (list-of PreparedStatement)
-    (define/public (prepare-multiple stmts)
-      (for-each (lambda (stmt)
-                  (unless (string? stmt)
-                    (raise-type-error 'prepare* "string" stmt)))
-                stmts)
+    ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
+    (define/public (prepare* fsym stmts)
       (map (lambda (stmt) (prepare1 stmt)) stmts))
 
     (define/private (prepare1 stmt)
@@ -501,10 +456,8 @@
                   (if (zero? fields) null (prepare1:get-fields))])
              (new prepared-statement%
                   (id id)
-                  (params params)
-                  (paraminfos paraminfos)
-                  (fields fields)
-                  (fieldinfos fieldinfos)
+                  (param-infos paraminfos)
+                  (field-infos fieldinfos)
                   (owner this)))])))
 
     (define/private (prepare1:get-params)
@@ -527,9 +480,8 @@
 ;; connection%
 (define connection% 
   (class* (query-mixin
-           (primitive-query-mixin
-            (connector-mixin
-             mysql-base%)))
+           (connector-mixin
+            mysql-base%))
       (connection<%>)
     (super-new)
     (inherit query*)

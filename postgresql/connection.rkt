@@ -16,7 +16,6 @@
          "../generic/query.rkt"
          "msg.rkt"
          "exceptions.rkt"
-         "types.rkt"
          "dbsystem.rkt")
 (provide pure-connection%
          connection%)
@@ -25,45 +24,11 @@
 (define DEBUG-RESPONSES #f)
 (define DEBUG-SENT-MESSAGES #f)
 
-;; prepared-statement%
 (define prepared-statement%
-  (class* object% (prepared-statement<%>)
-    (init-private name
-                  param-types
-                  result-count)
-    (init ([-owner owner]))
-
-    (define owner (make-weak-box -owner))
-    (define type-writers
-      (send -owner get-type-writers param-types))
-
+  (class prepared-statement-base%
+    (init-private name)
     (define/public (get-name) name)
-    (define/public (get-result-count) result-count)
-
-    (define/public (check-owner c)
-      (eq? c (weak-box-value owner)))
-
-    (define/public (bind params)
-      (check-param-count params param-types)
-      (let* ([params
-              (map (lambda (tw p)
-                     (if (sql-null? p)
-                         sql-null
-                         (tw p)))
-                   type-writers
-                   params)])
-        (statement-binding this params)))
-
-    (define/private (check-param-count params param-types)
-      (define len (length params))
-      (define tlen (length param-types))
-      (when (not (= len tlen))
-        (raise-user-error
-         'bind-prepared-statement
-         "prepared statement requires ~s parameters, given ~s" tlen len)))
-
     (super-new)))
-
 
 ;; base<%>
 ;; Manages communication
@@ -495,10 +460,11 @@
 ;; Provides functionality, not usability. See connection% for friendly 
 ;; interface.
 (define query-mixin
-  (mixin (base<%> primitive-query<%>) ()
+  (mixin (connection:admin<%> base<%>) ()
     (inherit-field process-id
                    secret-key)
-    (inherit recv-message
+    (inherit get-dbsystem
+             recv-message
              send-message
              buffer-message
              flush-message-buffer
@@ -516,24 +482,25 @@
         (begin0 (proc)
           (unlock))))
 
-    ;; query*/no-conversion : symbol (list-of Statement) Collector
-    ;;                     -> (list-of QueryResult)
-    ;; The single point of control for the query engine
-    (define/override (query*/no-conversion fsym stmts collector)
-      (for ([stmt (in-list stmts)])
-        (check-statement fsym stmt))
-      (let ([thunks
-             (call-with-lock fsym
-               (lambda ()
-                 (for ([stmt (in-list stmts)])
-                   (query1:enqueue stmt))
-                 (send-message (make-Sync))
-                 (let ([thunks
-                        (for/list ([stmt (in-list stmts)])
-                          (query1:collect fsym stmt collector))])
-                   (check-ready-for-query fsym)
-                   thunks)))])
-        (map (lambda (p) (p)) thunks)))
+    ;; query* : symbol (list-of Statement) Collector
+    ;;       -> (list-of QueryResult)
+    (define/public (query* fsym stmts collector)
+      (let ([collector
+             (compose-collector-with-conversions (get-dbsystem) collector)])
+        (for ([stmt (in-list stmts)])
+          (check-statement fsym stmt))
+        (let ([thunks
+               (call-with-lock fsym
+                 (lambda ()
+                   (for ([stmt (in-list stmts)])
+                     (query1:enqueue stmt))
+                   (send-message (make-Sync))
+                   (let ([thunks
+                          (for/list ([stmt (in-list stmts)])
+                            (query1:collect fsym stmt collector))])
+                     (check-ready-for-query fsym)
+                     thunks)))])
+          (map (lambda (p) (p)) thunks))))
 
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
@@ -614,12 +581,9 @@
          (raise-user-error fsym "COPY OUT statements not supported")]
         [_ (error fsym "internal error: unexpected message")]))
 
-    ;; prepare-multiple : (list-of string) -> (list-of PreparedStatement)
-    (define/public (prepare-multiple stmts)
-      (for ([stmt (in-list stmts)])
-        (unless (string? stmt)
-          (raise-type-error 'prepare* "string" stmt)))
-      (call-with-lock 'prepare-multiple
+    ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
+    (define/public (prepare* fsym stmts)
+      (call-with-lock fsym
         (lambda ()
           ;; name generation within exchange: synchronized
           (let ([names (map (lambda (_) (generate-name)) stmts)])
@@ -631,8 +595,8 @@
             (let ([results
                    (for/list ([name (in-list names)]
                               [stmt (in-list stmts)])
-                     (prepare1:collect 'prepare-multiple name stmt))])
-              (check-ready-for-query 'prepare-multiple)
+                     (prepare1:collect fsym name stmt))])
+              (check-ready-for-query fsym)
               results)))))
 
     ;; prepare1:enqueue : string string -> void
@@ -656,8 +620,8 @@
     (define/private (prepare1:describe-result fsym name stmt param-types)
       (let ([r (recv-message fsym)])
         (match r
-          [(struct RowDescription (field-records))
-           (prepare1:finish fsym name stmt param-types (length field-records))]
+          [(struct RowDescription (fields))
+           (prepare1:finish fsym name stmt param-types (map field-description->alist fields))]
           [(struct NoData ())
            (prepare1:finish fsym name stmt param-types #f)]
           [else (prepare1:error fsym r stmt)])))
@@ -666,8 +630,8 @@
     (define/private (prepare1:finish fsym name stmt param-types result-fields)
       (new prepared-statement%
            (name name)
-           (param-types param-types)
-           (result-count result-fields)
+           (param-infos (map (lambda (t) `((*type* . ,t))) param-types))
+           (result-infos result-fields)
            (owner this)))
 
     ;; check-statement : symbol any -> void
@@ -691,9 +655,8 @@
 ;; pure-connection%
 (define pure-connection% 
   (class* (query-mixin
-           (primitive-query-mixin
-            (connector-mixin
-             base%)))
+           (connector-mixin
+            base%))
       (connection<%>)
     (super-new)))
 

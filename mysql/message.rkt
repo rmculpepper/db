@@ -377,7 +377,8 @@
   #|(printf "binary row: ~s or ~s\n" b (bytes->list b))|#
   (let* ([first (io:read-byte in)] ;; SKIP? seems to be always zero
          [param-count (length param-types)]
-         [null-map-length (floor (/ (+ 9 param-count) 8))]
+         ;; FIXME: avoid reifying null-map as list?
+         [null-map-length (floor (/ (+ 9 param-count) 8))]  ;; FIXME: use quotient?
          [null-map-int (io:read-le-intN in null-map-length)]
          [null-map (cddr (integer->null-map null-map-int (+ 2 param-count)))]
          [fields

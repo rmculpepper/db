@@ -111,10 +111,11 @@ by dashes.
 }
 
 MySQL does not infer parameter types in prepared queries, instead
-assigning them the pseudotype @tt{var-string}....
-
-@bold{FIXME}
-
+assigning them the pseudotype @tt{var-string}. Consequently,
+conversion of Racket values to @tt{var-string} parameters accepts, in
+addition to strings, numbers (@racket[rational?]---no infinities or
+NaN) and SQL date/time structures (@racket[sql-date?],
+@racket[sql-time?], and @racket[sql-timestamp?]).
 
 A SQL value of type @tt{numeric} (aka @tt{decimal}) is always
 converted to an exact rational (MySQL seems not to support infinite

@@ -1,4 +1,4 @@
-;; Copyright 2007-2010 Ryan Culpepper
+;; Copyright 2007-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -10,6 +10,7 @@ Based on protocol documentation here:
 #lang racket/base
 (require racket/match
          "../generic/sql-data.rkt"
+         "../generic/sql-convert.rkt"
          "../generic/io.rkt")
 (provide (all-defined-out))
 
@@ -419,8 +420,9 @@ Based on protocol documentation here:
        ;; format is YYMDhmsNNNN (N = nanoseconds)
        ;; but trailing zeros can be dropped
        (define (get-int start len)
-         (if (>= (+ start len) (bytes-length bs))
-             (integer-bytes->integer bs #f start (+ start len))
+         (if (<= (+ start len) (bytes-length bs))
+             (cond [(= len 1) (bytes-ref bs start)]
+                   [else (integer-bytes->integer bs #t #f start (+ start len))])
              0))
        (let ([year  (get-int 0 2)]
              [month (get-int 2 1)]
@@ -433,9 +435,9 @@ Based on protocol documentation here:
            ((date newdate)
             (sql-date year month day))
            ((datetime timestamp)
-            (sql-timestamp year month day hour min (+ sec (/ nsec #i1e9)) #f))
+            (sql-timestamp year month day hour min sec nsec #f))
            ((time)
-            (sql-time hour min (+ sec (/ nsec #i1e9)) #f))))))
+            (sql-time hour min sec nsec #f))))))
 
     ((year) (io:read-le-int16 in))
 
@@ -454,7 +456,22 @@ Based on protocol documentation here:
     ((short) (io:write-le-int16 out param))
     ((long) (io:write-le-int32 out param))
     ((longlong) (io:write-le-intN out param 8))
-    ((var-string) (io:write-length-coded-string out param))
+
+    ;; Special case: mysql gives all parameters type var-string,
+    ;; even when obviously not (eg, "select 1 + ?")
+    ;; So, convert all reasonable data to string rep on send.
+    ((var-string)
+     (let ([param
+            (cond [(string? param) param]
+                  [(exact-integer? param) (number->string param)]
+                  [(rational? param) (number->string param)] ;; inf, nan not allowed
+                  ;; FIXME: can mysql interpret as date, time, etc?
+                  [(sql-date? param) (marshal-date param)]
+                  [(sql-time? param) (marshal-time param)]
+                  [(sql-timestamp? param) (marshal-timestamp param)]
+                  [else (error 'send-param "cannot marshal as var-string: ~e" param)])])
+       (io:write-length-coded-string out param)))
+
     (else (error 'send-param "unimplemented: ~s" type))))
 
 

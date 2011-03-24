@@ -39,6 +39,10 @@
 (define (bind-prepared-statement pst params)
   (send pst bind params))
 
+(define (prepared-statement-parameter-types pst)
+  (send pst get-param-types))
+(define (prepared-statement-result-types pst)
+  (send pst get-result-types))
 
 ;; == Query procedures
 
@@ -365,6 +369,10 @@
   (-> any/c any)]
  [prepared-statement?
   (-> any/c any)]
+ [prepared-statement-parameter-types
+  (-> prepared-statement? (or/c list? #f))]
+ [prepared-statement-result-types
+  (-> prepared-statement? (or/c list? #f))]
 
  [query-exec
   (->* (connection? callable/c) () #:rest list? any)]

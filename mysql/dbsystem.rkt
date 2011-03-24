@@ -22,11 +22,16 @@
            typeids))
 
     (define/public (typeids->type-writers typeids)
+      #|
       (map (lambda (typeid)
              (let ([type (wire-typeid->type typeid)])
                (or (type->type-writer type)
                    (make-default-marshal type))))
-           typeids))
+           typeids)
+      |#
+
+      ;; All params sent as binary data, so handled in message.rkt
+      (map (lambda (typeid) values) typeids))
 
     (define/public (get-known-types) known-types+aliases)
 
@@ -101,6 +106,9 @@
     ;; ((timestamp-with-time-zone) 'timestamptz) ???
     (else alias)))
 
+;; FIXME: Only non-param'd query path uses type-readers;
+;; would be better to always take binary path, eliminate redundancy.
+
 ;; type->type-reader : symbol -> (string -> datum) or #f
 (define (type->type-reader type)
   (case type
@@ -118,6 +126,10 @@
     ;; set
     ;; geometry
     (else #f)))
+
+#|
+
+;; Parameters sent as binary data, so handled at lower level.
 
 ;; type->type-writer : symbol -> (datum -> string) or #f
 (define (type->type-writer type)
@@ -141,3 +153,5 @@
     ;; set
     ;; geometry
     (else #f)))
+
+|#

@@ -5,12 +5,7 @@ To do
 
   - bring postgresql's types in line with documented types
 
-  - idea: conversion to SQL text type accept multiple racket types,
-    because of MySQL's no type inference...
-
-  - add operations on prepared-statement (expected param types, etc)
-
-  - permit types in param'd queries
+  - permit types in param'd queries (would fix mysql issue)
   - permit extra conversions on result fields...
     (eg, in SQLite, explicitly specify "date" conversion)
 

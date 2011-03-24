@@ -10,9 +10,6 @@ Docs
 
 --------------------
 
-- change simple-result to have unspecified alist instead of string...
-- change field-info to have additional alist (after name)
-
 - add operations on prepared-statement (expected param types, etc)
 
 - add security-guard path checks

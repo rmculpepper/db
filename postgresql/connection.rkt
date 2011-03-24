@@ -593,9 +593,12 @@
       (let ([r (recv-message fsym)])
         (match r
           [(struct CommandComplete (command))
-           (query1:finalize fsym (lambda () (simple-result command)))]
+           (query1:finalize fsym
+                            (lambda ()
+                              (simple-result
+                               `((command . ,(string->command command))))))]
           [(struct EmptyQueryResponse ())
-           (query1:finalize fsym (lambda () (simple-result #f)))]
+           (query1:finalize fsym (lambda () (simple-result '())))]
           [_ (query1:error-recovery fsym r)])))
     (define/private (query1:finalize fsym result)
       (let ([r (recv-message fsym)])

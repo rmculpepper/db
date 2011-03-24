@@ -147,7 +147,7 @@
                  (for/fold ([accum init]) ([row (in-list rows)])
                    (combine accum row))))]
               [else
-               (simple-result "")])))
+               (simple-result '())])))
 
     (define/private (load-param fsym db stmt i param)
       (handle-status

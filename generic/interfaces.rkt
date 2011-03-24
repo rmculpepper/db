@@ -95,9 +95,9 @@
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls
 
 ;; A query-result is one of:
-;;  - (simple-result string)
+;;  - (simple-result alist)
 ;;  - (recordset Header value)
-(struct simple-result (command) #:transparent)
+(struct simple-result (info) #:transparent)
 (struct recordset (info data) #:transparent)
 
 ;; A Header is one of
@@ -105,12 +105,8 @@
 ;;  - list of field-info
 ;;  - #f
 
-;; A field-info is (field-info string)
-(struct field-info (name) #:transparent)
-
-;; A Statement is one of
-;;  - string
-;;  - statement-binding
+;; A field-info is (field-info string alist)
+(struct field-info (name info) #:transparent)
 
 ;; A Collector = RowDescription boolean -> b (b a ... -> b) (b -> c) Header
 

@@ -170,10 +170,15 @@ A query result is either a @scheme[simple-result] or a
 @scheme[recordset].
 
 @defstruct*[simple-result
-            ([command (or/c #f string?)])]{
+            ([info (listof pair?)])]{
 
 Represents the result of a SQL statement that does not return a
 relation, such as a @tt{INSERT} or @tt{DELETE} statement.
+
+The @racket[info] field is an association list containing arbitrary
+information about the SQL statement's execution. Do not rely on the
+contents of the @racket[info] field; it varies based on database
+system and may change in future versions of this library.
 }
 
 @defstruct*[recordset
@@ -185,9 +190,14 @@ such as a @tt{SELECT} query.
 }
 
 @defstruct*[field-info
-            ([name string?])]{
+            ([name string?]
+             [info (listof pair?)])]{
 
-Represents the name of a column.
+Represents a column in a recordset. The @racket[name] field is the
+name of the column, and the @racket[info] field is an association list
+containing arbitrary additional information about the column. Do not
+rely on the contents of the @racket[info] field; it varies based on
+database system and may change in future versions of this library.
 }
 
 @deftogether[[

@@ -68,7 +68,7 @@
 
 ;; standard-info : (listof ???) -> (listof field-info)
 (define (standard-info field-records)
-  (map (lambda (fr) (field-info (get-field-name fr)))
+  (map (lambda (fr) (field-info (get-field-name fr) fr))
        field-records))
 
 (define (get-field-name alist)

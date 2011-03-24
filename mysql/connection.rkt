@@ -445,7 +445,10 @@
       (let ([r (recv 'query* 'result)])
         (match r
           [(struct ok-packet (affected-rows insert-id status warnings message))
-           (simple-result message)]
+           (simple-result `((affected-rows . ,affected-rows)
+                            (insert-id . ,insert-id)
+                            (status . ,status)
+                            (message . ,message)))]
           [(struct result-set-header-packet (fields extra))
            (query1:expect-fields binary? null collector)])))
 

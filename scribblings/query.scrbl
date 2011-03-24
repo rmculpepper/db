@@ -17,9 +17,9 @@ raises an exception. Different query functions impose different
 constraints on the query results and offer different mechanisms for
 processing the results.
 
-In most cases, a query error does not cause the connection to be
-disconnected. Specifically, the following kinds of errors should never
-cause a connection to be disconnected:
+@bold{Errors} In most cases, a query error does not cause the
+connection to be disconnected. Specifically, the following kinds of
+errors should never cause a connection to be disconnected:
 @itemize[
 @item{SQL syntax errors, including references to undefined tables,
   columns, or operations, etc}
@@ -31,10 +31,27 @@ cause a connection to be disconnected:
 The following kinds of errors may cause a connection to be
 disconnected:
 @itemize[
-@item{changing communication settings, such as changing the encoding
-  to anything other than UTF-8}
+@item{changing communication settings, such as changing the character
+  encoding to anything other than UTF-8}
 @item{communication failures and internal errors in the library}
 ]
+
+@bold{Character encoding} This library is designed to interact with
+database systems using the UTF-8 character encoding. The connection
+functions attempt to negotiate UTF-8 communication at the beginning of
+every connection, but some systems also allow the character encoding
+to be changed via SQL commands. If this happens, the client might be
+unable to reliably communicate with the database, and data might get
+corrupted in transmission. @emph{Avoid changing a connection's
+character set encoding.}
+
+@bold{Synchronization} Connections are internally synchronized: it is
+safe to perform concurrent queries on the same connection object from
+different threads. @emph{Connections are not kill-safe.}  Killing a
+thread that is using a connection---or shutting down the connection's
+managing custodian---may leave the connection in a damaged state where
+future operations may return garbage or block indefinitely.
+
 
 @section{Simple queries}
 
@@ -173,7 +190,7 @@ A query result is either a @scheme[simple-result] or a
             ([info (listof pair?)])]{
 
 Represents the result of a SQL statement that does not return a
-relation, such as a @tt{INSERT} or @tt{DELETE} statement.
+relation, such as an @tt{INSERT} or @tt{DELETE} statement.
 
 The @racket[info] field is an association list containing arbitrary
 information about the SQL statement's execution. Do not rely on the

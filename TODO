@@ -36,4 +36,6 @@ Docs
        Solutions: check that ports are still open (?)
                   wrap with custodian-box (?)
 
+- disconnect should always work, even on messed-up connections (eg thread killed)
+
 - create abstraction that combined finalizer with custodian management (?)

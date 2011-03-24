@@ -4,21 +4,20 @@
           "config.rkt")
 
 @title[#:version (my-package-version)]{db: Database connectivity}
-@author{Ryan Culpepper}
+@author[@author+email["Ryan Culpepper" "ryanc@racket-lang.org"]]
 
 @section-index["postgresql"]
 @section-index["mysql"]
+@section-index["sqlite"]
 @section-index["database"]
 
-This manual documents the database package version
-@(my-package-version). This package is the successor to
-spgsql.
+This manual documents the @tt{database} package version
+@(my-package-version). This package is the successor to @tt{spgsql}.
 
 @(my-defmodule)
 
-The database package provides a high-level interface to several
-database systems. The following database systems are currently
-supported:
+This package provides a high-level interface to several database
+systems. The following database systems are currently supported:
 @itemize[
 @item{PostgreSQL, versions 7.4 and later}
 @item{MySQL, versions 5 and later}
@@ -35,15 +34,14 @@ and retrieval. In other words, connections do not contain query
 state. Connections are internally synchronized, so multiple threads
 can use a connection simultaneously.
 
+@bold{Acknowledgments} Thanks to Dave Gurnell, Noel Welsh, Mike Burns,
+and Doug Orleans for contributions to @tt{spgsql}, the PostgreSQL-only
+predecessor of this package.
+
 @include-section["connect.scrbl"]
 @include-section["query.scrbl"]
 @include-section["sql-types.scrbl"]
-@;@include-section["class-api.scrbl"]
 @include-section["notes.scrbl"]
-@include-section["example.scrbl"]
 
-@section{Acknowledgments}
-
-Thanks to Dave Gurnell, Noel Welsh, Mike Burns, and Doug Orleans for
-contributions to spgsql, the PostgreSQL-only predecessor of this
-package.
+@;@include-section["class-api.scrbl"]
+@;@include-section["example.scrbl"]

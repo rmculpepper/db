@@ -1,24 +1,22 @@
 To do
 =====
 
-Docs
-
-- "procedure" => "function"
-- "Scheme" => "Racket"
-
-- variable c => pg-c to mark postgresql syntax and results
-
---------------------
-
-- add operations on prepared-statement (expected param types, etc)
+- idea: conversion to SQL text type accept multiple racket types,
+  because of MySQL's bad type inference...
 
 - add security-guard path checks
 
+- add operations on prepared-statement (expected param types, etc)
+
 - clean up types, conversions, etc
+
+- sqlite: add optional conversions based on decltype (eg, date, time)
 
 - write tests for improved simple query functions
 
 - permit types in param'd queries
+- permit extra conversions on result fields...
+   (eg, in SQLite, explicitly specify "date" conversion)
 
 - connection-set-notify-callback!, etc; notification struct types
   also, connection option, defaults to void

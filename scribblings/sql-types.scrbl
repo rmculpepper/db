@@ -6,36 +6,35 @@
           "config.rkt"
           "tabbing.rkt")
 
-@title{SQL Types and Conversions}
+@title[#:tag "sql-types"]{SQL types and conversions}
 
 @(my-declare-exporting)
 
-For most basic SQL types, connections automatically process query
-results and paramterized query parameters to convert between Scheme
-values and SQL external representations. When there is no automatic
-conversion to or from a SQL type, you must supply or accept a string
-containing the SQL value's external representation.
+For most basic SQL types, connections automatically convert query
+results to appropriate Racket types. Likewise, query parameters are
+accepted as Racket values and converted to the appropriate SQL type.
 
-@(examples/results
-  [(query-value psql-c "select 18") 18]
-  [(query-value psql-c "select false") #f]
-  [(query-value psql-c "select '{1,2,3}'::int[]") "{1,2,3}"]
-  [(query-value psql-c "select point (1,2)") "(1,2)"])
+@examples/results[
+[(query-value pgc "select count(*) from the_numbers") 4]
+[(query-value pgc "select false") #f]
+[(query-value pgc "select 1 + $1" 2) 3]
+]
 
-The sections below describe this library's support for PostgreSQL and
-MySQL data types. The listed type names and aliases are not used by
-any operation defined in this library yet, but more operations on SQL
-data types are planned, and they will use the names listed below.
+
+@section{Database system type correspondences}
+
+This sections describes the correspondences between SQL types and
+Racket types for the supported database systems. 
          
-@section{PostgreSQL Types and Conversions}
+@subsection[#:tag "postgresql-types"]{PostgreSQL}
 
-Here are the PostgreSQL types known to this package with their
-corresponding Scheme representations. The type is listed by its Scheme
-notation, which generally corresponds to the SQL notation with spaces
+The following table lists the PostgreSQL types known to this library,
+along with their corresponding Racket representations. The type name
+as listed generally corresponds to the SQL notation with spaces
 replaced by dashes.
 
 @tabbing{
-  @bold{Type name}                @& @bold{Aliases}      @& @bold{Scheme datatype} @//
+  @bold{PostgreSQL type}          @& @bold{Aliases}      @& @bold{Racket type} @//
   @tt{bigint}                     @& @tt{int8}           @& @scheme[exact-integer?] @//
   @tt{bigserial}                  @& @tt{serial8}        @& @scheme[exact-integer?] @//
   @tt{boolean}                    @& @tt{bool}           @& @scheme[boolean?] @//
@@ -57,35 +56,46 @@ replaced by dashes.
   @tt{oid}                        @& @tt{}               @& @scheme[exact-integer?]
 }
 
-A SQL value of type @tt{numeric/decimal} is always converted to
-either an exact rational or @scheme[+nan.0]. When converting Scheme
-values to SQL @tt{numeric}, exact rational values representable by
-finite decimal strings are converted without loss of precision. Other
-real values are converted to decimals with a loss of precision.
+A SQL value of type @tt{numeric} (aka @tt{decimal}) is always
+converted to either an exact rational or @scheme[+nan.0]. When
+converting Scheme values to SQL @tt{numeric}, exact rational values
+representable by finite decimal strings are converted without loss of
+precision. (Precision may be lost, of course, if the value is then
+stored in a database field of lower precision.) Other real values are
+converted to decimals with a loss of precision.
 
-PostgreSQL defines many other datatypes, such as network addresses and
-various geometric types. These are not converted.
+@examples/results[
+[(query-value pgc "select real '+Infinity'")
+ +inf.0]
+[(query-value pgc "select decimal '12345678901234567890'")
+ 12345678901234567890]
+]
+
+PostgreSQL defines many other types, such as network addresses and
+various geometric shapes. These are currently converted to and from
+Racket strings, but future versions of this library may include new
+type correspondences and conversions.
 
 Array types are also not currently supported. Support may be added in
 a future version.
 
-@(examples/results
-  [(query-value psql-c "select real '+Infinity'")
-   +inf.0]
-  [(query-value psql-c "select decimal '12345678901234567890'")
-   12345678901234567890])
+@examples/results[
+[(query-value pgc "select point (1,2)") "(1,2)"]
+[(query-value pgc "select '{1,2,3}'::int[]") "{1,2,3}"]
+]
 
 See also date and time examples in @secref{sql-data}.
 
-@section{MySQL Types and Conversions}
 
-Here are the MySQL types known to this package with their
-corresponding Scheme representations. The type is listed by its Scheme
-notation, which generally corresponds to the SQL notation with spaces
-replaced by dashes.
+@subsection[#:tag "mysql-types"]{MySQL}
+
+The following table lists the MySQL types known to this package, along
+with their corresponding Racket representations. The type name as
+listed generally corresponds to the SQL notation with spaces replaced
+by dashes.
 
 @tabbing{
-  @bold{Type name}                @& @bold{Aliases}      @& @bold{Scheme datatype} @//
+  @bold{MySQL type}               @& @bold{Aliases}      @& @bold{Racket type} @//
   @tt{integer}                    @& @tt{int long}       @& @scheme[exact-integer?] @//
   @tt{tinyint}                    @& @tt{}               @& @scheme[exact-integer?] @//
   @tt{smallint}                   @& @tt{}               @& @scheme[exact-integer?] @//
@@ -100,20 +110,59 @@ replaced by dashes.
   @tt{timestamp-without-time-zone}@& @tt{datetime}       @& @scheme[sql-timestamp?]
 }
 
-A SQL value of type @tt{numeric/decimal} is always converted to an
-exact rational (MySQL seems not to support infinite numerics).
+MySQL does not infer parameter types in prepared queries, instead
+assigning them the pseudotype @tt{var-string}....
+
+@bold{FIXME}
 
 
-@section[#:tag "sql-data"]{SQL Data}
+A SQL value of type @tt{numeric} (aka @tt{decimal}) is always
+converted to an exact rational (MySQL seems not to support infinite
+@tt{numeric} values).
 
-SQL NULL values are always translated into the unique @scheme[sql-null] value.
+See also date and time examples in @secref{sql-data}.
+
+
+@subsection[#:tag "sqlite-types"]{SQLite}
+
+The following table lists the SQLite types known to this package,
+along with their corresponding Racket representations. The type name
+as listed generally corresponds to the SQL notation with spaces
+replaced by dashes.
+
+Unlike PostgreSQL and MySQL, SQLite does not enforce declared type
+constraints (with the exception of integer primary keys). Rather,
+every SQLite value has an associated ``storage class''.
+
+@tabbing{
+  @bold{SQLite storage class}  @& @bold{Racket type} @//
+  @tt{integer}                 @& @scheme[exact-integer?] @//
+  @tt{real}                    @& @scheme[real?] @//
+  @tt{text}                    @& @scheme[string?] @//
+  @tt{blob}                    @& @scheme[bytes?]
+}
+
+An exact integer that cannot be represented as a 64-bit signed integer
+is converted as @tt{real}, not @tt{integer}.
+
+@examples/results[
+[(query-value slc "select ?" (expt 2 80))
+ 1.2089258196146292e+24]
+]
+
+
+@;{----------------------------------------}
+
+@section[#:tag "sql-data"]{SQL data}
+
+SQL @tt{NULL} values are always translated into the unique @scheme[sql-null] value.
 
 @defthing[sql-null sql-null?]
 @defproc[(sql-null? [val any/c])
          boolean?]{
 
-A special value and predicate used to represent NULL values in query
-results. The @scheme[sql-null] value may be recognized using
+A special value and predicate used to represent @tt{NULL} values in
+query results. The @scheme[sql-null] value may be recognized using
 @scheme[eq?].
 
 @(examples/results
@@ -121,37 +170,37 @@ results. The @scheme[sql-null] value may be recognized using
    sql-null])
 }
 
-New Scheme datatypes are also provided for a few SQL types that have
-no close analogues in Scheme.
+New Racket datatypes are also provided for a few SQL types that have
+no existing close analogues.
 
-@defstruct[sql-date
-           ([year exact-nonnegative-integer?]
-            [month exact-nonnegative-integer?]
-            [day exact-nonnegative-integer?])]
-@defstruct[sql-time
-           ([hour exact-nonnegative-integer?]
-            [minute exact-nonnegative-integer?]
-            [second exact-nonnegative-integer?]
-            [nanosecond exact-nonnegative-integer?]
-            [tz (or/c exact-integer? #f)])]
-@defstruct[sql-timestamp
-           ([year exact-nonnegative-integer?]
-            [month exact-nonnegative-integer?]
-            [day exact-nonnegative-integer?]
-            [hour exact-nonnegative-integer?]
-            [minute exact-nonnegative-integer?]
-            [second exact-nonnegative-integer?]
-            [nanosecond exact-nonnegative-integer?]
-            [tz (or/c exact-integer? #f)])]{
+@defstruct*[sql-date
+            ([year exact-nonnegative-integer?]
+             [month exact-nonnegative-integer?]
+             [day exact-nonnegative-integer?])]
+@defstruct*[sql-time
+            ([hour exact-nonnegative-integer?]
+             [minute exact-nonnegative-integer?]
+             [second exact-nonnegative-integer?]
+             [nanosecond exact-nonnegative-integer?]
+             [tz (or/c exact-integer? #f)])]
+@defstruct*[sql-timestamp
+            ([year exact-nonnegative-integer?]
+             [month exact-nonnegative-integer?]
+             [day exact-nonnegative-integer?]
+             [hour exact-nonnegative-integer?]
+             [minute exact-nonnegative-integer?]
+             [second exact-nonnegative-integer?]
+             [nanosecond exact-nonnegative-integer?]
+             [tz (or/c exact-integer? #f)])]{
 
   Representations of SQL dates, times, and timestamps. The @scheme[tz]
   field may be @scheme[#f] to indicate no time zone information.
 
   The @scheme[sql-time] and @scheme[sql-timestamp] structures store
-  fractional seconds to nanosecond accuracy for compatibility with
-  SRFI 19. Note, however, that PostgreSQL only supports microsecond
-  time accuracy. Fractional seconds are rounded to the nearest
-  microsecond when they are stored in the database.
+  fractional seconds to nanosecond precision for compatibility with
+  SRFI 19. Note, however, that database systems generally do not
+  support nanosecond precision; PostgreSQL, for example, only supports
+  microsecond precision.
 
 @(examples/results
   [(query-value psql-c "select date '25-dec-1980'")
@@ -164,13 +213,14 @@ no close analogues in Scheme.
    (make-sql-timestamp 1969 12 31 19 0 0 0 -18000)])
 }
 
-@(examples/results
-  [(query-value mysql-c "select date('1980-12-25')")
-   (make-sql-date 1980 12 25)]
-  [(query-value mysql-c "select time('7:30')")
-   (make-sql-time 7 30 0 0 #f)]
-  [(query-value mysql-c "select from_unixtime(0)")
-   (make-sql-timestamp 1969 12 31 19 0 0 0 #f)])
+@examples/results[
+[(query-value mysql-c "select date('1980-12-25')")
+ (make-sql-date 1980 12 25)]
+[(query-value mysql-c "select time('7:30')")
+ (make-sql-time 7 30 0 0 #f)]
+[(query-value mysql-c "select from_unixtime(0)")
+ (make-sql-timestamp 1969 12 31 19 0 0 0 #f)]
+]
 
 @defproc[(sql-datetime->srfi-date [t (or/c sql-date? sql-time? sql-timestamp?)])
          date?]
@@ -202,121 +252,4 @@ no close analogues in Scheme.
     (query-value psql-c "select timestamp 'epoch'"))
    (sql-datetime->srfi-date (make-sql-timestamp 1970 1 1 0 0 0 0 #f))])
 
-}
-
-@;{
-@section{Creating SQL Strings}
-
-The @scheme[format-sql] and @scheme[concat-sql] macros help construct
-SQL query strings. 
-
-@emph{Note:} Constructing query strings is error-prone and
-dangerous. When possible, use prepared statements or other means
-instead.
-
-@defform/subs[(format-sql format-string ... sql-spec ...)
-              ([sql-spec [type-id expr]
-                          [#:trust expr type-string-expr]
-                          [#:name expr]
-                          [#:Name expr]
-                          [#:sql expr]])]{
-  Encodes each tagged datum to a SQL literal expression and inserts it
-  into the format string. The result is a string. A @scheme[sql-spec] has one
-  of the following forms, categorized by the SQL statement context it
-  is used in:
-
-  SQL literal expressions:
-  @specsubform[[type-id expr]]{
-
-      Converts the result of @scheme[expr] to the SQL type named by
-      @scheme[type-id]. The @scheme[type-id] must be a syntactic
-      identifier naming a SQL type, and @scheme[expr] must evaluate to
-      a value of the appropriate Scheme datatype.
-
-      Example: This code generates a query that returns all numbers 
-      greater than the value of the Scheme variable @scheme[lower-bound]:
-      @schemeblock[
-        (format-sql "select n from the_numbers where n >= ~a"
-                    [int4 lower-bound])
-      ]
-
-      Warning: the type name is not checked. You must avoid specifying
-      type names that contain SQL delimiters such as @litchar{)} or
-      @litchar{--}.
-  }
-  @specsubform[[#:trust expr type-string-expr]]{
-
-      Performs minimal escaping on the value of @scheme[expr], which must be
-      a string that is a suitable external representation for the SQL
-      type named by @scheme[type-string-expr].
-
-      Example: Generates a query for boxes containing the origin:
-      @schemeblock[
-        (format-sql "select b from some_boxes where ~a < b"
-                    [#:trust "(0,0)" "point"])
-      ]
-
-      Warning: the type name is not checked. You must avoid specifying
-      type names that contain SQL delimiters such as @litchar{)} or
-      @litchar{--}.
-  }
-
-  SQL identifiers:
-  @specsubform[[#:name expr]]
-  @specsubform[[#:Name expr]]{
-
-      Quotes a SQL identifier (eg, table name or field name). The
-      expression must produce a string. Using @scheme[#:name] performs
-      the default case conversion on the name. The following are
-      equivalent:
-
-        @scheme[[#:name "table"]] = @scheme[[#:name "TABLE"]] = @scheme[[#:name "TaBlE"]]
-
-      If @scheme[#:Name] is used, the case of the name is preserved.
-
-      Example:
-      @schemeblock[
-        (format-sql "select n from ~a"
-                    [#:name "the_numbers"])
-      ]
-  }
-
-  SQL code:
-  @specsubform[[#:sql expr]]{
-
-      Splices in a string containing arbitrary SQL code. No escaping
-      of is done, but whitespace is added around the spliced code.
-
-      Example:
-      @schemeblock[
-        (format-sql "select n from ~a ~a"
-                    [#:name "the_numbers"]
-                    [#:sql (if only-pos? "where n > 0" "")])
-      ]
-
-  Note: The format string must contain only @litchar{~a} placeholders
-  (using @litchar{~s} placeholders would generally result in invalid
-  SQL). Literal @litchar{~} characters may be written as @litchar{~~}.
-  }
-}
-
-@defform/subs[(concat-sql string-or-sql-spec ...)
-              ([string-or-sql-spec string
-                                    sql-spec])]{
-
-  Composes a SQL string by concatenating the literal strings and the
-  interpretations of the @scheme[sql-spec] (as above; see
-  @scheme[format-sql]).
-
-  Whitespace is added after every fragment. Unlike
-  @scheme[format-sql], the @litchar{~} character has no special
-  meaning within the strings.
-
-  Example:
-  @schemeblock[
-    (concat-sql "select n"
-                "from" [#:name "the_numbers"]
-                [#:sql (if only-pos? "where n > 0" "")])
-  ]
-}
 }

@@ -3,8 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require racket/unit
-         "../generic/sql-data.rkt")
+(require "../generic/sql-data.rkt")
 (provide wire-typeid->type
          known-types+aliases
          type-alias->type

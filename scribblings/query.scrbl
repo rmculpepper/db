@@ -2,7 +2,7 @@
 @(require scribble/manual
           scribble/eval
           scribble/struct
-          scheme/sandbox
+          racket/sandbox
           "config.rkt")
 
 @title[#:tag "query-api"]{Queries}
@@ -75,7 +75,7 @@ or prepared statement, not a statement-binding.
 @examples/results[
 [(query-exec c "insert into some_table values (1, 'a')")
  (void)]
-[(query-exec c "delete from some_table where n = $1" 42)
+[(query-exec pgc "delete from some_table where n = $1" 42)
  (void)]
 ]
 }
@@ -89,8 +89,8 @@ or prepared statement, not a statement-binding.
   list of rows (as vectors) from the query.
 
 @examples/results[
-[(query-rows c "select n, s from some_table where n = $1" 42)
- (list (vector 42 "the answer to life, the universe, and everything"))]
+[(query-rows pgc "select * from the_numbers where n = $1" 2)
+ (list (vector 2 "company"))]
 [(query-rows c "select 17")
  (list (vector 17))]
 ]
@@ -105,7 +105,7 @@ or prepared statement, not a statement-binding.
   column, and returns the list of values from the query.
 
 @examples/results[
-[(query-list c "select n from some_table where n < 2")
+[(query-list c "select n from the_numbers where n < 2")
  (list 0 1)]
 [(query-list c "select 'hello'")
  (list "hello")]
@@ -121,8 +121,8 @@ or prepared statement, not a statement-binding.
   row, and returns its (single) row result as a vector.
 
 @examples/results[
-[(query-row c "select n, s from some_table where n = $1" 42)
- (vector 42 "the answer to life, the universe, and everything")]
+[(query-row myc "select * from the_numbers where n = ?" 2)
+ (vector 2 "company")]
 [(query-row c "select 17")
  (vector 17)]
 ]
@@ -133,11 +133,11 @@ or prepared statement, not a statement-binding.
                           [arg any/c] ...)
          (or/c (vectorof _field) false/c)]{
 
-  Like @scheme[query-row], but the query may produce zero rows; in
-  that case, @scheme[#f] is returned.
+  Like @racket[query-row], but the query may produce zero rows; in
+  that case, @racket[#f] is returned.
 
 @examples/results[
-[(query-maybe-row c "select n, s from some_table where n = $1" 43)
+[(query-maybe-row pgc "select * from the_numbers where n = $1" 100)
  #f]
 [(query-maybe-row c "select 17")
  (vector 17)]
@@ -153,10 +153,10 @@ or prepared statement, not a statement-binding.
   column and exactly one row, and returns its single value result.
 
 @examples/results[
-[(query-value c "select timestamp 'epoch'")
+[(query-value pgc "select timestamp 'epoch'")
  (sql-timestamp 1970 1 1 0 0 0 0 #f)]
-[(query-value c "select s from some_table where n = $1" 42)
- "the answer to life, the universe, and everything"]
+[(query-value pgc "select s from the_numbers where n = $1" 3)
+ "a crowd"]
 ]
 }
 
@@ -165,11 +165,11 @@ or prepared statement, not a statement-binding.
                             [arg any/c] ...)
          (or/c _field false/c)]{
 
-  Like @scheme[query-value], but the query may produce zero rows; in
-  that case, @scheme[#f] is returned.
+  Like @racket[query-value], but the query may produce zero rows; in
+  that case, @racket[#f] is returned.
 
 @examples/results[
-[(query-value c "select s from some_table where n = $1" 43)
+[(query-value myc "select s from some_table where n = ?" 100)
  #f]
 [(query-value c "select 17")
  17]
@@ -181,10 +181,10 @@ or prepared statement, not a statement-binding.
 
 A statement is either a string containing a single non-parameterized
 SQL statement or a statement-binding value returned by
-@scheme[bind-prepared-statement].
+@racket[bind-prepared-statement].
 
-A query result is either a @scheme[simple-result] or a
-@scheme[recordset].
+A query result is either a @racket[simple-result] or a
+@racket[recordset].
 
 @defstruct*[simple-result
             ([info (listof pair?)])]{
@@ -227,7 +227,7 @@ database system and may change in future versions of this library.
 
   Executes queries, returning structures that describe the
   results. Unlike the more specialized query functions,
-  @scheme[query-multiple] supports a mixture of recordset-returning
+  @racket[query-multiple] supports a mixture of recordset-returning
   queries and effect-only queries.
 }
 
@@ -236,18 +236,20 @@ database system and may change in future versions of this library.
          void?]{
 
   Executes SQL statements for effect and discards the result(s).
-  Calling @scheme[query-exec*] on multiple statements at once may be
-  more efficient than calling @scheme[query-exec] multiple times on
+  Calling @racket[query-exec*] on multiple statements at once may be
+  more efficient than calling @racket[query-exec] multiple times on
   the statements individually.
 
   Example:
-  @schemeinput[
+  @racketinput[
     (query-exec* c
-      "create table the_numbers (n integer, name varchar)"
-      "insert into the_numbers (n, name) values (0, 'zero')")]
+      "create table the_numbers (n integer, description varchar)"
+      "insert into the_numbers values (0, 'nothing')"
+      "insert into the_numbers values (1, 'the loneliest number')")
+  ]
 
   @bold{PostgreSQL note}: The set of statements passed to
-  @scheme[query-exec*] are executed within their own
+  @racket[query-exec*] are executed within their own
   ``mini-transaction''; if any statement fails, the effects of all
   previous statements in the set are rolled back.
 
@@ -260,7 +262,7 @@ database system and may change in future versions of this library.
          _alpha]{
 
   Left fold over the results of the query. The arity of
-  @scheme[fold-proc] must include a number one greater than the number
+  @racket[fold-proc] must include a number one greater than the number
   of columns returned by the query.
 }
 
@@ -271,7 +273,7 @@ queries. A parameterized query may be executed any number of times
 with different values for its parameters.
 
 A @deftech{prepared statement} is the result of a call to
-@scheme[prepare] or @scheme[prepare-multiple].
+@racket[prepare] or @racket[prepare-multiple].
 
 The syntax of parameterized queries varies depending on the database
 system. For example:
@@ -303,20 +305,20 @@ SQLite supports both syntaxes and possibly others.
          statement-binding?]{
 
   Fills in the parameters of a parameterized prepared query. The
-  resulting statement can be executed with @scheme[query],
-  @scheme[query-multiple], or any of the other query functions, but it
+  resulting statement can be executed with @racket[query],
+  @racket[query-multiple], or any of the other query functions, but it
   must be used with the same connection that created it.
 
   @(examples/results
     [(let* ([get-name-pst
-            (prepare c "select name from the_numbers where n = $1")]
-            [get-name1
-             (bind-prepared-statement get-name-pst (list 1))]
+            (prepare pgc "select description from the_numbers where n = $1")]
             [get-name2
-             (bind-prepared-statement get-name-pst (list 2))])
-       (list (query-value c get-name1)
-             (query-value c get-name2)))
-     (list "one" "two")])
+             (bind-prepared-statement get-name-pst (list 2))]
+            [get-name3
+             (bind-prepared-statement get-name-pst (list 3))])
+       (list (query-value pgc get-name2)
+             (query-value pgc get-name3)))
+     (list "company" "a crowd")])
 }
 
 @defproc[(prepared-statement? [x any/c]) boolean?]{
@@ -346,60 +348,36 @@ resulting function should be called with zero arguments.
 Prepared-statement functions hold their associated connections
 strongly.
 
+@deftogether[[
 @defproc[(prepare-query-exec [connection connection?]
-                             [prep string?])
-         (_param _... -> void?)]{
-
-  Prepared version of @scheme[query-exec].
-}
-
+                             [stmt string?])
+         (_param _... -> void?)]
 @defproc[(prepare-query-rows [connection connection?]
-                             [prep string?])
-         (_param _... -> (listof (vectorof _field)))]{
-
-  Prepared version of @scheme[query-rows].
-}
-
+                             [stmt string?])
+         (_param _... -> (listof (vectorof _field)))]
 @defproc[(prepare-query-list [connection connection?]
-                             [prep string?])
-         (_param _... -> (listof _field))]{
-
-  Prepared version of @scheme[query-list].
-}
-
+                             [stmt string?])
+         (_param _... -> (listof _field))]
 @defproc[(prepare-query-row [connection connection?]
-                            [prep string?])
-         (_param _... -> (vectorof _field))]{
-
-  Prepared version of @scheme[query-row].
-}
-
+                            [stmt string?])
+         (_param _... -> (vectorof _field))]
 @defproc[(prepare-query-maybe-row [connection connection?]
-                                  [prep string?])
-         (_param _... -> (or/c (vectorof _field) false?))]{
-
-  Prepared version of @scheme[query-maybe-row].
-}
-
+                                  [stmt string?])
+         (_param _... -> (or/c (vectorof _field) false?))]
 @defproc[(prepare-query-value [connection connection?]
-                              [prep string?])
-         (_param _... -> _field)]{
-
-  Prepared version of @scheme[query-value].
-}
-
+                              [stmt string?])
+         (_param _... -> _field)]
 @defproc[(prepare-query-maybe-value [connection connection?]
-                                    [prep string?])
-         (_param _... -> (or/c _field false?))]{
-
-  Prepared version of @scheme[query-maybe-value].
-}
-
+                                    [stmt string?])
+         (_param _... -> (or/c _field false?))]
 @defproc[(prepare-query-fold [connection connection?]
-                             [prep string?]
+                             [stmt string?]
                              [proc (_alpha _field _... -> _alpha)]
                              [init _alpha])
-         (_param _... -> _alpha)]{
+         (_param _... -> _alpha)]]]{
 
-  Prepared version of @scheme[query-fold].
+  Prepared versions of @racket[query-exec], @racket[query-rows],
+  @racket[query-list], @racket[query-row], @racket[query-maybe-row],
+  @racket[query-value], @racket[query-maybe-value], and
+  @racket[query-fold], respectively.
 }

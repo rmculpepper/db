@@ -12,6 +12,9 @@
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'mysql)
 
+    (define/public (typeids->types typeids)
+      (map wire-typeid->type typeids))
+
     (define/public (typeids->type-readers typeids)
       (map (lambda (typeid)
              (let ([type (wire-typeid->type typeid)])
@@ -56,7 +59,7 @@
     ((time) 'time)
     ((datetime) 'datetime)
     ((varchar) 'varchar)
-    ((var-string) 'varstring)
+    ((var-string) 'var-string)
     ((tiny-blob) 'tinyblob)
     ((medium-blob) 'mediumblob)
     ((long-blob) 'longblob)
@@ -68,7 +71,7 @@
     tinyint smallint mediumint int bigint
     float double
     date time datetime
-    varchar varstring
+    varchar var-string
     tinyblob mediumblob longblob blob))
 
 (define known-type-aliases
@@ -108,7 +111,7 @@
     ((date) parse-date)
     ((time) parse-time)
     ((datetime) parse-timestamp)
-    ((varchar varstring) parse-string)
+    ((varchar var-string) parse-string)
     ((tinyblob mediumblob longblob blob) parse-string)
     ;; bit
     ;; enum
@@ -131,7 +134,7 @@
     ((date) marshal-date)
     ((time) marshal-time)
     ((datetime) marshal-timestamp)
-    ((varchar varstring) marshal-string)
+    ((varchar var-string) marshal-string)
     ((tinyblob mediumblob longblob blob) marshal-string)
     ;; bit
     ;; enum

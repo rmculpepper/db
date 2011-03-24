@@ -56,6 +56,9 @@
     ;;                -> (listof symbol)
     get-known-types
 
+    ;; typeids->types : (listof typeid) -> (listof type)
+    typeids->types
+
     ;; typeids->type-readers : (listof typeid) -> (listof (U #f (-> string datum)))
     typeids->type-readers
 
@@ -71,17 +74,13 @@
 (define prepared-statement<%>
   (interface ()
 
-    ;; get-param-count : -> nat/#f
-    get-param-count
+    get-param-count    ;; -> nat or #f
+    get-param-typeids  ;; -> (listof typeid) or #f
+    get-param-types    ;; -> (listof type) or #f
 
-    ;; get-param-types : -> (listof type) or #f
-    get-param-types
-
-    ;; get-result-count : -> number/#f
-    get-result-count
-
-    ;; get-result-types : -> (listof type) or #f
-    get-result-types
+    get-result-count   ;; -> nat or #f
+    get-result-typeids ;; -> (listof typeid) or #f
+    get-result-types   ;; -> (listof type) or #f
 
     ;; bind : (listof param) -> StatementBinding
     bind))

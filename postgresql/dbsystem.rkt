@@ -12,6 +12,9 @@
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'postgresql)
 
+    (define/public (typeids->types typeids)
+      (map typeid->type typeids))
+
     (define/public (typeids->type-readers typeids)
       (map (lambda (typeid)
              (let ([type (typeid->type typeid)])

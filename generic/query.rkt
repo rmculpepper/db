@@ -56,14 +56,19 @@
     (init ([-owner owner]))
 
     (define owner (make-weak-box -owner))
-    (define type-writers
-      (send (send -owner get-dbsystem)
-            typeids->type-writers (map get-fi-type param-infos)))
+    (define dbsystem (send -owner get-dbsystem))
+
+    ;; FIXME: store or recompute?
+    (define param-typeids (map get-fi-type param-infos))
+    (define result-typeids (map get-fi-type result-infos))
+    (define type-writers (send dbsystem typeids->type-writers param-typeids))
 
     (define/public (get-param-count) (length param-infos))
-    (define/public (get-param-types) (map get-fi-type param-infos))
+    (define/public (get-param-typeids) param-typeids)
+    (define/public (get-param-types) (send dbsystem typeids->types param-typeids))
     (define/public (get-result-count) (length result-infos))
-    (define/public (get-result-types) (map get-fi-type result-infos))
+    (define/public (get-result-typeids) result-typeids)
+    (define/public (get-result-types) (send dbsystem typeids->types result-typeids))
 
     (define/public (check-owner c)
       (eq? c (weak-box-value owner)))

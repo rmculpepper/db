@@ -2,6 +2,11 @@
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
+#|
+Based on protocol documentation here:
+  http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
+|#
+
 #lang racket/base
 (require racket/match
          "../generic/sql-data.rkt"
@@ -395,12 +400,53 @@
 
 (define (read-binary-datum in type)
   (case type
+
     ((tiny) (io:read-byte in))
     ((short) (io:read-le-int16 in))
+    ((int24) (io:read-le-int24 in)) ;; or maybe send as long???
     ((long) (io:read-le-int32 in))
     ((longlong) (io:read-le-intN in 8))
-    ((blob var-string) (io:read-length-coded-string in))
-    (else (error 'get-param "unimplemented: ~s" type))))
+    ((varchar var-string) (io:read-length-coded-string in))
+    ((blob) (io:read-length-coded-bytes in))
+
+    ((float)
+     (floating-point-bytes->real (io:read-bytes-as-bytes in 4) #f))
+    ((double)
+     (floating-point-bytes->real (io:read-bytes-as-bytes in 8) #f))
+
+    ((date datetime time timestamp newdate) ;; ???
+     (let* ([bs (io:read-length-coded-bytes in)])
+       ;; format is YYMDhmsNNNN (N = nanoseconds)
+       ;; but trailing zeros can be dropped
+       (define (get-int start len)
+         (if (>= (+ start len) (bytes-length bs))
+             (integer-bytes->integer bs #f start (+ start len))
+             0))
+       (let ([year  (get-int 0 2)]
+             [month (get-int 2 1)]
+             [day   (get-int 3 1)]
+             [hour  (get-int 4 1)]
+             [min   (get-int 5 1)]
+             [sec   (get-int 6 1)]
+             [nsec  (get-int 7 4)])
+         (case type
+           ((date newdate)
+            (sql-date year month day))
+           ((datetime timestamp)
+            (sql-timestamp year month day hour min (+ sec (/ nsec #i1e9)) #f))
+           ((time)
+            (sql-time hour min (+ sec (/ nsec #i1e9)) #f))))))
+
+    ((year) (io:read-le-int16 in))
+
+    ;; FIXME
+    ((decimal newdecimal)
+     (error 'get-param "unimplemented decimal type: ~s" type))
+    ((bit enum set tiny-blob medium-blob long-blob geometry)
+     (error 'get-param "unimplemented type: ~s" type))
+
+    (else
+     (error 'get-param "unknown type: ~s" type))))
 
 (define (write-binary-datum out type param)
   (case type

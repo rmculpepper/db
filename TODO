@@ -3,6 +3,8 @@ To do
 
 - clean up types, conversions, etc
 
+  - bring postgresql's types in line with documented types
+
   - idea: conversion to SQL text type accept multiple racket types,
     because of MySQL's no type inference...
 

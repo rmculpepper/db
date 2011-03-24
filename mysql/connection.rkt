@@ -366,6 +366,8 @@
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
       (cond
+       ;; FIXME: always go through prepared query path, for simplicity
+       ;; and uniformity (because they use different type conversions)
         [(string? stmt)
          (send-message (make-command-packet 'query stmt))]
         [(statement-binding? stmt)
@@ -396,9 +398,8 @@
          (query1:result #f collector)]
         [(statement-binding? stmt)
          (let* ([pst (statement-binding-pst stmt)]
-                [fieldinfos (send pst get-fieldinfos)]
-                [types (map get-fi-type fieldinfos)])
-           (query1:result types collector))]))
+                [field-typeids (send pst get-result-typeids)])
+           (query1:result field-typeids collector))]))
 
     (define/private (query1:result binary? collector)
       (let ([r (recv 'query* 'result)])
@@ -457,7 +458,7 @@
              (new prepared-statement%
                   (id id)
                   (param-infos paraminfos)
-                  (field-infos fieldinfos)
+                  (result-infos fieldinfos)
                   (owner this)))])))
 
     (define/private (prepare1:get-params)

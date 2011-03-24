@@ -17,8 +17,9 @@
 (define sqlite-dbsystem%
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'sqlite3)
-    (define/public (typeids->type-readers) '())
-    (define/public (typeids->type-writers) '())
+    (define/public (typeids->types x) null)
+    (define/public (typeids->type-readers x) null)
+    (define/public (typeids->type-writers x) null)
     (define/public (get-known-types) '())
     (define/public (has-support? x) #f)
     (super-new)))
@@ -51,11 +52,11 @@
       (sqlite3_column_count stmt))
 
     (define/public (get-param-count) param-count)
-    (define/public (get-param-types)
-      (for/list ([i (in-range param-count)]) 'any))
+    (define/public (get-param-typeids) #f)
+    (define/public (get-param-types) #f)
     (define/public (get-result-count) result-count)
-    (define/public (get-result-types)
-      (for/list ([i (in-range result-count)]) 'any))
+    (define/public (get-result-typeids) #f)
+    (define/public (get-result-types) #f)
 
     (define/public (get-stmt) -stmt)
 

@@ -118,24 +118,23 @@
             reverse
             #f)))
 
-(define (recordset->one-row function rs sql)
+(define (recordset->one-row fsym rs sql)
   (define rows (recordset-data rs))
-  (cond [(and (pair? rows) (null? (cdr rows)))
+  (cond [(null? rows)
+         (raise-mismatch-error fsym "query returned zero rows: " sql)]
+        [(null? (cdr rows))
          (car rows)]
-        [else (raise-mismatch-error 
-               function
-               "query did not return exactly one row: "
-               sql)]))
+        [else
+         (raise-mismatch-error fsym "query returned multiple rows: " sql)]))
 
-(define (recordset->maybe-row function rs sql)
+(define (recordset->maybe-row fsym rs sql)
   (define rows (recordset-data rs))
-  (cond [(null? rows) #f]
+  (cond [(null? rows)
+         #f]
         [(and (pair? rows) (null? (cdr rows)))
          (car rows)]
-        [else (raise-mismatch-error 
-               function
-               "query did not return zero or one rows: "
-               sql)]))
+        [else
+         (raise-mismatch-error fsym "query returned multiple rows: " sql)]))
 
 (define (compose-statement who c sql args checktype)
   (cond [(or (pair? args) (prepared-statement? sql))
@@ -217,7 +216,7 @@
 
 ;; query-exec : connection Statement arg ... -> void
 (define (query-exec c sql . args)
-  (let ([sql (compose-statement 'query-exec c sql args 'column)])
+  (let ([sql (compose-statement 'query-exec c sql args #f)])
     (send c query* 'query-exec (list sql) void-collector)
     (void)))
 

@@ -38,9 +38,8 @@ can use a connection simultaneously.
 and Doug Orleans for contributions to @tt{spgsql}, the PostgreSQL-only
 predecessor of this package.
 
+@include-section["overview.scrbl"]
 @include-section["connect.scrbl"]
 @include-section["query.scrbl"]
 @include-section["sql-types.scrbl"]
 @include-section["notes.scrbl"]
-
-@;@include-section["example.scrbl"]

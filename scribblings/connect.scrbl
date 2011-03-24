@@ -5,7 +5,7 @@
           racket/sandbox
           "config.rkt")
 
-@title{Connections}
+@title[#:tag "connect"]{Connections}
 
 @(my-declare-exporting)
 

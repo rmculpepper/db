@@ -243,7 +243,7 @@
 
     ;; connected? : -> boolean
     (define/public (connected?)
-      (and outport #t))
+      (and outport (not (port-closed? outport))))
 
     ;; == System
 

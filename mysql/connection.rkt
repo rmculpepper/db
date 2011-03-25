@@ -99,7 +99,8 @@
            (err next)])
         next))
 
-    (define/public (alive?) #t)
+    (define/public (alive?)
+      (not (port-closed? outport)))
 
     (super-new)))
 

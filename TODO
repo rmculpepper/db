@@ -20,18 +20,11 @@ To do
   convenience function: print-notification takes notification, extracts string, prints
     also print-notification-to-error-port (?)
 
-- eliminate common code (eg, various prepared-statement%)
-
-- sqlite locking?
+- figure out sqlite locking
 
 - sqlite disconnect on custodian shutdown
 
 - postgresql array types
-
-- bug: create connection, shut down managing custodian, ask connected?
-       => output ports may not be shutdown, so says yes but really no
-       Solutions: check that ports are still open (?)
-                  wrap with custodian-box (?)
 
 - disconnect should always work, even on messed-up connections (eg thread killed)
 

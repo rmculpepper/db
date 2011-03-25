@@ -6,6 +6,7 @@
 (require racket/class
          racket/contract
          "../generic/main.rkt"
+         "../generic/check-access.rkt"
          "connection.rkt"
          "ffi.rkt")
 (provide/contract
@@ -23,10 +24,15 @@
                   [(memory) #":memory:"]
                   ;; Private, temporary on-disk
                   [(temporary) #""])]
-               [(relative-path? path-or-sym)
-                (path->bytes (build-path (current-directory) path-or-sym))]
-               [else
-                (path->bytes path-or-sym)])])
+               [(or (path? path-or-sym) (string? path-or-sym))
+                (let ([path (cleanse-path (path->complete-path path-or-sym))])
+                  (scheme_security_check_file "sqlite3-connect"
+                                              path
+                                              (+ SCHEME_GUARD_FILE_READ
+                                                 (case mode
+                                                   ((read-only) 0)
+                                                   (else SCHEME_GUARD_FILE_WRITE))))
+                  path)])])
     (let-values ([(db open-status)
                   (sqlite3_open_v2 path
                                    (case mode

@@ -11,10 +11,7 @@ To do
 
 ----
 
-- finish adding fsym arguments (eg, bind method)
-  - possibly to type-writers also
-
-- add security-guard path checks
+- add fsym arguments to type-writers
 
 - write tests for improved simple query functions
 

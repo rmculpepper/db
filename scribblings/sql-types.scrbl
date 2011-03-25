@@ -25,42 +25,48 @@ accepted as Racket values and converted to the appropriate SQL type.
 
 This sections describes the correspondences between SQL types and
 Racket types for the supported database systems. 
-         
+
 @subsection[#:tag "postgresql-types"]{PostgreSQL}
 
 The following table lists the PostgreSQL types known to this library,
 along with their corresponding Racket representations.
 
 @tabbing{
-  @bold{PostgreSQL type}          @& @bold{Aliases}      @& @bold{Racket type} @//
-  @tt{bigint}                     @& @tt{int8}           @& @scheme[exact-integer?] @//
-  @tt{bigserial}                  @& @tt{serial8}        @& @scheme[exact-integer?] @//
-  @tt{boolean}                    @& @tt{bool}           @& @scheme[boolean?] @//
-  @tt{bytea}                      @& @tt{}               @& @scheme[bytes?] @//
-  @tt{character}                  @& @tt{char}           @& @scheme[string?] @//
-  @tt{date}                       @& @tt{}               @& @scheme[sql-date?] @//
-  @tt{double}                     @& @tt{float8}         @& @scheme[real?] @//
-  @tt{integer}                    @& @tt{int int4}       @& @scheme[exact-integer?] @//
-  @tt{numeric}                    @& @tt{decimal}        @& @scheme[number?] @//
-  @tt{real}                       @& @tt{float4}         @& @scheme[real?] @//
-  @tt{smallint}                   @& @tt{int2}           @& @scheme[exact-integer?] @//
-  @tt{serial}                     @& @tt{serial4}        @& @scheme[exact-integer?] @//
-  @tt{text}                       @& @tt{}               @& @scheme[string?] @//
-  @tt{time-without-time-zone}     @& @tt{time}           @& @scheme[sql-time?] @//
-  @tt{time-with-time-zone}        @& @tt{timetz}         @& @scheme[sql-time?] @//
-  @tt{timestamp-without-time-zone}@& @tt{timestamp}      @& @scheme[sql-timestamp?] @//
-  @tt{timestamp-with-time-zone}   @& @tt{timestamptz}    @& @scheme[sql-timestamp?] @//
-  @tt{varchar}                    @& @tt{}               @& @scheme[string?] @//
-  @tt{oid}                        @& @tt{}               @& @scheme[exact-integer?]
+  @bold{PostgreSQL type} @& @bold{Aliases}      @& @bold{Racket type} @//
+  @tt{bool}          @& @tt{boolean}            @& @scheme[boolean?] @//
+  @tt{char1}         @& @tt{}                   @& @scheme[char?] @//
+  @tt{int2}          @& @tt{smallint}           @& @scheme[exact-integer?] @//
+  @tt{int4}          @& @tt{integer int}        @& @scheme[exact-integer?] @//
+  @tt{int8}          @& @tt{bigint}             @& @scheme[exact-integer?] @//
+  @tt{float4}        @& @tt{real}               @& @scheme[real?] @//
+  @tt{float8}        @& @tt{double}             @& @scheme[real?] @//
+  @tt{numeric}       @& @tt{decimal}            @& @scheme[number?] @//
+  @tt{serial4}       @& @tt{serial}             @& @scheme[exact-integer?] @//
+  @tt{serial8}       @& @tt{bigserial}          @& @scheme[exact-integer?] @//
+  @tt{bpchar}        @& @tt{character}          @& @scheme[string?] @//
+  @tt{varchar}       @& @tt{}                   @& @scheme[string?] @//
+  @tt{bytea}         @& @tt{}                   @& @scheme[bytes?] @//
+  @tt{date}          @& @tt{}                   @& @scheme[sql-date?] @//
+  @tt{text}          @& @tt{}                   @& @scheme[string?] @//
+  @tt{time}          @& @tt{}                   @& @scheme[sql-time?] @//
+  @tt{timetz}        @& @tt{}                   @& @scheme[sql-time?] @//
+  @tt{timestamp}     @& @tt{}                   @& @scheme[sql-timestamp?] @//
+  @tt{timestamptz}   @& @tt{}                   @& @scheme[sql-timestamp?] @//
+  @tt{oid}           @& @tt{}                   @& @scheme[exact-integer?]
 }
 
-A SQL value of type @tt{numeric} (aka @tt{decimal}) is always
-converted to either an exact rational or @scheme[+nan.0]. When
-converting Scheme values to SQL @tt{numeric}, exact rational values
-representable by finite decimal strings are converted without loss of
-precision. (Precision may be lost, of course, if the value is then
-stored in a database field of lower precision.) Other real values are
-converted to decimals with a loss of precision.
+The type name @tt{bpchar} corresponds to the standard SQL blank-padded
+string type written @tt{character} and abbreviated @tt{char}. The type
+@tt{char1} is a one-byte integer type written @tt{"char"} in PostgreQL
+syntax (the quotation marks are significant).
+
+A SQL value of type @tt{numeric} is always converted to either an
+exact rational or @scheme[+nan.0]. When converting Scheme values to
+SQL @tt{numeric}, exact rational values representable by finite
+decimal strings are converted without loss of precision. (Precision
+may be lost, of course, if the value is then stored in a database
+field of lower precision.) Other real values are converted to decimals
+with a loss of precision.
 
 @examples/results[
 [(query-value pgc "select real '+Infinity'")
@@ -74,8 +80,7 @@ various geometric shapes. These are currently converted to and from
 Racket strings, but future versions of this library may include new
 type correspondences and conversions.
 
-Array types are also not currently supported. Support may be added in
-a future version.
+Array types are not currently supported.
 
 @examples/results[
 [(query-value pgc "select point (1,2)") "(1,2)"]
@@ -88,36 +93,36 @@ See also date and time examples in @secref{sql-data}.
 @subsection[#:tag "mysql-types"]{MySQL}
 
 The following table lists the MySQL types known to this package, along
-with their corresponding Racket representations. The type name as
-listed generally corresponds to the SQL notation with spaces replaced
-by dashes.
+with their corresponding Racket representations.
 
 @tabbing{
-  @bold{MySQL type}                @& @bold{Aliases}      @& @bold{Racket type} @//
-  @tt{integer}                     @& @tt{int long}       @& @scheme[exact-integer?] @//
-  @tt{tinyint}                     @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{smallint}                    @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{mediumint}                   @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{biginteger}                  @& @tt{bigint}         @& @scheme[exact-integer?] @//
-  @tt{real}                        @& @tt{float}          @& @scheme[real?] @//
-  @tt{double-precision}            @& @tt{double}         @& @scheme[real?] @//
-  @tt{numeric}                     @& @tt{decimal}        @& @scheme[number?] @//
-  @tt{character-varying}           @& @tt{varchar}        @& @scheme[string?] @//
-  @tt{date}                        @& @tt{}               @& @scheme[sql-date?] @//
-  @tt{time-without-time-zone}      @& @tt{time}           @& @scheme[sql-time?] @//
-  @tt{timestamp-without-time-zone} @& @tt{datetime}       @& @scheme[sql-timestamp?]
+  @bold{MySQL type}  @& @bold{Aliases}                   @& @bold{Racket type} @//
+  @tt{int}           @& @tt{integer}                     @& @scheme[exact-integer?] @//
+  @tt{tinyint}       @& @tt{}                            @& @scheme[exact-integer?] @//
+  @tt{smallint}      @& @tt{}                            @& @scheme[exact-integer?] @//
+  @tt{mediumint}     @& @tt{}                            @& @scheme[exact-integer?] @//
+  @tt{biginteger}    @& @tt{bigint}                      @& @scheme[exact-integer?] @//
+  @tt{float}         @& @tt{real}                        @& @scheme[real?] @//
+  @tt{double}        @& @tt{}                            @& @scheme[real?] @//
+  @tt{decimal}       @& @tt{numeric}                     @& @scheme[number?] @//
+  @tt{varchar}       @& @tt{}                            @& @scheme[string?] @//
+  @tt{var-string}    @& @tt{}                            @& @scheme[string?], but see below @//
+  @tt{date}          @& @tt{}                            @& @scheme[sql-date?] @//
+  @tt{time}          @& @tt{}                            @& @scheme[sql-time?] @//
+  @tt{datetime}      @& @tt{}                            @& @scheme[sql-timestamp?]
+@;{FIXME: blob types?}
 }
 
 MySQL does not infer parameter types in prepared queries, instead
-assigning them the pseudotype @tt{var-string}. Consequently,
-conversion of Racket values to @tt{var-string} parameters accepts, in
-addition to strings, numbers (@racket[rational?]---no infinities or
-NaN) and SQL date/time structures (@racket[sql-date?],
-@racket[sql-time?], and @racket[sql-timestamp?]).
+assigning them the type @tt{var-string}. Consequently, conversion of
+Racket values to @tt{var-string} parameters accepts, in addition to
+strings, numbers (@racket[rational?]---no infinities or NaN) and SQL
+date/time structures (@racket[sql-date?], @racket[sql-time?], and
+@racket[sql-timestamp?]).
 
-A SQL value of type @tt{numeric} (aka @tt{decimal}) is always
+A SQL value of type @tt{decimal} (aka @tt{numeric}) is always
 converted to an exact rational (MySQL seems not to support infinite
-@tt{numeric} values).
+@tt{decimal} values).
 
 See also date and time examples in @secref{sql-data}.
 
@@ -125,9 +130,7 @@ See also date and time examples in @secref{sql-data}.
 @subsection[#:tag "sqlite-types"]{SQLite}
 
 The following table lists the SQLite types known to this package,
-along with their corresponding Racket representations. The type name
-as listed generally corresponds to the SQL notation with spaces
-replaced by dashes.
+along with their corresponding Racket representations.
 
 Unlike PostgreSQL and MySQL, SQLite does not enforce declared type
 constraints (with the exception of integer primary keys). Rather,
@@ -165,7 +168,7 @@ query results. The @scheme[sql-null] value may be recognized using
 @scheme[eq?].
 
 @(examples/results
-  [(query-value psql-c "select NULL")
+  [(query-value c "select NULL")
    sql-null])
 }
 
@@ -202,22 +205,22 @@ no existing close analogues.
   microsecond precision.
 
 @(examples/results
-  [(query-value psql-c "select date '25-dec-1980'")
+  [(query-value pgc "select date '25-dec-1980'")
    (make-sql-date 1980 12 25)]
-  [(query-value psql-c "select time '7:30'")
+  [(query-value pgc "select time '7:30'")
    (make-sql-time 7 30 0 0 #f)]
-  [(query-value psql-c "select timestamp 'epoch'")
+  [(query-value pgc "select timestamp 'epoch'")
    (make-sql-timestamp 1970 1 1 0 0 0 0 #f)]
-  [(query-value psql-c "select timestamp with time zone 'epoch'")
+  [(query-value pgc "select timestamp with time zone 'epoch'")
    (make-sql-timestamp 1969 12 31 19 0 0 0 -18000)])
 }
 
 @examples/results[
-[(query-value mysql-c "select date('1980-12-25')")
+[(query-value myc "select date('1980-12-25')")
  (make-sql-date 1980 12 25)]
-[(query-value mysql-c "select time('7:30')")
+[(query-value myc "select time('7:30')")
  (make-sql-time 7 30 0 0 #f)]
-[(query-value mysql-c "select from_unixtime(0)")
+[(query-value myc "select from_unixtime(0)")
  (make-sql-timestamp 1969 12 31 19 0 0 0 #f)]
 ]
 
@@ -241,14 +244,14 @@ no existing close analogues.
 
 @(examples/results
   [(sql-datetime->srfi-date
-    (query-value psql-c "select time '7:30'"))
+    (query-value pgc "select time '7:30'"))
    (sql-datetime->srfi-date (make-sql-time 7 30 0 0 #f))]
   [(sql-datetime->srfi-date
-    (query-value psql-c "select date '25-dec-1980'"))
+    (query-value pgc "select date '25-dec-1980'"))
    (sql-datetime->srfi-date
     (make-sql-date 1980 12 25))]
   [(sql-datetime->srfi-date
-    (query-value psql-c "select timestamp 'epoch'"))
+    (query-value pgc "select timestamp 'epoch'"))
    (sql-datetime->srfi-date (make-sql-timestamp 1970 1 1 0 0 0 0 #f))])
 
 }

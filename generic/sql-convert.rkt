@@ -17,6 +17,7 @@ No conversion may be passed sql-null.
 |#
 
 (provide parse-string
+         parse-char1
          parse-bytea
          parse-integer
          parse-real
@@ -29,6 +30,9 @@ No conversion may be passed sql-null.
          parse-timestamp-tz)
 
 (define (parse-string s) s)
+
+(define (parse-char1 s)
+  (string-ref s 0))
 
 (define (parse-bytea s)
   (define (decode in out)
@@ -154,6 +158,7 @@ No conversion may be passed sql-null.
 
 (provide marshal-string
          marshal-ascii-string
+         marshal-char1
          marshal-bytea
          marshal-integer
          marshal-int1
@@ -185,6 +190,11 @@ No conversion may be passed sql-null.
     (unless (<= 0 (char->integer (string-ref s i)) 127)
       (marshal-error "ascii-string" s)))
   s)
+
+(define (marshal-char1 c)
+  (unless (and (char? c) (< (char->integer c) 128))
+    (marshal-error "char1"))
+  (string c))
 
 (define (marshal-bytea s)
   (unless (bytes? s)

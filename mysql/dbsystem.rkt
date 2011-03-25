@@ -80,12 +80,7 @@
     tinyblob mediumblob longblob blob))
 
 (define known-type-aliases
-  '(integer biginteger
-    real double-precision
-    numeric
-    character-varying
-    time-without-time-zone
-    timestamp timestamp-without-time-zone))
+  '(integer real numeric))
 
 (define known-types+aliases
   (append known-type-aliases known-types))
@@ -95,15 +90,8 @@
 (define (type-alias->type alias)
   (case alias
     ((integer) 'int)
-    ((biginteger) 'bigint)
     ((real) 'float)
-    ((double-precision) 'double)
     ((numeric) 'decimal)
-    ((character-varying) 'varchar)
-    ((time-without-time-zone) 'time)
-    ;; ((time-with-time-zone) 'timetz) ???
-    ((timestamp timestamp-without-time-zone) 'datetime) ;; ???
-    ;; ((timestamp-with-time-zone) 'timestamptz) ???
     (else alias)))
 
 ;; FIXME: Only non-param'd query path uses type-readers;

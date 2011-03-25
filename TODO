@@ -3,8 +3,6 @@ To do
 
 - clean up types, conversions, etc
 
-  - bring postgresql's types in line with documented types
-
   - permit types in param'd queries (would fix mysql issue)
   - permit extra conversions on result fields...
     (eg, in SQLite, explicitly specify "date" conversion)
@@ -30,6 +28,8 @@ To do
 - sqlite locking?
 
 - sqlite disconnect on custodian shutdown
+
+- postgresql array types
 
 - bug: create connection, shut down managing custodian, ask connected?
        => output ports may not be shutdown, so says yes but really no

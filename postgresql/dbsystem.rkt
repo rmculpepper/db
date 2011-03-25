@@ -56,18 +56,20 @@
     float real
     double
     decimal
+    #|
     time-without-time-zone
     time-with-time-zone
     timestamp-without-time-zone
-    timestamp-with-time-zone))
+    timestamp-with-time-zone
+    |#))
 
 (define known-types
   '(int2 int4 int8 tid xid cid oid
     float4 float8
     numeric
-    text varchar char
+    text varchar bpchar
     bytea
-    bool
+    bool char1
     date
     time
     timetz
@@ -81,19 +83,20 @@
 (define (type-alias->type alias)
   (case alias
     ((boolean) 'bool)
-    ((character) 'char)
+    ((character) 'bpchar)
     ((string) 'text)
     ((smallint) 'int2)
     ((integer int serial serial4) 'int4)
     ((bigint serial8) 'int8)
     ((float real) 'float4)
-    ((double double-precision) 'float8)
+    ((double) 'float8)
     ((decimal) 'numeric)
-    ((character-varying) 'varchar)
+    #|
     ((time-without-time-zone) 'time)
     ((time-with-time-zone) 'timetz)
     ((timestamp-without-time-zone) 'timestamp)
     ((timestamp-with-time-zone) 'timestamptz)
+    |#
     (else alias)))
 
 ;; type->type-reader : symbol -> (string -> datum) or #f
@@ -102,9 +105,10 @@
     [(int2 int4 int8 tid xid cid oid) parse-integer]
     [(float4 float8) parse-real]
     [(numeric) parse-decimal]
-    [(text varchar char) parse-string]
+    [(text varchar bpchar) parse-string]
     [(bytea) parse-bytea]
     [(bool) parse-boolean]
+    [(char1) parse-char1]
     [(date) parse-date]
     [(time) parse-time]
     [(timetz) parse-time-tz]
@@ -123,6 +127,7 @@
     [(text varchar char) marshal-string]
     [(bytea) marshal-bytea]
     [(bool) marshal-bool]
+    [(char1) marshal-char1]
     [(date) marshal-date]
     [(time) marshal-time]
     [(timetz) marshal-time-tz]
@@ -137,7 +142,7 @@
   (case typeid
     ((16) 'bool)
     ((17) 'bytea)
-    ((18) 'char)
+    ((18) 'char1)
     ((19) 'name)
     ((20) 'int8)
     ((21) 'int2)
@@ -163,7 +168,7 @@
   (case type
     ((bool) 16)
     ((bytea) 17)
-    ((char) 18)
+    ((char1) 18)
     ((name) 19)
     ((int8) 20)
     ((int2) 21)

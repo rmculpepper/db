@@ -29,13 +29,13 @@
 
 ;; ----
 
-(define statement-will-executor (make-will-executor))
+(define will-executor (make-will-executor))
 
-(define statement-finalizer-thread
+(define finalizer-thread
   (thread/suspend-to-kill
    (lambda ()
      (let loop ()
-       (will-execute statement-will-executor)
+       (will-execute will-executor)
        (loop)))))
 
 (define prepared-statement%
@@ -220,8 +220,8 @@
                          (stmt stmt)
                          (owner this))])
            (hash-set! statement-table pst #t)
-           (thread-resume statement-finalizer-thread)
-           (will-register statement-will-executor pst (lambda (pst) (send pst finalize)))
+           (thread-resume finalizer-thread)
+           (will-register will-executor pst (lambda (pst) (send pst finalize)))
            pst))))
 
     (define/public (disconnect)
@@ -238,7 +238,18 @@
 
     (super-new)
 
-    (register-finalizer this (lambda (obj) (send obj disconnect)))))
+    (register-finalizer this (lambda (obj) (send obj disconnect)))
+
+    #|
+    (define custodian-shutdown-trick
+      ;; When the custodian is shutdown, the box is emptied, and the
+      ;; dummy box becomes unreachable, triggering the finalizer.
+      (make-custodian-box
+       (current-custodian)
+       (let ([dummy (box this)])
+         (register-finalizer dummy (lambda (dummy) (send (unbox dummy) disconnect)))
+         dummy)))
+    |#))
 
 ;; ----------------------------------------
 

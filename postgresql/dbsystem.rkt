@@ -54,9 +54,8 @@
     integer int serial serial4
     bigint serial8
     float real
-    double double-precision
+    double
     decimal
-    character-varying
     time-without-time-zone
     time-with-time-zone
     timestamp-without-time-zone

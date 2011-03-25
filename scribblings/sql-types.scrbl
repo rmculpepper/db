@@ -29,9 +29,7 @@ Racket types for the supported database systems.
 @subsection[#:tag "postgresql-types"]{PostgreSQL}
 
 The following table lists the PostgreSQL types known to this library,
-along with their corresponding Racket representations. The type name
-as listed generally corresponds to the SQL notation with spaces
-replaced by dashes.
+along with their corresponding Racket representations.
 
 @tabbing{
   @bold{PostgreSQL type}          @& @bold{Aliases}      @& @bold{Racket type} @//
@@ -39,10 +37,9 @@ replaced by dashes.
   @tt{bigserial}                  @& @tt{serial8}        @& @scheme[exact-integer?] @//
   @tt{boolean}                    @& @tt{bool}           @& @scheme[boolean?] @//
   @tt{bytea}                      @& @tt{}               @& @scheme[bytes?] @//
-  @tt{character-varying}          @& @tt{varchar}        @& @scheme[string?] @//
   @tt{character}                  @& @tt{char}           @& @scheme[string?] @//
   @tt{date}                       @& @tt{}               @& @scheme[sql-date?] @//
-  @tt{double-precision}           @& @tt{double float8}  @& @scheme[real?] @//
+  @tt{double}                     @& @tt{float8}         @& @scheme[real?] @//
   @tt{integer}                    @& @tt{int int4}       @& @scheme[exact-integer?] @//
   @tt{numeric}                    @& @tt{decimal}        @& @scheme[number?] @//
   @tt{real}                       @& @tt{float4}         @& @scheme[real?] @//
@@ -53,6 +50,7 @@ replaced by dashes.
   @tt{time-with-time-zone}        @& @tt{timetz}         @& @scheme[sql-time?] @//
   @tt{timestamp-without-time-zone}@& @tt{timestamp}      @& @scheme[sql-timestamp?] @//
   @tt{timestamp-with-time-zone}   @& @tt{timestamptz}    @& @scheme[sql-timestamp?] @//
+  @tt{varchar}                    @& @tt{}               @& @scheme[string?] @//
   @tt{oid}                        @& @tt{}               @& @scheme[exact-integer?]
 }
 
@@ -95,19 +93,19 @@ listed generally corresponds to the SQL notation with spaces replaced
 by dashes.
 
 @tabbing{
-  @bold{MySQL type}               @& @bold{Aliases}      @& @bold{Racket type} @//
-  @tt{integer}                    @& @tt{int long}       @& @scheme[exact-integer?] @//
-  @tt{tinyint}                    @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{smallint}                   @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{mediumint}                  @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{biginteger}                 @& @tt{bigint}         @& @scheme[exact-integer?] @//
-  @tt{real}                       @& @tt{float}          @& @scheme[real?] @//
-  @tt{double-precision}           @& @tt{double}         @& @scheme[real?] @//
-  @tt{numeric}                    @& @tt{decimal}        @& @scheme[number?] @//
-  @tt{character-varying}          @& @tt{varchar}        @& @scheme[string?] @//
-  @tt{date}                       @& @tt{}               @& @scheme[sql-date?] @//
-  @tt{time-without-time-zone}     @& @tt{time}           @& @scheme[sql-time?] @//
-  @tt{timestamp-without-time-zone}@& @tt{datetime}       @& @scheme[sql-timestamp?]
+  @bold{MySQL type}                @& @bold{Aliases}      @& @bold{Racket type} @//
+  @tt{integer}                     @& @tt{int long}       @& @scheme[exact-integer?] @//
+  @tt{tinyint}                     @& @tt{}               @& @scheme[exact-integer?] @//
+  @tt{smallint}                    @& @tt{}               @& @scheme[exact-integer?] @//
+  @tt{mediumint}                   @& @tt{}               @& @scheme[exact-integer?] @//
+  @tt{biginteger}                  @& @tt{bigint}         @& @scheme[exact-integer?] @//
+  @tt{real}                        @& @tt{float}          @& @scheme[real?] @//
+  @tt{double-precision}            @& @tt{double}         @& @scheme[real?] @//
+  @tt{numeric}                     @& @tt{decimal}        @& @scheme[number?] @//
+  @tt{character-varying}           @& @tt{varchar}        @& @scheme[string?] @//
+  @tt{date}                        @& @tt{}               @& @scheme[sql-date?] @//
+  @tt{time-without-time-zone}      @& @tt{time}           @& @scheme[sql-time?] @//
+  @tt{timestamp-without-time-zone} @& @tt{datetime}       @& @scheme[sql-timestamp?]
 }
 
 MySQL does not infer parameter types in prepared queries, instead

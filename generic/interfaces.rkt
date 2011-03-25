@@ -82,7 +82,7 @@
     get-result-typeids ;; -> (listof typeid) or #f
     get-result-types   ;; -> (listof type) or #f
 
-    ;; bind : (listof param) -> StatementBinding
+    ;; bind : symbol (listof param) -> StatementBinding
     bind))
 
 ;; A statement is one of:

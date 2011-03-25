@@ -73,8 +73,8 @@
     (define/public (check-owner c)
       (eq? c (weak-box-value owner)))
 
-    (define/public (bind params)
-      (check-param-count params param-infos)
+    (define/public (bind fsym params)
+      (check-param-count fsym params param-infos)
       (let* ([params
               (map (lambda (tw p)
                      (cond [(sql-null? p) sql-null]
@@ -83,11 +83,10 @@
                    params)])
         (statement-binding this #f params)))
 
-    (define/private (check-param-count params param-infos)
+    (define/private (check-param-count fsym params param-infos)
       (define len (length params))
       (define tlen (length param-infos))
       (when (not (= len tlen))
-        (error 'bind-prepared-statement
-               "prepared statement requires ~s parameters, given ~s" tlen len)))
+        (error fsym "prepared statement requires ~s parameters, given ~s" tlen len)))
 
     (super-new)))

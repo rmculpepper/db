@@ -37,7 +37,7 @@
   (is-a? x prepared-statement<%>))
 
 (define (bind-prepared-statement pst params)
-  (send pst bind params))
+  (send pst bind 'bind-prepared-statement params))
 
 (define (prepared-statement-parameter-types pst)
   (send pst get-param-types))
@@ -63,10 +63,10 @@
             "query did not return recordset: " sql)])))
 
 ;; -fold : connection symbol Statement ('a fieldv -> 'a) 'a -> 'a
-(define (-fold c function sql f base)
+(define (-fold c fsym sql f base)
   (recordset-data
    (query/recordset c
-                    function
+                    fsym
                     sql
                     (mk-folding-collector base f))))
 
@@ -140,7 +140,7 @@
         [else
          (raise-mismatch-error fsym "query returned multiple rows: " sql)]))
 
-(define (compose-statement who c sql args checktype)
+(define (compose-statement fsym c sql args checktype)
   (cond [(or (pair? args) (prepared-statement? sql))
          (let ([pst
                 (cond [(string? sql) (prepare c sql)]
@@ -148,17 +148,17 @@
                        ;; Ownership check done later, by query* method.
                        sql]
                       [(statement-binding? sql)
-                       (error who
+                       (error fsym
                               (string-append "expected string or prepared statement "
                                              "for SQL statement with arguments, got ~e")
                               sql)])])
            (case checktype
              ((recordset)
-              (check-results who pst sql))
+              (check-results fsym pst sql))
              ((column)
-              (check-results/one-column who pst sql))
+              (check-results/one-column fsym pst sql))
              (else (void)))
-           (send pst bind args))]
+           (send pst bind fsym args))]
         [else ;; no args, and sql is either string or statement-binding
          sql]))
 

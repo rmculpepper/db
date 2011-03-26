@@ -1,15 +1,13 @@
 To do
 =====
 
-- write tests for improved simple query functions
+- test, export, and doc kill-safe wrapper
 
 - permit type annotations for
   - query params (would help mysql)
   - extra conversions on result fields (eg sqlite, specify date field)
 
 - sqlite: opportunistic conversions based on decltype (eg date, time)
-
-- test, export, and doc kill-safe wrapper
 
 - add fsym arguments to type-writers
 
@@ -18,3 +16,7 @@ To do
 - postgresql array types
 
 - disconnect should always work, even on messed-up connections (eg thread killed)
+
+----
+
+bug: bad behavior on postgresql bad password

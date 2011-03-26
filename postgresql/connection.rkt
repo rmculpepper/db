@@ -241,19 +241,20 @@
     ;; If politely? = #t, lock is not already held.
     ;; If politely? = #f, lock is already held.
     (define/public (disconnect* politely?)
-      (when politely?
-        (lock 'disconnect)
-        (send-message (make-Terminate)))
-      (when DEBUG-SENT-MESSAGES
-        (fprintf (current-error-port) "  ** Disconnecting\n"))
-      (when inport
-        (close-input-port inport)
-        (set! inport #f))
-      (when outport
-        (close-output-port outport)
-        (set! outport #f))
-      (when politely?
-        (unlock)))
+      (when (connected?)
+        (when politely?
+          (lock 'disconnect)
+          (send-message (make-Terminate)))
+        (when DEBUG-SENT-MESSAGES
+          (fprintf (current-error-port) "  ** Disconnecting\n"))
+        (when inport
+          (close-input-port inport)
+          (set! inport #f))
+        (when outport
+          (close-output-port outport)
+          (set! outport #f))
+        (when politely?
+          (unlock))))
 
     ;; connected? : -> boolean
     (define/public (connected?)

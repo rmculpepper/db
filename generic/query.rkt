@@ -52,8 +52,8 @@
 ;; prepared-statement-base%
 (define prepared-statement-base%
   (class* object% (prepared-statement<%>)
-    (init-private param-infos
-                  result-infos)
+    (init-private param-infos   ;; list
+                  result-infos) ;; list or #f
     (init ([-owner owner]))
 
     (define owner (make-weak-box -owner))
@@ -61,15 +61,16 @@
 
     ;; FIXME: store or recompute?
     (define param-typeids (map get-fi-type param-infos))
-    (define result-typeids (map get-fi-type result-infos))
+    (define result-typeids (and result-infos (map get-fi-type result-infos)))
     (define type-writers (send dbsystem typeids->type-writers param-typeids))
 
     (define/public (get-param-count) (length param-infos))
     (define/public (get-param-typeids) param-typeids)
     (define/public (get-param-types) (send dbsystem typeids->types param-typeids))
-    (define/public (get-result-count) (length result-infos))
+    (define/public (get-result-count) (and result-infos (length result-infos)))
     (define/public (get-result-typeids) result-typeids)
-    (define/public (get-result-types) (send dbsystem typeids->types result-typeids))
+    (define/public (get-result-types)
+      (and result-infos (send dbsystem typeids->types result-typeids)))
 
     (define/public (check-owner c)
       (eq? c (weak-box-value owner)))

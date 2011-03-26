@@ -12,7 +12,7 @@
 This section describes functions for creating connections as well as
 administrative functions for managing connections.
 
-@section[#:tag "connect"]{Creating connections}
+@section{Creating connections}
 
 Connections are made using the following functions.
 

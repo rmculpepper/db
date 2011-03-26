@@ -1,10 +1,9 @@
-;; Copyright 2000-2010 Ryan Culpepper
+;; Copyright 2000-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require racket/class
-         racket/unit
+(require racket/unit
          "../generic/signatures.rkt"
          "../generic/functions.rkt")
 (provide test^
@@ -53,7 +52,7 @@
   (define (connect-and-setup)
     (let [(cx (connect-for-test))]
       (query-exec cx
-         "create temporary table the_numbers (N integer primary key, description text)")
+         "create temporary table the_numbers (N integer primary key, descr text)")
       (for-each (lambda (p)
                   (query-exec cx
                               (format "insert into the_numbers values (~a, '~a')"

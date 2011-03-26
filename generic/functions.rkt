@@ -288,7 +288,7 @@
      (define (name c sql arg ...)
        (let ([pst (car (send c prepare* 'name (list sql)))])
          (check 'name pst sql) ...
-         (lambda args (method c (send pst bind args) arg ...))))]))
+         (lambda args (method c (send pst bind 'name args) arg ...))))]))
 
 (define (check-results name pst stmt)
   (unless (send pst get-result-count)

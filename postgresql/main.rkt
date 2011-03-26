@@ -1,4 +1,4 @@
-;; Copyright 2000-2010 Ryan Culpepper
+;; Copyright 2000-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
@@ -62,29 +62,28 @@
       (raise-user-error 'connect
                         (string-append
                          "cannot specify more than one of server/port, "
-                         "socket, or input-port/output-port arguments"))))
-  (when (or input-port output-port)
-    (unless (and input-port output-port)
-      (raise-user-error 'connect
-                        "must give input-port and output-port arguments together")))
-  (let ([c (new (mixin connection%)
-                (notice-handler notice-handler)
-                (notification-handler notification-handler)
-                (allow-cleartext-password? allow-cleartext-password?))])
-    (send c set-ssl-options ssl ssl-encrypt)
-    (cond [socket
-           (let-values ([(in out) (unix-socket-connect socket)])
-             (send c attach-to-ports in out))]
-          [input-port
-           (send c attach-to-port input-port output-port)]
-          [else
-           (let ([server (or server "localhost")]
-                 [port (or port 5432)])
-             (let-values ([(in out) (tcp-connect server port)])
-               (send c attach-to-ports in out)))])
-    (send c start-connection-protocol database user password)
-    c))
-
+                         "socket, or input-port/output-port arguments")))
+    (when (or input-port output-port)
+      (unless (and input-port output-port)
+        (raise-user-error 'connect
+                          "must give input-port and output-port arguments together")))
+    (let ([c (new (mixin connection%)
+                  (notice-handler notice-handler)
+                  (notification-handler notification-handler)
+                  (allow-cleartext-password? allow-cleartext-password?))])
+      (send c set-ssl-options ssl ssl-encrypt)
+      (cond [socket
+             (let-values ([(in out) (unix-socket-connect socket)])
+               (send c attach-to-ports in out))]
+            [input-port
+             (send c attach-to-port input-port output-port)]
+            [else
+             (let ([server (or server "localhost")]
+                   [port (or port 5432)])
+               (let-values ([(in out) (tcp-connect server port)])
+                 (send c attach-to-ports in out)))])
+      (send c start-connection-protocol database user password)
+      c)))
 
 (define socket-paths
   '("/var/run/postgresql/.s.PGSQL.5432"))
@@ -101,9 +100,9 @@
            "notice: ~a (SQL code ~a)\n" message code))
 
 ;; make-print-notification : output-port -> string string -> void
-(define ((make-print-notification out) condition message)
+(define ((make-print-notification out) condition)
   (fprintf (case out
              ((output) (current-output-port))
              ((error) (current-error-port))
              (else out))
-           "notification ~a: ~a\n" condition info))
+           "notification: ~a\n" condition))

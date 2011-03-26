@@ -30,7 +30,7 @@ Connections are made using the following functions.
                          (-> string? string? any))]
                   [#:notification-handler notification-handler
                    (or/c 'output 'error output-port?
-                         (-> string? string? any))])
+                         (-> string? any))])
          connection?]{
 
   Creates a connection to a PostgreSQL server. The
@@ -75,11 +75,12 @@ Connections are made using the following functions.
   @racket[notice-handler] function takes two string arguments: the
   condition's SQL code and a message. The
   @racket[notification-handler] is called in response to an event
-  notification (see the @tt{LISTEN} and @tt{NOTIFY} statements). The
-  default behavior for both handlers is to print a message to the
-  current error port; a value of @racket['output] sends the messages
-  to the current output port instead, and an output port sends the
-  value to that output port.
+  notification (see the @tt{LISTEN} and @tt{NOTIFY} statements); its
+  argument is the name of the event as a string. The default behavior
+  for both handlers is to print a message to the current error port; a
+  value of @racket['output] sends the messages to the current output
+  port instead, and an output port sends the value to that output
+  port.
 
   If the connection cannot be made, an exception is raised.
 

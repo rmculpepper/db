@@ -107,8 +107,8 @@
            [outport #f]
            [process-id #f]
            [secret-key #f])
-    (init-field [notice-callback void]
-                [notification-callback void])
+    (init-field [notice-handler void]
+                [notification-handler void])
     (define wlock (make-semaphore 1))
 
     ;; Delay async handler calls until unlock.
@@ -226,7 +226,7 @@
     (define/public (handle-notification condition info)
       (set! delayed-handler-calls
             (cons (lambda ()
-                    (notification-handler condition info))
+                    (notification-handler condition))
                   delayed-handler-calls)))
 
     ;; == Connection management

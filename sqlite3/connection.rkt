@@ -68,7 +68,7 @@
         (raise-user-error 'bind-prepared-statement
                           "prepared statement requires ~s arguments, given ~s"
                           param-count (length params)))
-      (statement-binding this params))
+      (statement-binding this #f params))
 
     (define/public (finalize)
       (call-as-atomic

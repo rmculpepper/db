@@ -1,19 +1,17 @@
 To do
 =====
 
-- clean up types, conversions, etc
+- write tests for improved simple query functions
 
-  - permit types in param'd queries (would fix mysql issue)
-  - permit extra conversions on result fields...
-    (eg, in SQLite, explicitly specify "date" conversion)
+- permit type annotations for
+  - query params (would help mysql)
+  - extra conversions on result fields (eg sqlite, specify date field)
 
-  - sqlite: add optional conversions based on decltype (eg, date, time)
+- sqlite: opportunistic conversions based on decltype (eg date, time)
 
-----
+- test, export, and doc kill-safe wrapper
 
 - add fsym arguments to type-writers
-
-- write tests for improved simple query functions
 
 - connection-set-notify-callback!, etc; notification struct types
   also, connection option, defaults to void
@@ -22,10 +20,6 @@ To do
 
 - figure out sqlite locking
 
-- sqlite disconnect on custodian shutdown
-
 - postgresql array types
 
 - disconnect should always work, even on messed-up connections (eg thread killed)
-
-- create abstraction that combined finalizer with custodian management (?)

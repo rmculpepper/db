@@ -5,7 +5,8 @@
 #lang racket/base
 (require racket/contract
          racket/class
-         "interfaces.rkt")
+         "interfaces.rkt"
+         "query.rkt")
 
 ;; == Administrative procedures
 

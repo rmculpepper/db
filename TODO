@@ -13,11 +13,6 @@ To do
 
 - add fsym arguments to type-writers
 
-- connection-set-notify-callback!, etc; notification struct types
-  also, connection option, defaults to void
-  convenience function: print-notification takes notification, extracts string, prints
-    also print-notification-to-error-port (?)
-
 - figure out sqlite locking
 
 - postgresql array types

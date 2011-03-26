@@ -12,7 +12,7 @@
 This section describes functions for creating connections as well as
 administrative functions for managing connections.
 
-@section{Creating connections}
+@section[#:tag "connect"]{Creating connections}
 
 Connections are made using the following functions.
 
@@ -24,7 +24,13 @@ Connections are made using the following functions.
                   [#:password password (or/c string? false/c) #f]
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
-                  [#:ssl ssl (symbols 'yes 'optional 'no) 'no])
+                  [#:ssl ssl (symbols 'yes 'optional 'no) 'no]
+                  [#:notice-handler notice-handler
+                   (or/c 'output 'error output-port?
+                         (-> string? string? any))]
+                  [#:notification-handler notification-handler
+                   (or/c 'output 'error output-port?
+                         (-> string? string? any))])
          connection?]{
 
   Creates a connection to a PostgreSQL server. The
@@ -62,6 +68,18 @@ Connections are made using the following functions.
   unencrypted connection if @racket[ssl] was set to
   @racket['optional]. SSL may only be used with TCP connections, not
   with local sockets.
+
+  The @racket[notice-handler] is called on informational messages
+  received asynchronously from the server. A common example is notice
+  of an index created automatically for a table's primary key. The
+  @racket[notice-handler] function takes two string arguments: the
+  condition's SQL code and a message. The
+  @racket[notification-handler] is called in response to an event
+  notification (see the @tt{LISTEN} and @tt{NOTIFY} statements). The
+  default behavior for both handlers is to print a message to the
+  current error port; a value of @racket['output] sends the messages
+  to the current output port instead, and an output port sends the
+  value to that output port.
 
   If the connection cannot be made, an exception is raised.
 

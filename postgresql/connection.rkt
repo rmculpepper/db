@@ -103,11 +103,17 @@
 ;; base%
 (define base%
   (class* object% (connection:admin<%> postgres-base<%>)
-    (init-field [inport #f]
-                [outport #f]
-                [process-id #f]
-                [secret-key #f])
+    (field [inport #f]
+           [outport #f]
+           [process-id #f]
+           [secret-key #f])
+    (init-field [notice-callback void]
+                [notification-callback void])
     (define wlock (make-semaphore 1))
+
+    ;; Delay async handler calls until unlock.
+    (define delayed-handler-calls null)
+
     (super-new)
 
     ;; with-disconnect-on-error
@@ -125,7 +131,10 @@
         (error who "not connected")))
 
     (define/public (unlock)
-      (semaphore-post wlock))
+      (let ([handler-calls delayed-handler-calls])
+        (set! delayed-handler-calls null)
+        (semaphore-post wlock)
+        (for-each (lambda (p) (p)) handler-calls)))
 
     (define/public (call-with-lock who proc)
       (lock who)
@@ -197,23 +206,28 @@
         (unless (equal? value "UTF8")
           (disconnect* #f)
           (error 'connection
-                 "client encoding must be UTF8, changed to: ~e"
+                 (string-append
+                  "backend attempted to change the client character encoding "
+                  "from UTF8 to ~a, disconnecting")
                  value)))
       (void))
 
     ;; handle-notice : (listof (cons symbol string)) -> void
+    ;; Queues handler call for execution on unlock
     (define/public (handle-notice properties)
-      (fprintf (current-error-port)
-               "notice: ~a (SQL code ~a)\n" 
-               (cdr (assq 'message properties))
-               (cdr (assq 'code properties))))
+      (set! delayed-handler-calls
+            (cons (lambda ()
+                    (notice-handler (cdr (assq 'code properties))
+                                    (cdr (assq 'message properties))))
+             delayed-handler-calls)))
 
     ;; handle-notification :  string string -> void
+    ;; Queues handler call for execution on unlock
     (define/public (handle-notification condition info)
-      (fprintf (current-error-port)
-               "notification ~a: ~a\n"
-               condition
-               info))
+      (set! delayed-handler-calls
+            (cons (lambda ()
+                    (notification-handler condition info))
+                  delayed-handler-calls)))
 
     ;; == Connection management
 

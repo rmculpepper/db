@@ -24,6 +24,8 @@
         #:allow-cleartext-password? boolean?
         #:ssl (symbols 'yes 'no 'optional)
         #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
+        #:notice-handler (or/c 'output 'error output-port? procedure?)
+        #:notification-handler (or/c 'output 'error output-port? procedure?)
         #:mixin any/c)
        any/c)]
  [guess-socket-path
@@ -41,11 +43,21 @@
                  #:allow-cleartext-password? [allow-cleartext-password? #f]
                  #:ssl [ssl 'no]
                  #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
+                 #:notice-handler [notice-handler 'error]
+                 #:notification-handler [notification-handler 'error]
                  #:mixin [mixin values])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0)
-            (if (or input-port output-port) 1 0))])
+            (if (or input-port output-port) 1 0))]
+        [notice-handler
+         (if (procedure? notice-handler)
+             notice-handler
+             (make-print-notice notice-handler))]
+        [notification-handler
+         (if (procedure? notification-handler)
+             notification-handler
+             (make-print-notification notification-handler))])
     (when (> connection-options 1)
       (raise-user-error 'connect
                         (string-append
@@ -56,6 +68,8 @@
       (raise-user-error 'connect
                         "must give input-port and output-port arguments together")))
   (let ([c (new (mixin connection%)
+                (notice-handler notice-handler)
+                (notification-handler notification-handler)
                 (allow-cleartext-password? allow-cleartext-password?))])
     (send c set-ssl-options ssl ssl-encrypt)
     (cond [socket
@@ -77,3 +91,19 @@
 
 (define (guess-socket-path)
   (guess-socket-path/paths 'postgresql-guess-socket-path socket-paths))
+
+;; make-print-notice : output-port -> string string -> void
+(define ((make-print-notice out) code message)
+  (fprintf (case out
+             ((output) (current-output-port))
+             ((error) (current-error-port))
+             (else out))
+           "notice: ~a (SQL code ~a)\n" message code))
+
+;; make-print-notification : output-port -> string string -> void
+(define ((make-print-notification out) condition message)
+  (fprintf (case out
+             ((output) (current-output-port))
+             ((error) (current-error-port))
+             (else out))
+           "notification ~a: ~a\n" condition info))

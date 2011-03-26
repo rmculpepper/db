@@ -1,7 +1,7 @@
 To do
 =====
 
-- test, export, and doc kill-safe wrapper
+- export and doc kill-safe wrapper
 
 - permit type annotations for
   - query params (would help mysql)
@@ -11,11 +11,8 @@ To do
 
 - add fsym arguments to type-writers
 
-- figure out sqlite locking
-
-- postgresql array types
-
-- disconnect should always work, even on messed-up connections (eg thread killed)
+- disconnect should always work, even on damaged connections
+  (eg kill-thread, custodian shutdown)
 
 ----
 

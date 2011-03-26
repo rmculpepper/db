@@ -21,7 +21,7 @@
 (define (sql str)
   (case (dbsystem-name dbsystem)
     ((postgresql) str)
-    ((mysql sqlite3) (regexp-replace #rx"\\$[0-9]" str "?"))))
+    ((mysql sqlite3) (regexp-replace* #rx"\\$[0-9]" str "?"))))
 
 ;; prep-mode:
 ;;   'string = query w/ string

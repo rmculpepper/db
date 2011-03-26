@@ -20,3 +20,7 @@ To do
 ----
 
 bug: bad behavior on postgresql bad password
+
+bug: mysql concurrency tests sometimes fail
+
+bug: mysql blob parsing differs (text vs binary)

@@ -63,11 +63,10 @@
     (define/public (check-owner c)
       (eq? c (weak-box-value -owner)))
 
-    (define/public (bind params)
+    (define/public (bind fsym params)
       (unless (= (length params) param-count)
-        (raise-user-error 'bind-prepared-statement
-                          "prepared statement requires ~s arguments, given ~s"
-                          param-count (length params)))
+        (error fsym "prepared statement requires ~s arguments, given ~s"
+               param-count (length params)))
       (statement-binding this #f params))
 
     (define/public (finalize)
@@ -112,7 +111,7 @@
     (define/private (query1 fsym stmt collector)
       (cond [(string? stmt)
              (let* ([pst (prepare1 fsym stmt)]
-                    [sb (send pst bind null)])
+                    [sb (send pst bind fsym null)])
                (query1 fsym sb collector))]
             [(statement-binding? stmt)
              (let ([pst (statement-binding-pst stmt)]

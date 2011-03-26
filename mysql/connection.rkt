@@ -185,11 +185,12 @@
       (disconnect* #t))
 
     (define/public (disconnect* politely?)
-      (when politely?
-        (fresh-exchange)
-        (send-message (make-command-packet 'quit "")))
-      (send backend-link close)
-      (set! backend-link disconnected-backend-link))
+      (when (connected?)
+        (when politely?
+          (fresh-exchange)
+          (send-message (make-command-packet 'quit "")))
+        (send backend-link close)
+        (set! backend-link disconnected-backend-link)))
 
     ;; connected? : -> boolean
     (define/public (connected?)

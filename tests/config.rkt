@@ -52,7 +52,7 @@
   (define (connect-and-setup)
     (let [(cx (connect-for-test))]
       (query-exec cx
-         "create temporary table the_numbers (N integer primary key, descr text)")
+         "create temporary table the_numbers (N integer primary key, descr varchar(80))")
       (for-each (lambda (p)
                   (query-exec cx
                               (format "insert into the_numbers values (~a, '~a')"

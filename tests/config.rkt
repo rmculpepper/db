@@ -31,7 +31,13 @@
 
   (define (connect-for-test)
     (case (dbsystem-name dbsystem)
-      ((postgresql mysql)
+      ((postgresql)
+       (connect #:user (getenv "DBUSER")
+                #:database (or (getenv "DBDB") (getenv "DBUSER"))
+                #:password (getenv "DBPASSWORD")
+                #:notice-handler void
+                #:mixin (testing-connection-mixin)))
+      ((mysql)
        (connect #:user (getenv "DBUSER")
                 #:database (or (getenv "DBDB") (getenv "DBUSER"))
                 #:password (getenv "DBPASSWORD")

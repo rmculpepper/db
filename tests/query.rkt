@@ -166,7 +166,29 @@
     (test-case "query - update"
       (with-connection c
         (let [(q (query c "update the_numbers set N = -1 where N = 1"))]
-          (check-pred simple-result? q))))))
+          (check-pred simple-result? q))))
+    (test-case "prepared-stmt inspection"
+      (with-connection c
+        (let ([pst (prepare c "select n, descr from the_numbers")])
+          (check-equal? (prepared-statement-parameter-types pst) '())
+          (check-equal? (prepared-statement-result-types pst)
+                        (case (dbsystem-name dbsystem)
+                          ((postgresql) '(int4 varchar))
+                          ((mysql) '(int var-string))
+                          ((sqlite3) '(any any)))))
+        (let ([pst (prepare c (sql "select n from the_numbers where n = $1"))])
+          (check-equal? (prepared-statement-parameter-types pst)
+                        (case (dbsystem-name dbsystem)
+                          ((postgresql) '(int4))
+                          ((mysql) '(var-string))
+                          ((sqlite3) '(any)))))
+        (let ([pst (prepare c (sql "insert into the_numbers values ($1, $2)"))])
+          (check-equal? (prepared-statement-parameter-types pst)
+                        (case (dbsystem-name dbsystem)
+                          ((postgresql) '(int4 varchar))
+                          ((mysql) '(var-string var-string))
+                          ((sqlite3) '(any any))))
+          (check-equal? (prepared-statement-result-types pst) #f))))))
 
 (define misc-tests
   (test-suite "misc correctness"
@@ -238,7 +260,7 @@
                  sql-null 27 28 29 30 sql-null 32 33 sql-null 35))))))
 
 (define error-tests
-  (test-suite "Errors"
+  (test-suite "errors"
     (test-suite "low-level"
       (test-case "query-multiple - not a statement list"
         (with-connection c
@@ -254,9 +276,7 @@
       (test-case "query - unowned prepared stmt"
         (with-connection c1 
           (with-connection c
-            (printf "connections: ~s, ~s\n" c1 c)
             (let ([pst (prepare c1 "select 5")])
-              (printf "prepared stmt: ~s\n" pst)
               (let ([stmt (bind-prepared-statement pst null)])
                 (check-exn exn:fail? (lambda () (query c stmt))))))))
       (test-case "query errors - nonfatal"
@@ -264,6 +284,11 @@
           (check-exn exn:fail? (lambda () (query-value c "select nonsuch")))
           (check-equal? (query-value c "select 17") 17))))))
 
+(define prep-tests
+  (test-suite "prepared-statement inspection"
+))
+                          
+          
 
 (define test
   (test-suite "query API"

@@ -46,17 +46,17 @@
     (define -stmt stmt)
     (define -owner (make-weak-box owner))
 
-    (define param-count
-      (sqlite3_bind_parameter_count -stmt))
-    (define result-count ;; ???
-      (sqlite3_column_count stmt))
+    (define param-count (sqlite3_bind_parameter_count -stmt))
+    (define result-count (sqlite3_column_count stmt))
 
     (define/public (get-param-count) param-count)
     (define/public (get-param-typeids) #f)
-    (define/public (get-param-types) #f)
+    (define/public (get-param-types) (for/list ([i (in-range param-count)]) 'any))
     (define/public (get-result-count) result-count)
     (define/public (get-result-typeids) #f)
-    (define/public (get-result-types) #f)
+    (define/public (get-result-types)
+      (and (positive? result-count)
+           (for/list ([i (in-range result-count)]) 'any)))
 
     (define/public (get-stmt) -stmt)
 

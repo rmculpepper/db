@@ -327,6 +327,26 @@ SQLite supports both syntaxes and possibly others.
   @racket[prepare] or @racket[prepare-multiple], @racket[#f] otherwise.
 }
 
+@defproc[(prepared-statement-parameter-types [pst prepared-statement?])
+         (listof symbol?)]{
+
+  Returns a list of symbols, one for each of the prepared statement's
+  parameters. For PostgreSQL and MySQL connections, the symbols
+  identify the expected SQL types of the parameters. For SQLite
+  connections, the symbol is always @racket['any].
+}
+
+@defproc[(prepared-statement-result-types [pst prepared-statement?])
+         (or/c (listof symbol?) #f)]{
+
+  For PostgreSQL and MySQL, if @racket[pst] is a recordset-producing
+  statement (eg, @tt{SELECT}), returns a list of symbols, identifying
+  the SQL types of the result columns.
+
+  For SQLite, or if @racket[pst] does not produce a recordset, the
+  function returns @racket[#f].
+}
+
 @defproc[(statement-binding? [x any/c]) boolean?]{
 
   Returns @racket[#t] if @racket[x] is a statement created by

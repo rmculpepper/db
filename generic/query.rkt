@@ -70,7 +70,8 @@
     (define/public (get-result-count) (and result-infos (length result-infos)))
     (define/public (get-result-typeids) result-typeids)
     (define/public (get-result-types)
-      (and result-infos (send dbsystem typeids->types result-typeids)))
+      (and (pair? result-typeids)
+           (send dbsystem typeids->types result-typeids)))
 
     (define/public (check-owner c)
       (eq? c (weak-box-value owner)))

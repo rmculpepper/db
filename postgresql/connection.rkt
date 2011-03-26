@@ -46,7 +46,7 @@
     ;; flush-message-buffer : -> void
     flush-message-buffer
 
-    ;; check-ready-for-query : symbol -> void
+    ;; check-ready-for-query : symbol boolean -> void
     check-ready-for-query
 
     ;; lock : symbol -> void
@@ -156,7 +156,7 @@
     (define/public (recv-message behalf)
       (let ([r (raw-recv)])
         (cond [(ErrorResponse? r)
-               (check-ready-for-query behalf) ;; FIXME: eat msgs until ReadyForQuery?
+               (check-ready-for-query behalf #t) ;; FIXME: eat msgs until ReadyForQuery?
                (raise-backend-error behalf r)]
               [(or (NoticeResponse? r)
                    (NotificationResponse? r)
@@ -183,10 +183,12 @@
        (flush-output outport)))
 
     ;; check-ready-for-query : symbol -> void
-    (define/public (check-ready-for-query fsym)
+    (define/public (check-ready-for-query fsym or-eof?)
       (let ([r (recv-message fsym)])
-        (unless (ReadyForQuery? r)
-          (error fsym "internal error: backend sent unexpected message: ~e" r))))
+        (cond [(ReadyForQuery? r) (void)]
+              [(and or-eof? (eof-object? r)) (void)]
+              [else
+               (error fsym "internal error: backend sent unexpected message: ~e" r)])))
 
     ;; == Asynchronous message hooks
 
@@ -298,7 +300,7 @@
     ;; start-connection-protocol : string string string/#f -> void
     (define/public (start-connection-protocol dbname username password)
       (with-disconnect-on-error
-       (call-with-lock 'connect
+       (call-with-lock 'postgresql-connect
         (lambda ()
           (send-message
            (make-StartupMessage
@@ -310,7 +312,7 @@
 
     ;; expect-auth : string/#f -> ConnectionResult
     (define/private (expect-auth username password)
-      (let ([r (recv-message 'connect)])
+      (let ([r (recv-message 'postgresql-connect)])
         (match r
           [(struct AuthenticationOk ())
            (expect-ready-for-query)]
@@ -330,12 +332,12 @@
            (handle-scm-credential-authentication)
            (expect-auth username password)]
           [_
-           (error 'connect
+           (error 'postgresql-connect
                   "authentication failed (backend sent unexpected message)")])))
 
     ;; expect-ready-for-query : -> void
     (define/private (expect-ready-for-query)
-      (let ([r (recv-message 'connect)])
+      (let ([r (recv-message 'postgresql-connect)])
         (match r
           [(struct ReadyForQuery (status))
            (void)]
@@ -344,7 +346,7 @@
            (set! secret-key secret)
            (expect-ready-for-query)]
           [_
-           (error 'connect
+           (error 'postgresql-connect
                   (string-append "connection failed after authentication "
                                  "(backend sent unexpected message: ~e)")
                   r)])))
@@ -361,13 +363,13 @@
     ;; handle-cleartext-password-authentication : string -> void
     (define/private (handle-cleartext-password-authentication password)
       (unless (string? password)
-        (raise-user-error 'connect "password needed but not supplied"))
+        (raise-user-error 'postgresql-connect "password needed but not supplied"))
       (send-message (make-PasswordMessage (compute-cleartext-password password))))
 
     ;; compute-cleartext-password : string -> string
     (define/public (compute-cleartext-password password)
       (unless allow-cleartext-password?
-        (raise-user-error 'connect (nosupport "cleartext password")))
+        (raise-user-error 'postgresql-connect (nosupport "cleartext password")))
       password)
 
     ;; handle-crypt-password-authentication : string bytes -> void
@@ -376,7 +378,7 @@
 
     ;; compute-crypt-password : string bytes -> void
     (define/public (compute-crypt-password password salt)
-      (raise-user-error 'connect (nosupport "crypt()-encrypted password")))
+      (raise-user-error 'postgresql-connect (nosupport "crypt()-encrypted password")))
 
     ;; handle-md5-password-authentication : string string bytes -> void
     (define/private (handle-md5-password-authentication user password salt)
@@ -385,16 +387,16 @@
     ;; compute-md5-password : strin string bytes -> bytes
     (define/public (compute-md5-password user password salt)
       (unless (string? password)
-        (raise-user-error 'connect "password needed but not supplied"))
+        (raise-user-error 'postgresql-connect "password needed but not supplied"))
       (md5password user password salt))
 
     ;; handle-kerberos5-authentication : -> void
     (define/public (handle-kerberos5-authentication)
-      (raise-user-error 'connect (nosupport "KerberosV5 authentication")))
+      (raise-user-error 'postgresql-connect (nosupport "KerberosV5 authentication")))
 
     ;; handle-scm-credential-authentication : -> void
     (define/public (handle-scm-credential-authentication)
-      (raise-user-error 'connect (nosupport "SCM authentication")))
+      (raise-user-error 'postgresql-connect (nosupport "SCM authentication")))
 
     ))
 
@@ -441,13 +443,14 @@
                 ;; Backend gracefully declined
                 (void (read-byte in))
                 (unless (eq? ssl 'optional)
-                  (raise-user-error 'connect "backend does not support SSL"))
+                  (error 'postgresql-connect "backend does not support SSL"))
                 (super attach-to-ports in out))
                ((#\E)
                 (let ([r (parse-server-message in)])
-                  (raise-backend-error 'connect r)))
+                  (error 'postgresql-connect r)))
                (else
-                (error 'connect "backend returned invalid response to SSL request")))))
+                (error 'postgresql-connect
+                       "backend returned invalid response to SSL request")))))
           ((no)
            (super attach-to-ports in out)))))))
 
@@ -513,7 +516,7 @@
                    (let ([thunks
                           (for/list ([stmt (in-list stmts)])
                             (query1:collect fsym stmt collector))])
-                     (check-ready-for-query fsym)
+                     (check-ready-for-query fsym #f)
                      thunks)))])
           (map (lambda (p) (p)) thunks))))
 
@@ -611,7 +614,7 @@
                    (for/list ([name (in-list names)]
                               [stmt (in-list stmts)])
                      (prepare1:collect fsym name stmt))])
-              (check-ready-for-query fsym)
+              (check-ready-for-query fsym #f)
               results)))))
 
     ;; prepare1:enqueue : string string -> void

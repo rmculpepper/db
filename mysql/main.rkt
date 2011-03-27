@@ -7,6 +7,7 @@
          racket/class
          racket/tcp
          "../generic/main.rkt"
+         "../generic/query.rkt"
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
          "connection.rkt"
@@ -64,7 +65,7 @@
              (let-values ([(in out) (tcp-connect server port)])
                (send c attach-to-ports in out)))])
     (send c start-connection-protocol database user password)
-    c))
+    (new kill-safe-connection% (connection c))))
 
 (define socket-paths
   '("/var/run/mysqld/mysqld.sock"))

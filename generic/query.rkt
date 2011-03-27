@@ -143,7 +143,7 @@
       (call (lambda (obj) (send obj disconnect))))
 
     (define/public (get-dbsystem)
-      (call (lambda (obj) (send obj get-dbsytem))))
+      (call (lambda (obj) (send obj get-dbsystem))))
 
     (define/public (query* fsym stmts collector)
       (call (lambda (obj) (send obj query* fsym stmts collector))))

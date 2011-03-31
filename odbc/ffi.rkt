@@ -77,8 +77,8 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (descr-length : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)
         -> (values status
-                   (bytes->string/utf-8 server-buf #f 0 server-length)
-                   (bytes->string/utf-8 descr-buf #f descr-length))))
+                   (and (zero? status) (bytes->string/utf-8 server-buf #f 0 server-length))
+                   (and (zero? status) (bytes->string/utf-8 descr-buf #f 0 descr-length)))))
 
 (define-odbc SQLPrepare
   (_fun (handle stmt) ::

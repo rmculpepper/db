@@ -1,11 +1,21 @@
 #lang racket/base
-(require racket/contract
-         unsafe/ffi
-         unsafe/ffi/define
+(require (rename-in racket/contract [-> c->])
+         ffi/unsafe
+         ffi/unsafe/define
          "ffi-constants.rkt")
-(provide (all-from "ffi-constants.rkt"))
+(provide (all-from-out "ffi-constants.rkt"))
+(provide (all-defined-out))
 
 ;; turn into unit, param'd by odbc lib
+
+(define-cpointer-type _sqlhandle)
+
+(define-cpointer-type _sqlhenv)
+(define-cpointer-type _sqlhdbc)
+(define-cpointer-type _sqlhstmt)
+
+(define _sqllen _long)
+(define _sqlulen _ulong)
 
 (define _sqlsmallint _sshort)
 (define _sqlusmallint _ushort)
@@ -13,18 +23,36 @@
 (define _sqluinteger _uint)
 (define _sqlreturn _sqlsmallint)
 
+
 #|
 Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
 |#
 
-(define-ffi-definer define-odbc ???)
+(define-ffi-definer define-odbc (ffi-lib "libodbc")) ;; FIXME
 
 (define-odbc SQLAllocHandle
-  (_fun _sqlsmallint
-        _sqlhandle
-        (handle : (_ptr o _sqlhandle))
+  (_fun (type : _sqlsmallint)
+        (parent : _sqlhandle/null)
+        (handle : (_ptr o _sqlhandle/null))
         -> (status : _sqlreturn)
-        -> (values status handle)))
+        -> (values status
+                   (begin (when handle
+                            (cpointer-push-tag! handle
+                                                (cond [(= type SQL_HANDLE_ENV) sqlhenv-tag]
+                                                      [(= type SQL_HANDLE_DBC) sqlhdbc-tag]
+                                                      [(= type SQL_HANDLE_STMT) sqlhstmt-tag]
+                                                      [else sqlhandle-tag])))
+                          handle))))
+
+;; SQLSetEnvAttr
+;; must set odbc version env attr before making connection
+
+(define-odbc SQLSetEnvAttr
+  (_fun (env : _sqlhenv)
+        (attr : _sqlinteger)
+        (value-buf : _sqlinteger) ;; (the one case we care about takes int, not ptr)
+        (_sqlinteger = 0)
+        -> _sqlreturn))
 
 (define-odbc SQLConnect
   (_fun (handle server user auth) ::
@@ -38,7 +66,7 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         -> _sqlreturn))
 
 (define-odbc SQLDataSources
-  (_fun (handle direction)
+  (_fun (handle direction) ::
         (handle : _sqlhenv)
         (direction : _sqlusmallint)
         (server-buf : _bytes = (make-bytes 1024)) ;; FIXME: get proper size
@@ -49,11 +77,11 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (descr-length : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)
         -> (values status
-                   (bytes->string/utf-8 server-buf 0 server-length)
-                   (bytes->string/utf-8 descr-buf 0 descr-length))))
+                   (bytes->string/utf-8 server-buf #f 0 server-length)
+                   (bytes->string/utf-8 descr-buf #f descr-length))))
 
 (define-odbc SQLPrepare
-  (_fun (handle stmt)
+  (_fun (handle stmt) ::
         (handle : _sqlhstmt)
         (stmt : _string)
         ((string-utf-8-length stmt) : _sqlinteger)
@@ -69,7 +97,7 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (digits : _sqlsmallint)
         (value : _pointer) ;; must be pinned until after SQLExecute called
         (value-len : _sqllen) ;; ignored for fixed-length data
-        (str-len-or-ind-ptr : _sqllen-pointer)
+        (str-len-or-ind-ptr : _pointer) ;; _sqllen-pointer)
         -> _sqlreturn))
 
 (define-odbc SQLExecute
@@ -81,6 +109,16 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (count : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)
         -> (values status count)))
+
+(define-odbc SQLDescribeParam
+  (_fun (handle : _sqlhstmt)
+        (parameter : _sqlusmallint)
+        (data-type : (_ptr o _sqlsmallint))
+        (size : (_ptr o _sqlulen))
+        (digits : (_ptr o _sqlsmallint))
+        (nullable : (_ptr o _sqlsmallint))
+        -> (status : _sqlreturn)
+        -> (values status data-type size digits nullable)))
 
 (define-odbc SQLNumResultCols
   (_fun (handle : _sqlhstmt)
@@ -96,13 +134,13 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         ((bytes-length column-buf) : _sqlsmallint)
         (column-len : (_ptr o _sqlsmallint))
         (data-type : (_ptr o _sqlsmallint))
-        (column-size : (_ptr o _sqlulen))
+        (size : (_ptr o _sqlulen))
         (digits : (_ptr o _sqlsmallint))
         (nullable : (_ptr o _sqlsmallint))
-        -> (status : _sqlstatus)
+        -> (status : _sqlreturn)
         -> (values status
-                   (list (bytes->string/utf-8 column-buf 0 column-length)
-                         data-type column-size digits nullable))))
+                   (bytes->string/utf-8 column-buf #f 0 column-len)
+                   data-type size digits nullable)))
 
 (define-odbc SQLFetch
   (_fun _sqlhstmt
@@ -114,10 +152,10 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (column : _sqlusmallint)
         (target-type : _sqlsmallint)
         (buffer : _bytes) ;; may be null (#f) to get length
-        ((bytes-length buffer) : _sqllen)
+        ((if buffer (bytes-length buffer) 0) : _sqllen)
         (len-or-ind : (_ptr o _sqllen))
         -> (status : _sqlreturn)
-        -> (values status buffer len-or-ind)))
+        -> (values status len-or-ind)))
 
 (define-odbc SQLFreeStmt
   (_fun (handle : _sqlhstmt)
@@ -138,7 +176,8 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         -> _sqlreturn))
 
 (define-odbc SQLGetDiagRec
-  (_fun (handle-type : _sqlsmallint)
+  (_fun (handle-type handle rec-number) ::
+        (handle-type : _sqlsmallint)
         (handle : _sqlhandle)
         (rec-number : _sqlsmallint)
         (sql-state-buf : _bytes = (make-bytes 6))
@@ -148,6 +187,6 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (message-len : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)
         -> (values status
-                   (bytes->string/utf-8 sql-state-buf 0 5)
+                   (bytes->string/utf-8 sql-state-buf #\? 0 5)
                    native-errcode
-                   (bytes->string/utf-8 message-buf 0 message-len))))
+                   (bytes->string/utf-8 message-buf #\? 0 message-len))))

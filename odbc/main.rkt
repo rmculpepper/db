@@ -19,14 +19,14 @@
                  #:user user
                  #:password auth)
   (let-values ([(status env) (SQLAllocHandle SQL_HANDLE_ENV #f)])
-    (handle-status 'connect status)
+    (handle-status 'odbc-connect status env)
     (let ([status (SQLSetEnvAttr env SQL_ATTR_ODBC_VERSION SQL_OV_ODBC3)])
-      (handle-status 'connect status)
+      (handle-status 'odbc-connect status env)
       (let-values ([(status db) (SQLAllocHandle SQL_HANDLE_DBC env)])
-        (handle-status 'connect status)
+        (handle-status 'odbc-connect status db)
         (let ([status (SQLConnect db database user auth)])
           ;; free db, env on failure
-          (handle-status 'connect status)
+          (handle-status 'odbc-connect status db)
           (new connection% (db db)))))))
 
 ;; FIXME: put env in connection?

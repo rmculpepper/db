@@ -54,6 +54,11 @@
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
 
+    (define has-describe-param?
+      (let-values ([(status supported?) (SQLGetFunctions db SQL_API_SQLDESCRIBEPARAM)])
+        (handle-status 'connect status db)
+        supported?))
+
     (define-syntax-rule (with-lock . body)
       (begin (semaphore-wait lock)
              (with-handlers ([values (lambda (e) (semaphore-post lock) (raise e))])
@@ -118,23 +123,42 @@
                (simple-result '())])))
 
     (define/private (load-param fsym db stmt i param)
+      ;; FIXME: for now we assume typeid is SQL_UNKNOWN_TYPE, but should
+      ;; have paraminfos around in case (also need size, digits, etc?)
       ;; FIXME: is there an easier way to alloc immobile bytes?
       ;; param buffers must not move between bind and execute
       (define (copy-buffer buffer)
-        (let* ([n (bytes-length buffer)]
+        (let* ([buffer (if (string? buffer) (string->bytes/utf-8 buffer) buffer)]
+               [n (bytes-length buffer)]
                [copy (make-sized-byte-string (malloc n 'raw) n)])
           (memcpy copy buffer n)
           copy))
-      (let ([buffer (copy-buffer (param-buffer param))]
-            [lenbuffer #f #| (copy-buffer (param-lenbuffer param)) |#]) ;; FIXME
-        (SQLBindParameter stmt i SQL_PARAM_INPUT
-                          (param-ctype param)
-                          (param-sqltype param)
-                          (param-size param)
-                          (param-digits param)
-                          buffer
-                          lenbuffer)
-        (list buffer lenbuffer)))
+      (define (int->buffer n) (copy-buffer (integer->integer-bytes n 4 #t)))
+      (define (bind ctype sqltype buf)
+        (let* ([lenbuf
+                (int->buffer (if buf (bytes-length buf) SQL_NULL_DATA))]
+               [status
+                (SQLBindParameter stmt i SQL_PARAM_INPUT ctype sqltype 0 0 buf lenbuf)])
+          (handle-status fsym status stmt)
+          (if buf (list buf lenbuf) (list lenbuf))))
+      (cond [(string? param)
+             (bind SQL_C_CHAR SQL_VARCHAR (copy-buffer param))]
+            [(bytes? param)
+             (bind SQL_C_BINARY SQL_BINARY (copy-buffer param))]
+            [(exact-integer? param)
+             (bind SQL_C_CHAR SQL_NUMERIC (copy-buffer (number->string param)))]
+            [(rational? param)
+             (bind SQL_C_CHAR SQL_DOUBLE
+                   (copy-buffer (number->string (exact->inexact  param))))]
+            [(sql-date? param)
+             (bind SQL_C_CHAR SQL_TYPE_DATE (copy-buffer (marshal-date param)))]
+            [(sql-time? param)
+             (bind SQL_C_CHAR SQL_TYPE_TIME (copy-buffer (marshal-time param)))]
+            [(sql-timestamp? param)
+             (bind SQL_C_CHAR SQL_TYPE_TIMESTAMP (copy-buffer (marshal-timestamp param)))]
+            [(sql-null? param)
+             (bind SQL_C_CHAR SQL_VARCHAR #f)]
+            [else (error 'load-param "cannot convert to unknown type: ~e" param)]))
 
     (define/private (fetch* fsym stmt result-typeids)
       (let ([c (fetch fsym stmt result-typeids)])
@@ -275,10 +299,13 @@
            pst))))
 
     (define/private (describe-param fsym stmt i)
-      (let-values ([(status type size digits nullable)
-                    (SQLDescribeParam stmt i)])
-        (handle-status fsym status stmt)
-        `((*type* . ,type) (size . ,size) (digits . ,digits))))
+      (cond [has-describe-param?
+             (let-values ([(status type size digits nullable)
+                           (SQLDescribeParam stmt i)])
+               (handle-status fsym status stmt)
+               `((*type* . ,type) (size . ,size) (digits . ,digits)))]
+            [else
+             `((*type* . ,SQL_UNKNOWN_TYPE))]))
 
     (define/private (describe-result-column fsym stmt i)
       (let-values ([(status name type size digits nullable)

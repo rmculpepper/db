@@ -54,6 +54,13 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (_sqlinteger = 0)
         -> _sqlreturn))
 
+(define-odbc SQLGetFunctions
+  (_fun (handle : _sqlhdbc)
+        (function-id : _sqlusmallint)
+        (supported? : (_ptr o _bool))
+        -> (status : _sqlreturn)
+        -> (values status supported?)))
+
 (define-odbc SQLConnect
   (_fun (handle server user auth) ::
         (handle : _sqlhdbc)
@@ -88,7 +95,8 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         -> _sqlreturn))
 
 (define-odbc SQLBindParameter
-  (_fun (handle : _sqlhstmt)
+  (_fun (handle param-num iomode c-type sql-type column-size digits value len-or-ind) ::
+        (handle : _sqlhstmt)
         (param-num : _sqlusmallint)
         (iomode : _sqlsmallint)
         (c-type : _sqlsmallint)
@@ -96,8 +104,8 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (column-size : _sqlulen)
         (digits : _sqlsmallint)
         (value : _pointer) ;; must be pinned until after SQLExecute called
-        (value-len : _sqllen) ;; ignored for fixed-length data
-        (str-len-or-ind-ptr : _pointer) ;; _sqllen-pointer)
+        ((if (bytes? value) (bytes-length value) 0) : _sqllen) ;; ignored for fixed-length data
+        (len-or-ind : _pointer) ;; _sqllen-pointer)
         -> _sqlreturn))
 
 (define-odbc SQLExecute

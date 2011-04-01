@@ -140,3 +140,5 @@
 (define SQL_RESULT_COL            3)
 (define SQL_PARAM_OUTPUT          4)
 (define SQL_RETURN_VALUE          5)
+
+(define SQL_API_SQLDESCRIBEPARAM 58)

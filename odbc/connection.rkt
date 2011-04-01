@@ -6,9 +6,11 @@
 (require racket/class
          ffi/unsafe
          ffi/unsafe/atomic
+         "../generic/io.rkt"
          "../generic/query.rkt"
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
+         "../generic/sql-convert.rkt"
          "ffi.rkt"
          "ffi-constants.rkt"
          "dbsystem.rkt")
@@ -91,13 +93,13 @@
          (let* ([db (get-db fsym)]
                 [stmt (send pst get-stmt)]
                 ;; FIXME: reset/clear
+                [result-infos (send pst get-result-infos)]
                 [pinned-buffers
                  (for/list ([i (in-naturals 1)]
                             [param (in-list params)]
                             #:when #t
                             [buf (in-list (load-param fsym db stmt i param))])
                    buf)]
-                [result-infos (send pst get-result-infos)]
                 [_ (handle-status fsym (SQLExecute stmt) stmt)]
                 [rows (fetch* fsym stmt (send pst get-result-typeids))])
            (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
@@ -151,19 +153,91 @@
               [else (handle-status fsym s stmt)])))
 
     (define/private (get-column fsym stmt i typeid)
-      (let-values ([(status len-or-ind)
-                    (SQLGetData stmt i SQL_C_CHAR #f)])  ;; FIXME: proper ctypes
-        (handle-status fsym status stmt #:ignore-ok/info #t)
-        (cond [(= len-or-ind SQL_NULL_DATA)
-               sql-null]
-              [(= len-or-ind SQL_NO_TOTAL)
-               (error 'get-column "NO_TOTAL")]
-              [else
-               (let ([buf (make-bytes (add1 len-or-ind))]) ;; for nul-terminated string
-                 (let-values ([(status _li) (SQLGetData stmt i SQL_C_CHAR buf)]) ;; FIXME
-                   (handle-status fsym status stmt)
-                   ;; FIXME: convert
-                   buf))])))
+      (define-syntax-rule (get-num size ctype convert convert-arg ...)
+        (let ([buf (make-bytes size)])
+          (let-values ([(status ind) (SQLGetData stmt i ctype buf)])
+            (handle-status fsym status stmt)
+            (cond [(= ind SQL_NULL_DATA) sql-null]
+                  [else (convert buf convert-arg ...)]))))
+      (define (get-int size ctype)
+        (get-num size ctype integer-bytes->integer #t))
+      (define (get-real ctype)
+        (get-num 8 ctype floating-point-bytes->real))
+      (define (get-int-list sizes ctype)
+        (let ([buf (make-bytes (apply + sizes))])
+          (let-values ([(status ind) (SQLGetData stmt i ctype buf)])
+            (handle-status fsym status stmt)
+            (cond [(= ind SQL_NULL_DATA) sql-null]
+                  [else (let ([in (open-input-bytes buf)])
+                          (for/list ([size (in-list sizes)])
+                            (case size
+                              ((2) (io:read-le-int16 in)) ;; FIXME: use host byte order?
+                              ((4) (io:read-le-int32 in))
+                              (else (error 'get-int-list
+                                           "internal error: bad size: ~e" size)))))]))))
+      (define (get-string)
+        ;; FIXME: use "wide chars" for unicode support?
+        (let-values ([(status len-or-ind) (SQLGetData stmt i SQL_C_CHAR #f)])
+          (handle-status fsym status stmt #:ignore-ok/info? #t)
+          (cond [(= len-or-ind SQL_NULL_DATA) sql-null]
+                [(= len-or-ind SQL_NO_TOTAL)
+                 (error 'get-column "internal error: SQL_NO_TOTAL")]
+                [else
+                 (let ([buf (make-bytes (add1 len-or-ind))]) ;; +1 for nul-terminated string
+                   (let-values ([(status _li) (SQLGetData stmt i SQL_C_CHAR buf)])
+                     (handle-status fsym status stmt)
+                     (bytes->string/latin-1 buf #f 0 len-or-ind)))])))
+      (define (get-bytes)
+        ;; FIXME: use "wide chars" for unicode support?
+        (let-values ([(status len-or-ind) (SQLGetData stmt i SQL_C_BINARY #f)])
+          (handle-status fsym status stmt #:ignore-ok/info? #t)
+          (cond [(= len-or-ind SQL_NULL_DATA) sql-null]
+                [(= len-or-ind SQL_NO_TOTAL)
+                 (error 'get-column "internal error: SQL_NO_TOTAL")]
+                [else
+                 (let ([buf (make-bytes len-or-ind)])
+                   (let-values ([(status _li) (SQLGetData stmt i SQL_C_BINARY buf)])
+                     (handle-status fsym status stmt)
+                     buf))])))
+      (cond [(or (= typeid SQL_CHAR)
+                 (= typeid SQL_VARCHAR)
+                 (= typeid SQL_LONGVARCHAR)) ;; long date might need repeated gets (?)
+             ;; FIXME: WCHAR, WVARCHAR, WLONGVARCHAR
+             (get-string)]
+            [(or (= typeid SQL_DECIMAL)
+                 (= typeid SQL_NUMERIC))
+             (parse-decimal (get-string))]
+            [(or (= typeid SQL_SMALLINT)
+                 (= typeid SQL_INTEGER)
+                 (= typeid SQL_TINYINT))
+             (get-int 4 SQL_C_LONG)]
+            [(or (= typeid SQL_BIGINT))
+             (get-int 8 SQL_C_SBIGINT)]
+            [(or (= typeid SQL_REAL)
+                 (= typeid SQL_FLOAT)
+                 (= typeid SQL_DOUBLE))
+             (get-real SQL_C_DOUBLE)]
+            [(or (= typeid SQL_BIT))
+             (case (get-int 4 SQL_C_LONG)
+               ((0) #f)
+               ((1) #t)
+               (else 'get-column "internal error: SQL_BIT"))]
+            [(or (= typeid SQL_BINARY)
+                 (= typeid SQL_VARBINARY))
+             (get-bytes)]
+            [(= typeid SQL_TYPE_DATE)
+             (let ([fields (get-int-list '(2 2 2) SQL_C_TYPE_DATE)])
+               (cond [(list? fields) (apply sql-date fields)]
+                     [(sql-null? fields) sql-null]))]
+            [(= typeid SQL_TYPE_TIME)
+             (let ([fields (get-int-list '(2 2 2) SQL_C_TYPE_TIME)])
+               (cond [(list? fields) (apply sql-time (append fields (list 0 #f)))]
+                     [(sql-null? fields) sql-null]))]
+            [(= typeid SQL_TYPE_TIMESTAMP)
+             (let ([fields (get-int-list '(2 2 2 2 2 2 4) SQL_C_TYPE_TIMESTAMP)])
+               (cond [(list? fields) (apply sql-timestamp (append fields (list #f)))]
+                     [(sql-null? fields) sql-null]))]
+            [else (get-string)]))
 
     (define/public (prepare* fsym stmts)
       (for/list ([stmt stmts])
@@ -233,7 +307,7 @@
 ;; handle-status : symbol integer -> integer
 ;; Returns the status code if no error occurred, otherwise
 ;; raises an exception with an appropriate message.
-(define (handle-status who s [handle #f] #:ignore-ok/info [ignore-ok/info? #f])
+(define (handle-status who s [handle #f] #:ignore-ok/info? [ignore-ok/info? #f])
   (cond [(= s SQL_SUCCESS_WITH_INFO)
          (when (and handle (not ignore-ok/info?))
            (diag-info who handle 'print))

@@ -289,14 +289,18 @@
   (integer-bytes->integer (read-bytes/timeout 4 port) #f #f))
 
 (define (io:read-le-intN port count)
-  (let ([b (read-bytes/timeout count port)])
-    (unless (and (bytes? b) (= count (bytes-length b)))
-      (error 'io:read-le-intN "unexpected eof; got ~s" b))
-    (let loop ([pos 0])
-      (if (< pos count)
-          (+ (arithmetic-shift (loop (add1 pos)) 8)
-             (bytes-ref b pos))
-          0))))
+  (case count
+    ((2) (io:read-le-int16 port))
+    ((4) (io:read-le-int32 port))
+    (else
+     (let ([b (read-bytes/timeout count port)])
+       (unless (and (bytes? b) (= count (bytes-length b)))
+         (error 'io:read-le-intN "unexpected eof; got ~s" b))
+       (let loop ([pos 0])
+         (if (< pos count)
+             (+ (arithmetic-shift (loop (add1 pos)) 8)
+                (bytes-ref b pos))
+             0))))))
 
 (define (io:read-length-code port)
   (let ([first (read-byte/timeout port)])

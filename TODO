@@ -1,6 +1,11 @@
 To do
 =====
 
+- export & test odbc
+- document odbc
+
+- clean up le/be/host in generic/io, odbc
+
 - export and doc kill-safe wrapper
 
 - permit type annotations for

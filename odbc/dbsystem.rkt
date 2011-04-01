@@ -9,10 +9,8 @@
          "../generic/query.rkt"
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
-         "ffi.rkt"
-         "types.rkt")
-(provide dbsystem
-         (all-from-out "types.rkt"))
+         "ffi.rkt")
+(provide dbsystem)
 
 (define odbc-dbsystem%
   (class* object% (dbsystem<%>)
@@ -28,33 +26,3 @@
 
 (define dbsystem
   (new odbc-dbsystem%))
-
-;; ========================================
-
-(define type-writer-table
-  `((,SQL_CHAR . ,send-char)
-    (,SQL_VARCHAR . ,send-varchar)
-    ;; SQL_DECIMAL
-    ;; SQL_NUMERIC
-    (,SQL_SMALLINT . ,send-smallint)
-    (,SQL_INTEGER . ,send-integer)
-    (,SQL_REAL . ,send-real)
-    ;; SQL_FLOAT
-    (,SQL_DOUBLE . ,send-double)
-    ;; SQL_BIT
-    (,SQL_TINYINT . ,send-tinyint)
-    (,SQL_BIGINT . ,send-bigint)
-    ;; SQL_BINARY, SQL_VARBINARY
-    (,SQL_TYPE_DATE . ,send-date)
-    (,SQL_TYPE_TIME . ,send-time)
-    (,SQL_TYPE_TIMESTAMP . ,send-timestamp)
-    ;; SQL_UTCDATETIME
-    ;; SQL_UTCTIME
-    ;; SQL_INTERVAL_*
-    ;; SQL_GUID
-    ))
-
-(define (typeid->type-writer typeid)
-  (cond [(assoc typeid type-writer-table)
-         => cdr]
-        [else (error 'typeid->type-writer "unsupported type id: ~e" typeid)]))

@@ -151,11 +151,37 @@
              (bind SQL_C_CHAR SQL_DOUBLE
                    (copy-buffer (number->string (exact->inexact  param))))]
             [(sql-date? param)
-             (bind SQL_C_CHAR SQL_TYPE_DATE (copy-buffer (marshal-date param)))]
+             (bind SQL_C_TYPE_DATE SQL_TYPE_DATE
+                   (copy-buffer
+                    (let* ([x param]
+                           [y (sql-date-year x)]
+                           [m (sql-date-month x)]
+                           [d (sql-date-day x)])
+                      (bytes-append (integer->integer-bytes y 2 #t)
+                                    (integer->integer-bytes m 2 #f)
+                                    (integer->integer-bytes d 2 #f)))))]
             [(sql-time? param)
-             (bind SQL_C_CHAR SQL_TYPE_TIME (copy-buffer (marshal-time param)))]
+             (bind SQL_C_TYPE_TIME SQL_TYPE_TIME
+                   (copy-buffer
+                    (let* ([x param]
+                           [h (sql-time-hour x)]
+                           [m (sql-time-minute x)]
+                           [s (sql-time-second x)])
+                      (bytes-append (integer->integer-bytes h 2 #f)
+                                    (integer->integer-bytes m 2 #f)
+                                    (integer->integer-bytes s 2 #f)))))]
             [(sql-timestamp? param)
-             (bind SQL_C_CHAR SQL_TYPE_TIMESTAMP (copy-buffer (marshal-timestamp param)))]
+             (bind SQL_C_TYPE_TIMESTAMP SQL_TYPE_TIMESTAMP
+                   (copy-buffer
+                    (let ([x param])
+                      (bytes-append
+                       (integer->integer-bytes (sql-timestamp-year x) 2 #f)
+                       (integer->integer-bytes (sql-timestamp-month x) 2 #f)
+                       (integer->integer-bytes (sql-timestamp-day x) 2 #f)
+                       (integer->integer-bytes (sql-timestamp-hour x) 2 #f)
+                       (integer->integer-bytes (sql-timestamp-minute x) 2 #f)
+                       (integer->integer-bytes (sql-timestamp-second x) 2 #f)
+                       (integer->integer-bytes (sql-timestamp-nanosecond x) 4 #f)))))]
             [(sql-null? param)
              (bind SQL_C_CHAR SQL_VARCHAR #f)]
             [else (error 'load-param "cannot convert to unknown type: ~e" param)]))

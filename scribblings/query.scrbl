@@ -53,6 +53,35 @@ managing custodian---may leave the connection in a damaged state,
 causing future operations to return garbage, raise errors, or block
 indefinitely.
 
+@section{Statements}
+
+All queries require both a connection and a @deftech{statement}, which
+is one of the following:
+@itemlist[
+@item{a string containing a single SQL statement, possibly with
+parameters}
+@item{a @tech{prepared statement} produced by @racket[prepare] or
+@racket[prepare-multiple]}
+@item{an @tech{automatically prepared statement} produced by
+@racket[auto-prepare-statement]}
+@item{a statement-binding value produced by
+@racket[bind-prepared-statement]}
+]
+
+@defproc[(statement? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is a @tech{statement}, @racket[#f]
+  otherwise.
+
+  Equivalent to the following:
+  @racketblock[
+    (or (string? x)
+        (prepared-statement? x)
+        (auto-prepare-statement? x)
+        (statement-binding? x))
+  ]
+}
+
 
 @section{Simple queries}
 
@@ -67,7 +96,7 @@ string or prepared statement can be given parameters; if the statement
 is a statement-binding, no additional parameters are permitted.
 
 @defproc[(query-exec [connection connection?]
-                     [stmt (or/c string? prepared-statement? statement-binding?)]
+                     [stmt statement?]
                      [arg any/c] ...)
          void?]{
 
@@ -82,7 +111,7 @@ is a statement-binding, no additional parameters are permitted.
 }
 
 @defproc[(query-rows [connection connection?]
-                     [stmt (or/c string? prepared-statement? statement-binding?)]
+                     [stmt statement?]
                      [arg any/c] ...)
          (listof (vectorof _field))]{
 
@@ -98,7 +127,7 @@ is a statement-binding, no additional parameters are permitted.
 }
 
 @defproc[(query-list [connection connection?]
-                     [stmt (or/c string? prepared-statement? statement-binding?)]
+                     [stmt statement?]
                      [arg any/c] ...)
          (listof _field)]{
 
@@ -114,7 +143,7 @@ is a statement-binding, no additional parameters are permitted.
 }
 
 @defproc[(query-row [connection connection?]
-                    [stmt (or/c string? prepared-statement? statement-binding?)]
+                    [stmt statement?]
                     [arg any/c] ...)
          (vectorof _field)]{
 
@@ -130,7 +159,7 @@ is a statement-binding, no additional parameters are permitted.
 }
 
 @defproc[(query-maybe-row [connection connection?]
-                          [stmt (or/c string? prepared-statement? statement-binding?)]
+                          [stmt statement?]
                           [arg any/c] ...)
          (or/c (vectorof _field) false/c)]{
 
@@ -146,7 +175,7 @@ is a statement-binding, no additional parameters are permitted.
 }
 
 @defproc[(query-value [connection connection?]
-                      [stmt (or/c string? prepared-statement? statement-binding?)]
+                      [stmt statement?]
                       [arg any/c] ...)
          _field]{
 
@@ -162,7 +191,7 @@ is a statement-binding, no additional parameters are permitted.
 }
 
 @defproc[(query-maybe-value [connection connection?]
-                            [stmt (or/c string? prepared-statement? statement-binding?)]
+                            [stmt statement?]
                             [arg any/c] ...)
          (or/c _field false/c)]{
 
@@ -179,16 +208,6 @@ is a statement-binding, no additional parameters are permitted.
 
 
 @section{General query support}
-
-A statement is one of the following:
-@itemlist[
-@item{a string containing a single SQL statement, possibly with
-parameters}
-@item{a @tech{prepared statement} produced by @racket[prepare] or
-@racket[prepare-multiple]}
-@item{a statement-binding value produced by
-@racket[bind-prepared-statement]}
-]
 
 A general query result is either a @racket[simple-result] or a
 @racket[recordset].
@@ -224,7 +243,7 @@ database system and may change in future versions of this library.
 }
 
 @defproc[(query [connection connection?]
-                [stmt (or/c string? prepared-statement? statement-binding?)]
+                [stmt statement?]
                 [arg any/c] ...)
          (or/c simple-result? recordset?)]{
 
@@ -293,14 +312,14 @@ PostgreSQL: @verbatim{select * from the_numbers where num > $1;}
 
 MySQL: @verbatim{select * from the_numbers where num > ?;}
 
-SQLite supports both syntaxes and possibly others.
+SQLite supports both syntaxes.
 
 @deftogether[[
 @defproc[(prepare [connection connection?]
-                  [prep string?])
+                  [stmt string?])
          prepared-statement?]
 @defproc[(prepare-multiple [connection connection?]
-                           [preps (listof string?)])
+                           [stmts (listof string?)])
          (listof prepared-statement?)]]]{
 
   Prepares parameterized queries. The resulting @tech{prepared
@@ -308,28 +327,6 @@ SQLite supports both syntaxes and possibly others.
   error to use them with any other connection. (The prepared statement
   holds its connection link weakly; a reference to a prepared
   statement will not keep a connection from being garbage collected.)
-}
-
-@defproc[(bind-prepared-statement
-            [pst prepared-statement?]
-            [params (listof any/c)])
-         statement-binding?]{
-
-  Fills in the parameters of a parameterized prepared query. The
-  resulting statement can be executed with @racket[query],
-  @racket[query-multiple], or any of the other query functions, but it
-  must be used with the same connection that created it.
-
-  @(examples/results
-    [(let* ([get-name-pst
-            (prepare pgc "select description from the_numbers where n = $1")]
-            [get-name2
-             (bind-prepared-statement get-name-pst (list 2))]
-            [get-name3
-             (bind-prepared-statement get-name-pst (list 3))])
-       (list (query-value pgc get-name2)
-             (query-value pgc get-name3)))
-     (list "company" "a crowd")])
 }
 
 @defproc[(prepared-statement? [x any/c]) boolean?]{
@@ -354,11 +351,78 @@ SQLite supports both syntaxes and possibly others.
   the function returns @racket[#f].
 }
 
+
+@defproc[(bind-prepared-statement
+            [pst prepared-statement?]
+            [params (listof any/c)])
+         statement-binding?]{
+
+  Fills in the parameters of a parameterized prepared query. The
+  resulting statement can be executed with @racket[query],
+  @racket[query-multiple], or any of the other query functions, but it
+  must be used with the same connection that created it.
+
+  @(examples/results
+    [(let* ([get-name-pst
+            (prepare pgc "select description from the_numbers where n = $1")]
+            [get-name2
+             (bind-prepared-statement get-name-pst (list 2))]
+            [get-name3
+             (bind-prepared-statement get-name-pst (list 3))])
+       (list (query-value pgc get-name2)
+             (query-value pgc get-name3)))
+     (list "company" "a crowd")])
+
+  Most query functions perform the binding step implicitly, but there
+  are functions such as @racket[query-fold] that do not accept query
+  parameters; @racket[bind-prepared-statement] is neccessary to use a
+  parameterized query with such functions.
+}
+
 @defproc[(statement-binding? [x any/c]) boolean?]{
 
   Returns @racket[#t] if @racket[x] is a statement created by
   @racket[bind-prepared-statement], @racket[#f] otherwise.
 }
+
+@defproc[(auto-prepare-statement [stmt-gen (or/c string? (-> dbsystem? string?))])
+         auto-prepare-statement?]{
+
+  Creates an @deftech{automatically prepared statement}
+  @racket[_auto-stmt], which encapsulates a weak hash mapping
+  connections to prepared statement objects. When a query function is
+  called with @racket[_auto-stmt] and a connection, the weak hash is
+  consulted to see if the statement has already been prepared for that
+  connection. If so, the prepared statement is used; otherwise, the
+  statement is prepared and stored in the table.
+
+  The @racket[stmt-gen] argument must be either a SQL string or a
+  function that accepts a databse system object and produces a SQL
+  string. The function variant allows the SQL syntax to be dynamically
+  customized for the database system in use.
+
+@examples/results[
+[(define pst
+   (auto-prepare-statement
+    (lambda (dbsys)
+      (case (dbsystem-name dbsys)
+        ((postgresql) "select n from the_numbers where n < $1")
+        ((sqlite3) "select n from the_numbers where n < ?")))))
+ (void)]
+[(query-list pgc pst 3)
+ (list 1 2)]
+[(query-list slc pst 3)
+ (list 1 2)]
+]
+}
+
+@defproc[(auto-prepare-statement? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is an automatically prepared
+  statement created by @racket[auto-prepare-statement], @racket[#f]
+  otherwise.
+}
+
 
 @section{Prepared queries as functions}
 

@@ -15,6 +15,8 @@
 
          prepared-statement<%>
          (struct-out statement-binding)
+         (except-out (struct-out auto-prepare-statement)
+                     auto-prepare-statement)
 
          connector<%>
          ssl-connector<%>
@@ -85,11 +87,16 @@
     ;; bind : symbol (listof param) -> StatementBinding
     bind))
 
-;; A statement is one of:
-;;   - string
+;; A statement-binding is:
 ;;   - (statement-binding prepared-statement ??? (listof ???))
 ;;     meta might include information such as text vs binary format
 (struct statement-binding (pst meta params))
+
+;; An auto-prepare-statement is:
+;;   - (auto-prepare-statement table gen)
+;;     where table is a weak-hasheq[connection => prepared-statement]
+;;     and gen is (dbsystem -> string)
+(define-struct auto-prepare-statement (table gen))
 
 ;; A YesNoOptional is one of 'yes, 'no, 'optional
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls

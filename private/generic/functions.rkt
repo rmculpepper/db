@@ -32,18 +32,33 @@
 ;; == Misc procedures
 
 (define (statement? x)
-  (or (string? x) (statement-binding? x)))
+  (or (string? x)
+      (prepared-statement? x)
+      (auto-prepare-statement? x)
+      (statement-binding? x)))
 
-(define (prepared-statement? x)
-  (is-a? x prepared-statement<%>))
+#|
+(define (complete-statement? x)
+  (or (string? x)
+      (statement-binding? x)))
+|#
+(define complete-statement?
+  (or/c string? statement-binding?))
 
 (define (bind-prepared-statement pst params)
   (send pst bind 'bind-prepared-statement params))
+
+(define (prepared-statement? x)
+  (is-a? x prepared-statement<%>))
 
 (define (prepared-statement-parameter-types pst)
   (send pst get-param-types))
 (define (prepared-statement-result-types pst)
   (send pst get-result-types))
+
+(define (auto-prepare-statement gen)
+  (make-auto-prepare-statement (make-weak-hasheq)
+                               (if (string? gen) (lambda (_) gen) gen)))
 
 ;; == Query procedures
 
@@ -142,9 +157,20 @@
          (raise-mismatch-error fsym "query returned multiple rows: " sql)]))
 
 (define (compose-statement fsym c sql args checktype)
-  (cond [(or (pair? args) (prepared-statement? sql))
+  (cond [(or (pair? args)
+             (prepared-statement? sql)
+             (auto-prepare-statement? sql))
          (let ([pst
                 (cond [(string? sql) (prepare c sql)]
+                      [(auto-prepare-statement? sql)
+                       (let ([table (auto-prepare-statement-table sql)]
+                             [gen (auto-prepare-statement-gen sql)])
+                         (let ([table-pst (hash-ref table c #f)])
+                           (or table-pst
+                               (let* ([sql-string (gen (send c get-dbsystem))]
+                                      [pst (prepare1 fsym c sql-string)])
+                                 (hash-set! table c pst)
+                                 pst))))]
                       [(prepared-statement? sql)
                        ;; Ownership check done later, by query* method.
                        sql]
@@ -231,20 +257,20 @@
   (let ([sql (compose-statement 'query c sql args #f)])
     (query1 c 'query sql vectorlist-collector/fieldinfo)))
 
-;; -- Functions without auto-prep --
+;; -- Functions that don't accept stmt params --
 
 ;; query-multiple : connection (list-of Statement) -> (list-of QueryResult)
 (define (query-multiple c stmts)
   (send c query* 'query-multiple stmts vectorlist-collector/fieldinfo))
 
 ;; query-exec* : connection Statement ... -> void
-(define (query-exec* c . sqls)
-  (send c query* 'query-exec* sqls void-collector)
+(define (query-exec* c . stmts)
+  (send c query* 'query-exec* stmts void-collector)
   (void))
 
 ;; query-fold : connection Statement ('a field ... -> 'a) 'a -> 'a
-(define (query-fold c sql f base)
-  (-fold c 'query-fold sql
+(define (query-fold c stmt f base)
+  (-fold c 'query-fold stmt
          (lambda (b av)
            (apply f b (vector->list av)))
          base))
@@ -288,9 +314,12 @@
      (defprepare name method [#:check check ...] [#:arg])]
     [(defprepare name method [#:check check ...] [#:arg arg ...])
      (define (name c sql arg ...)
-       (let ([pst (car (send c prepare* 'name (list sql)))])
+       (let ([pst (prepare1 'name c sql)])
          (check 'name pst sql) ...
          (lambda args (method c (send pst bind 'name args) arg ...))))]))
+
+(define (prepare1 fsym c sql)
+  (car (send c prepare* fsym (list sql))))
 
 (define (check-results name pst stmt)
   (unless (send pst get-result-count)
@@ -307,7 +336,7 @@
 ;; Prepared query API procedures
 
 (define (prepare c stmt)
-  (car (send c prepare* 'prepare (list stmt))))
+  (prepare1 'prepare c stmt))
 
 (define (prepare-multiple c stmts)
   (send c prepare* 'prepare-multiple stmts))
@@ -352,9 +381,6 @@
 
 ;; == Contracts
 
-(define callable/c
-  (or/c statement? prepared-statement?))
-
 (provide/contract
  [connection?
   (-> any/c any)]
@@ -371,6 +397,10 @@
 
  [statement?
   (-> any/c any)]
+ #|
+ [complete-statement?
+  (-> any/c any)]
+ |#
  [prepared-statement?
   (-> any/c any)]
  [prepared-statement-parameter-types
@@ -379,28 +409,28 @@
   (-> prepared-statement? (or/c list? #f))]
 
  [query-exec
-  (->* (connection? callable/c) () #:rest list? any)]
+  (->* (connection? statement?) () #:rest list? any)]
  [query-rows
-  (->* (connection? callable/c) () #:rest list? (listof vector?))]
+  (->* (connection? statement?) () #:rest list? (listof vector?))]
  [query-list
-  (->* (connection? callable/c) () #:rest list? list?)]
+  (->* (connection? statement?) () #:rest list? list?)]
  [query-row
-  (->* (connection? callable/c) () #:rest list? vector?)]
+  (->* (connection? statement?) () #:rest list? vector?)]
  [query-maybe-row
-  (->* (connection? callable/c) () #:rest list? (or/c #f vector?))]
+  (->* (connection? statement?) () #:rest list? (or/c #f vector?))]
  [query-value
-  (->* (connection? callable/c) () #:rest list? any)]
+  (->* (connection? statement?) () #:rest list? any)]
  [query-maybe-value
-  (->* (connection? callable/c) () #:rest list? any)]
+  (->* (connection? statement?) () #:rest list? any)]
  [query
-  (->* (connection? callable/c) () #:rest list? any)]
+  (->* (connection? statement?) () #:rest list? any)]
 
  [query-multiple
-  (-> connection? (listof statement?) any)]
+  (-> connection? (listof complete-statement?) any)]
  [query-exec*
-  (->* (connection?) () #:rest (listof statement?) any)]
+  (->* (connection?) () #:rest (listof complete-statement?) any)]
  [query-fold
-  (-> connection? statement? procedure? any/c any)]
+  (-> connection? complete-statement? procedure? any/c any)]
 
  [prepare
   (-> connection? string? any)]
@@ -408,6 +438,10 @@
   (-> connection? (listof string?) any)]
  [bind-prepared-statement
   (-> prepared-statement? list? any)]
+
+ [auto-prepare-statement
+  (-> (or/c string? (-> dbsystem? string?))
+      any)]
 
  [prepare-query
   (-> connection? string? any)]

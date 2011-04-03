@@ -11,6 +11,7 @@
          (struct-out recordset)
          (struct-out field-info)
          statement-binding?
+         auto-prepare-statement?
 
          sql-null
          sql-null?

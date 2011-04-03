@@ -3,22 +3,9 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require racket/match
+(require racket/contract
+         racket/match
          (prefix-in srfi: srfi/19))
-
-(provide sql-null
-         sql-null?
-
-         (struct-out sql-date)
-         (struct-out sql-time)
-         (struct-out sql-timestamp)
-
-         sql-datetime->srfi-date
-         srfi-date->sql-date
-         srfi-date->sql-time
-         srfi-date->sql-time-tz
-         srfi-date->sql-timestamp
-         srfi-date->sql-timestamp-tz)
 
 ;; SQL Data
 ;; Datatypes for things that have no appropriate corresponding Scheme datatype
@@ -83,3 +70,38 @@
 
 (define (srfi-date->sql-timestamp-tz date [ns #f])
   (srfi-date->sql-timestamp* date #t ns))
+
+;; ----
+
+(provide sql-null
+         sql-null?)
+(provide/contract
+ [struct sql-date ([year exact-integer?]
+                   [month exact-nonnegative-integer?]
+                   [day exact-nonnegative-integer?])]
+ [struct sql-time ([hour exact-nonnegative-integer?]
+                   [minute exact-nonnegative-integer?]
+                   [second exact-nonnegative-integer?]
+                   [nanosecond exact-nonnegative-integer?]
+                   [tz (or/c #f exact-integer?)])]
+ [struct sql-timestamp ([year exact-integer?]
+                        [month exact-nonnegative-integer?]
+                        [day exact-nonnegative-integer?]
+                        [hour exact-nonnegative-integer?]
+                        [minute exact-nonnegative-integer?]
+                        [second exact-nonnegative-integer?]
+                        [nanosecond exact-nonnegative-integer?]
+                        [tz (or/c #f exact-integer?)])]
+ [sql-datetime->srfi-date
+  (-> (or/c sql-date? sql-time? sql-timestamp?)
+      srfi:date?)]
+ [srfi-date->sql-date
+  (-> srfi:date? sql-date?)]
+ [srfi-date->sql-time
+  (-> srfi:date? sql-time?)]
+ [srfi-date->sql-time-tz
+  (-> srfi:date? sql-time?)]
+ [srfi-date->sql-timestamp
+  (-> srfi:date? sql-timestamp?)]
+ [srfi-date->sql-timestamp-tz
+  (-> srfi:date? sql-timestamp?)])

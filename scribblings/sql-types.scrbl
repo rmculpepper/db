@@ -4,7 +4,8 @@
           scribble/struct
           scheme/sandbox
           "config.rkt"
-          "tabbing.rkt")
+          "tabbing.rkt"
+          (for-label (prefix-in srfi: srfi/19)))
 
 @title[#:tag "sql-types"]{SQL types and conversions}
 
@@ -263,23 +264,25 @@ no existing close analogues.
  (make-sql-timestamp 1969 12 31 19 0 0 0 #f)]
 ]
 
+@deftogether[[
 @defproc[(sql-datetime->srfi-date [t (or/c sql-date? sql-time? sql-timestamp?)])
-         date?]
-@defproc[(srfi-date->sql-date [d date?])
+         srfi:date?]
+@defproc[(srfi-date->sql-date [d srfi:date?])
          sql-date?]
-@defproc[(srfi-date->sql-time [d date?])
+@defproc[(srfi-date->sql-time [d srfi:date?])
          sql-time?]
-@defproc[(srfi-date->sql-time-tz [d date?])
+@defproc[(srfi-date->sql-time-tz [d srfi:date?])
          sql-time?]
-@defproc[(srfi-date->sql-timestamp [d date?])
+@defproc[(srfi-date->sql-timestamp [d srfi:date?])
          sql-timestamp?]
-@defproc[(srfi-date->sql-timestamp-tz [d date?])
-         sql-timestamp?]{
+@defproc[(srfi-date->sql-timestamp-tz [d srfi:date?])
+         sql-timestamp?]]]{
 
   Converts between this library's date and time values and SRFI 19's
-  date values. SRFI dates store more information than SQL dates and
-  times, so converting a SQL time to a SRFI date, for example, puts
-  zeroes in the year, month, and day fields.
+  date values (see @racketmodname[srfi/19]). SRFI dates store more
+  information than SQL dates and times, so converting a SQL time to a
+  SRFI date, for example, puts zeroes in the year, month, and day
+  fields.
 
 @(examples/results
   [(sql-datetime->srfi-date
@@ -292,5 +295,4 @@ no existing close analogues.
   [(sql-datetime->srfi-date
     (query-value pgc "select timestamp 'epoch'"))
    (sql-datetime->srfi-date (make-sql-timestamp 1970 1 1 0 0 0 0 #f))])
-
 }

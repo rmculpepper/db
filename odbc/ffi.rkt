@@ -28,7 +28,7 @@
 Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
 |#
 
-(define-ffi-definer define-odbc (ffi-lib "libodbc")) ;; FIXME
+(define-ffi-definer define-odbc (ffi-lib "libodbc" '("1")))
 
 (define-odbc SQLAllocHandle
   (_fun (type : _sqlsmallint)

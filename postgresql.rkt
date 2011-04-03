@@ -1,9 +1,10 @@
-;; Copyright 2009-2010 Ryan Culpepper
+;; Copyright 2009-2011 Ryan Culpepper
 ;; Released under the terms of the modified BSD license (see the file
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "generic/main.rkt"
+(require "base.rkt"
          (prefix-in postgresql- "postgresql/main.rkt"))
-(provide (all-from-out "generic/main.rkt")
-         (all-from-out "postgresql/main.rkt"))
+(provide (all-from-out "base.rkt")
+         postgresql-connect
+         postgresql-guess-socket-path)

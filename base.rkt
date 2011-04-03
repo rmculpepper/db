@@ -3,7 +3,5 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "base.rkt"
-         (prefix-in sqlite3- "sqlite3/main.rkt"))
-(provide (all-from-out "base.rkt")
-         sqlite3-connect)
+(require "generic/main.rkt")
+(provide (all-from-out "generic/main.rkt"))

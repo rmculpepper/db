@@ -9,6 +9,8 @@
          "../generic/check-access.rkt"
          "connection.rkt"
          "ffi.rkt")
+
+;; FIXME: Contracts duplicated at db/main.rkt
 (provide/contract
  [connect
   (-> #:database (or/c string? path? bytes? 'memory 'temporary)

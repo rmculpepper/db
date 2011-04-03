@@ -11,6 +11,8 @@
          "../generic/find-socket.rkt"
          "connection.rkt"
          "dbsystem.rkt")
+
+;; FIXME: Contracts duplicated at db/main.rkt
 (provide/contract
  [connect
   (->* (#:user string?

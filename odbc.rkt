@@ -4,6 +4,6 @@
 
 #lang racket/base
 (require "base.rkt"
-         (prefix-in sqlite3- "sqlite3/main.rkt"))
+         (prefix-in odbc- "odbc/main.rkt"))
 (provide (all-from-out "base.rkt")
-         sqlite3-connect)
+         odbc-connect)

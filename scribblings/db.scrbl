@@ -11,8 +11,7 @@
 @section-index["sqlite" "sqlite3"]
 @section-index["database" "sql"]
 
-This manual documents the @tt{database} package version
-@(my-package-version). This package is the successor to @tt{spgsql}.
+@centered{@bold{@italic{A database interface for functional programmers.}}}
 
 @(my-defmodule)
 
@@ -21,13 +20,13 @@ systems. The following database systems are currently supported:
 @itemlist[
 @item{@bold{PostgreSQL versions 7.4 and later}}
 @item{@bold{MySQL versions 5 and later}}
-@item{@bold{SQLite version 3} --- requires @tt{libsqlite3} shared library}
-@item{@bold{ODBC} --- requires @tt{libodbc} shared library}
+@item{@bold{SQLite version 3} --- requires @tt{libsqlite3} native library}
+@item{@bold{ODBC} --- requires @tt{libodbc} native library}
 ]
 Support for PostgreSQL and MySQL does not rely on any
-locally-installed client libraries; this package is everything you
+native client libraries; this package is everything you
 need to connect to a PostgreSQL or MySQL server. SQLite and ODBC
-support require the appropriate shared libraries to be installed.
+support require the appropriate native libraries to be installed.
 
 The query operations are functional in spirit. Queries return results;
 they do not stow them away in the connection for later manipulation
@@ -39,7 +38,7 @@ can use a connection simultaneously.
 and Doug Orleans for contributions to @tt{spgsql}, the PostgreSQL-only
 predecessor of this package.
 
-@include-section["overview.scrbl"]
+@include-section["introduction.scrbl"]
 @include-section["connect.scrbl"]
 @include-section["query.scrbl"]
 @include-section["sql-types.scrbl"]

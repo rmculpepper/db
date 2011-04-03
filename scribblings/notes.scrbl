@@ -73,12 +73,12 @@ when creating a prepared statement.
 
 @section{SQLite}
 
-Requires the @tt{libsqlite3} shared library (specifically
+Requires the @tt{libsqlite3} native library (specifically
 @tt{libsqlite3.so.0}).
 
 
 @section{ODBC}
 
-Requires the @tt{libodbc} shared library (specifically
+Requires the @tt{libodbc} native library (specifically
 @tt{libodbc.so.1}), provided by a package such as @tt{unixODBC} or
 @tt{iODBC}.

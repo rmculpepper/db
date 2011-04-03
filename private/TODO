@@ -28,6 +28,11 @@ To do
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)
 
+- add auto-prepared-statement:
+  - has weak hash of connection => prepared statement,
+    on (query-* auto-pst blah ...), prepares stmt if not already in table
+  - allow dbsystem-dispatch (would be great for testing...)
+
 ----
 
 bug: mysql concurrency tests sometimes fail

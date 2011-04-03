@@ -47,10 +47,11 @@ character set encoding.}
 
 @bold{Synchronization} Connections are internally synchronized: it is
 safe to perform concurrent queries on the same connection object from
-different threads. @emph{Connections are not kill-safe.}  Killing a
+different threads. @emph{Connections are not kill-safe:} killing a
 thread that is using a connection---or shutting down the connection's
 managing custodian---may leave the connection in a damaged state,
-causing future operations to return garbage or block indefinitely.
+causing future operations to return garbage, raise errors, or block
+indefinitely.
 
 
 @section{Simple queries}

@@ -27,10 +27,12 @@ Connections are made using the following functions.
                   [#:ssl ssl (symbols 'yes 'optional 'no) 'no]
                   [#:notice-handler notice-handler
                    (or/c 'output 'error output-port?
-                         (-> string? string? any))]
+                         (-> string? string? any))
+                   'error]
                   [#:notification-handler notification-handler
                    (or/c 'output 'error output-port?
-                         (-> string? any))])
+                         (-> string? any))
+                   'error])
          connection?]{
 
   Creates a connection to a PostgreSQL server. The
@@ -77,10 +79,10 @@ Connections are made using the following functions.
   @racket[notification-handler] is called in response to an event
   notification (see the @tt{LISTEN} and @tt{NOTIFY} statements); its
   argument is the name of the event as a string. The default behavior
-  for both handlers is to print a message to the current error port; a
-  value of @racket['output] sends the messages to the current output
-  port instead, and an output port sends the value to that output
-  port.
+  for both handlers (represented by an @racket['error] argument
+  value) is to print a message to the current error port; a value of
+  @racket['output] sends the messages to the current output port
+  instead, and an output port sends the message to that output port.
 
   If the connection cannot be made, an exception is raised.
 
@@ -128,8 +130,6 @@ Connections are made using the following functions.
   Creates a connection to a MySQL server. The meaning of the keyword
   arguments is similar to those of the @racket[postgresql-connect]
   function.
-
-  The default port for MySQL databases is 3306.
 
   @(examples/results
     [(mysql-connect #:server "db.mysite.com"
@@ -282,9 +282,9 @@ this manual.
 
 @(my-defmodule/nd base)
 
-Provides all generic connection operations, including those described
-in @secref{managing-connections}, @secref{query-api}, and
-@secref{sql-types}.
+Provides all generic connection operations (those described in
+@secref{managing-connections} and @secref{query-api}) and SQL data
+support (@secref{sql-types}).
 
 @(my-defmodule/nd postgresql)
 

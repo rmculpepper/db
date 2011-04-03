@@ -7,10 +7,13 @@
 (define compile-omit-paths
   '("tests"))
 (define blurb
-  '("This library provides a high-level, functional interface to PostgreSQL, "
-    "MySQL, and SQLite databases. PostgreSQL and MySQL support is implemented "
-    "in pure Racket, but SQLite access requires the SQLite native client library."))
-(define scribblings '(("scribblings/database.scrbl" (multi-page))))
+  '("A database interface for functional programmers."
+    "This library provides a high-level, functional interface to PostgreSQL, "
+    "MySQL, and SQLite databases as well as ODBC data sources. "
+    "PostgreSQL and MySQL support is implemented in pure Racket. "
+    "The optional SQLite and ODBC support requires the appropriate "
+    "native client libraries."))
+(define scribblings '(("scribblings/db.scrbl" (multi-page))))
 (define categories '(net))
 (define can-be-loaded-with 'all)
 (define required-core-version "5.1")

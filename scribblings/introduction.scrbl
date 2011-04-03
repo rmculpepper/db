@@ -5,7 +5,7 @@
           racket/sandbox
           "config.rkt")
 
-@title[#:tag "overview"]{Overview}
+@title[#:tag "introduction"]{Introduction}
 
 The following annotated program demonstrates how to connect to a
 database and perform simple queries. Some of the SQL syntax is
@@ -18,7 +18,7 @@ PostgreSQL-specific, such as the syntax of query parameters.
 
 First we create a connection. Replace @racket[_user], @racket[_db],
 and @racket[_password] below with the appropriate values for your
-configuration (see @secref{connect} for other connection examples):
+configuration (see @secref{creating-connections} for other connection examples):
 
 @my-interaction[
 [(define pgc
@@ -81,7 +81,7 @@ descriptions are not needed, it is more convenient to use the
 ]
 
 Use @racket[query-row] for queries that are known to return a
-recordset of just one row.
+recordset of exactly one row.
 
 @my-interaction[
 [(query-row pgc "select * from the_numbers where n = 0")

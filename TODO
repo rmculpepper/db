@@ -1,6 +1,8 @@
 To do
 =====
 
+- earlier param type checking (avoid checking within lock!)
+
 - add "[fatal]" to fatal error messages (where feasible)
 
 - test odbc

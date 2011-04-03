@@ -31,8 +31,8 @@ errors should never cause a connection to be disconnected:
 The following kinds of errors may cause a connection to be
 disconnected:
 @itemize[
-@item{changing communication settings, such as changing the character
-  encoding to anything other than UTF-8}
+@item{changing communication settings, such as changing the
+  connection's character encoding}
 @item{communication failures and internal errors in the library}
 ]
 
@@ -49,8 +49,8 @@ character set encoding.}
 safe to perform concurrent queries on the same connection object from
 different threads. @emph{Connections are not kill-safe.}  Killing a
 thread that is using a connection---or shutting down the connection's
-managing custodian---may leave the connection in a damaged state where
-future operations may return garbage or block indefinitely.
+managing custodian---may leave the connection in a damaged state,
+causing future operations to return garbage or block indefinitely.
 
 
 @section{Simple queries}
@@ -331,20 +331,16 @@ SQLite supports both syntaxes and possibly others.
          (listof symbol?)]{
 
   Returns a list of symbols, one for each of the prepared statement's
-  parameters. For PostgreSQL and MySQL connections, the symbols
-  identify the expected SQL types of the parameters. For SQLite
-  connections, the symbol is always @racket['any].
+  parameters, identifying the types of the parameters.
 }
 
 @defproc[(prepared-statement-result-types [pst prepared-statement?])
          (or/c (listof symbol?) #f)]{
 
-  For PostgreSQL and MySQL, if @racket[pst] is a recordset-producing
-  statement (eg, @tt{SELECT}), returns a list of symbols, identifying
-  the SQL types of the result columns.
-
-  For SQLite, or if @racket[pst] does not produce a recordset, the
-  function returns @racket[#f].
+  If @racket[pst] is a recordset-producing statement (eg,
+  @tt{SELECT}), returns a list of symbols, identifying the SQL types
+  of the result columns. If @racket[pst] does not produce a recordset,
+  the function returns @racket[#f].
 }
 
 @defproc[(statement-binding? [x any/c]) boolean?]{

@@ -87,8 +87,6 @@ Array types are not currently supported.
 [(query-value pgc "select '{1,2,3}'::int[]") "{1,2,3}"]
 ]
 
-See also date and time examples in @secref{sql-data}.
-
 
 @subsection[#:tag "mysql-types"]{MySQL}
 
@@ -113,18 +111,16 @@ with their corresponding Racket representations.
 @;{FIXME: blob types?}
 }
 
-MySQL does not infer parameter types in prepared queries, instead
-assigning them the type @tt{var-string}. Consequently, conversion of
-Racket values to @tt{var-string} parameters accepts, in addition to
-strings, numbers (@racket[rational?]---no infinities or NaN) and SQL
-date/time structures (@racket[sql-date?], @racket[sql-time?], and
-@racket[sql-timestamp?]).
+MySQL does not report specific parameter types for prepared queries,
+instead assigning them the type @tt{var-string}. Consequently,
+conversion of Racket values to @tt{var-string} parameters accepts, in
+addition to strings, numbers (@racket[rational?]---no infinities or
+NaN) and SQL date/time structures (@racket[sql-date?],
+@racket[sql-time?], and @racket[sql-timestamp?]).
 
 A SQL value of type @tt{decimal} (aka @tt{numeric}) is always
 converted to an exact rational (MySQL seems not to support infinite
 @tt{decimal} values).
-
-See also date and time examples in @secref{sql-data}.
 
 
 @subsection[#:tag "sqlite-types"]{SQLite}
@@ -144,6 +140,11 @@ every SQLite value has an associated ``storage class''.
   @tt{blob}                    @& @scheme[bytes?]
 }
 
+SQLite does not report specific parameter and result types for
+prepared queries. Instead, they are assigned the pseudotype
+@tt{any}. Conversion of Racket values to @tt{any} parameters accepts
+strings, bytes, and real numbers. 
+
 An exact integer that cannot be represented as a 64-bit signed integer
 is converted as @tt{real}, not @tt{integer}.
 
@@ -153,11 +154,49 @@ is converted as @tt{real}, not @tt{integer}.
 ]
 
 
+@subsection[#:tag "odbc-types"]{ODBC}
+
+The following table lists the ODBC types known to this package,
+along with their corresponding Racket representations.
+
+@tabbing{
+  @bold{ODBC type}  @& @bold{Racket type} @//
+  @tt{char}         @& @scheme[string?] @//
+  @tt{varchar}      @& @scheme[string?] @//
+  @tt{longvarchar}  @& @scheme[string?] @//
+  @tt{numeric}      @& @scheme[rational?] @//
+  @tt{decimal}      @& @scheme[rational?] @//
+  @tt{integer}      @& @scheme[exact-integer?] @//
+  @tt{tinyint}      @& @scheme[exact-integer?] @//
+  @tt{smallint}     @& @scheme[exact-integer?] @//
+  @tt{bigint}       @& @scheme[exact-integer?] @//
+  @tt{float}        @& @scheme[real?] @//
+  @tt{real}         @& @scheme[real?] @//
+  @tt{double}       @& @scheme[real?] @//
+  @tt{date}         @& @scheme[sql-date?] @//
+  @tt{time}         @& @scheme[sql-time?] @//
+  @tt{datetime}     @& @scheme[sql-timestamp?] @//
+  @tt{timestamp}    @& @scheme[sql-timestamp?] @//
+  @tt{binary}       @& @scheme[bytes?] @//
+  @tt{varbinary}    @& @scheme[bytes?] @//
+  @tt{longvarbinary}@& @scheme[bytes?] @//
+  @tt{bit}          @& @scheme[boolean?]
+}
+
+Not all ODBC drivers provide parameter type information for prepared
+queries. In such situations the connection assigns the parameter the
+pseudotype @tt{unknown}. Conversion of Racket values to @tt{unknown}
+parameters accepts strings, bytes, numbers (@racket[rational?]---no
+infinities or NaN) and SQL date/time structures (@racket[sql-date?],
+@racket[sql-time?], and @racket[sql-timestamp?]).
+
+
 @;{----------------------------------------}
 
 @section[#:tag "sql-data"]{SQL data}
 
-SQL @tt{NULL} values are always translated into the unique @scheme[sql-null] value.
+SQL @tt{NULL} is always translated into the unique @scheme[sql-null]
+value.
 
 @defthing[sql-null sql-null?]
 @defproc[(sql-null? [val any/c])

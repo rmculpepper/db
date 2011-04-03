@@ -3,7 +3,5 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "base.rkt"
-         (prefix-in odbc- "odbc/main.rkt"))
-(provide (all-from-out "base.rkt")
-         odbc-connect)
+(require (prefix-in odbc- "odbc/main.rkt"))
+(provide odbc-connect)

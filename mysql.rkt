@@ -3,8 +3,6 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "base.rkt"
-         (prefix-in mysql- "mysql/main.rkt"))
-(provide (all-from-out "base.rkt")
-         mysql-connect
+(require (prefix-in mysql- "mysql/main.rkt"))
+(provide mysql-connect
          mysql-guess-socket-path)

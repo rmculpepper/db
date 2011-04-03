@@ -3,7 +3,8 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require scribble/manual
+(require (for-syntax racket/base "../generic/unstable-syntax.rkt")
+         scribble/manual
          scribble/eval
          racket/sandbox
          (for-label racket/base
@@ -14,13 +15,26 @@
                     (all-from-out racket/contract)
                     (all-from-out (planet ryanc/db:1:0))))
 
-(define-syntax-rule (my-defmodule)
-  (defmodule (planet ryanc/db:1:0)))
-(define-syntax-rule (my-declare-exporting)
-  (declare-exporting (planet ryanc/db:1:0)))
-
 (define (my-package-version) "1.0")
 (define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:0)))))
+
+(define-syntax-rule (defmy name underlying)
+  (define-syntax (name stx)
+    (syntax-case stx ()
+      [(name)
+       #'(underlying (planet ryanc/db:1:0))]
+      [(name id)
+       (identifier? #'id)
+       (with-syntax ([mod (format-id #'id "ryanc/db:1:0/~a" #'id)])
+         #'(underlying (planet mod)))])))
+
+(defmy my-defmodule defmodule)
+(defmy my-defmodule/nd defmodule/nd)
+(defmy my-declare-exporting declare-exporting)
+(defmy my-racketmodname racketmodname)
+
+(define-syntax-rule (defmodule/nd mod)
+  (defmodule*/no-declare (mod)))
 
 ;; ----
 

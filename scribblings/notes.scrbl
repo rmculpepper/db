@@ -44,6 +44,27 @@ seems to work for unix domain sockets. The @tt{gss}, @tt{sspi},
 
 This library does not currently handle notices or notifications.
 
+@subsection{Character encoding}
+
+In most cases, a PostgreSQL database's character encoding is
+irrelevant, since this library always requests translation to Unicode
+(UTF-8) when creating a connection. If a database's character encoding
+is @tt{SQL_ASCII}, however, PostgreSQL will not honor the connection
+encoding; it will instead send untranslated octets, which will cause
+corrupt data or internal errors in the client connection.
+
+To convert a PostgreSQL from @tt{SQL_ASCII} to something sensible,
+@tt{pg_dump} the database, recode the dump file, create a new database
+with the desired encoding, and @tt{pg_restore} from the recoded dump
+file. For example, to interpret strings in the old database as
+@tt{LATIN1} and load them into a @tt{UTF8} database, convert the dump
+file thus:
+
+@tt{iconv -f latin1 -t utf8 < dump.sql > dump-utf8.sql}
+
+Changing the connection encoding (via the @tt{SET client_encoding}
+statement) is not allowed; the connection will observe the change and
+automatically disconnect with an error.
 
 @section{MySQL}
 
@@ -64,4 +85,12 @@ parameter types when creating a prepared statement.
 
 @section{SQLite}
 
-No notes.
+Requires the @tt{libsqlite3} shared library (specifically
+@tt{libsqlite3.so.0}).
+
+
+@section{ODBC}
+
+Requires the @tt{libodbc} shared library (specifically
+@tt{libodbc.so.1}), provided by a package such as @tt{unixODBC} or
+@tt{iODBC}.

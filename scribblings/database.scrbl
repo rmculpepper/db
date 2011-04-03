@@ -8,8 +8,8 @@
 
 @section-index["postgresql"]
 @section-index["mysql"]
-@section-index["sqlite"]
-@section-index["database"]
+@section-index["sqlite" "sqlite3"]
+@section-index["database" "sql"]
 
 This manual documents the @tt{database} package version
 @(my-package-version). This package is the successor to @tt{spgsql}.
@@ -18,15 +18,16 @@ This manual documents the @tt{database} package version
 
 This package provides a high-level interface to several database
 systems. The following database systems are currently supported:
-@itemize[
-@item{PostgreSQL, versions 7.4 and later}
-@item{MySQL, versions 5 and later}
-@item{SQLite, version 3}
+@itemlist[
+@item{@bold{PostgreSQL versions 7.4 and later}}
+@item{@bold{MySQL versions 5 and later}}
+@item{@bold{SQLite version 3} --- requires @tt{libsqlite3} shared library}
+@item{@bold{ODBC} --- requires @tt{libodbc} shared library}
 ]
 Support for PostgreSQL and MySQL does not rely on any
 locally-installed client libraries; this package is everything you
-need to connect to a PostgreSQL or MySQL server. Connecting to a
-SQLite database requires the SQLite shared library to be installed.
+need to connect to a PostgreSQL or MySQL server. SQLite and ODBC
+support require the appropriate shared libraries to be installed.
 
 The query operations are functional in spirit. Queries return results;
 they do not stow them away in the connection for later manipulation

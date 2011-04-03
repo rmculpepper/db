@@ -1,8 +1,12 @@
 To do
 =====
 
+- add "[fatal]" to fatal error messages (where feasible)
+
 - export & test odbc
 - document odbc
+
+- some parts of docs are Linux-centric, especially ODBC part; broaden
 
 - clean up le/be/host in generic/io, odbc
 
@@ -25,3 +29,10 @@ bug: mysql concurrency tests sometimes fail
   - temporary fix: always wrap mysql connection in kill-safe proxy
 
 bug: mysql blob parsing differs (text vs binary)
+
+----
+
+add extra sanity-checking mode (connection option?)
+  - check server_encoding, print message if SQL_ASCII
+    eg: (query-value c "show server_encoding") => "UTF8"
+  - check postgresql typeids as expected?

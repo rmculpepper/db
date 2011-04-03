@@ -28,7 +28,7 @@
 Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
 |#
 
-(define-ffi-definer define-odbc (ffi-lib "libodbc" '("1")))
+(define-ffi-definer define-odbc (ffi-lib "libodbc" '("1" #f)))
 
 (define-odbc SQLAllocHandle
   (_fun (type : _sqlsmallint)
@@ -67,10 +67,23 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (server : _string)
         ((string-utf-8-length server) : _sqlsmallint)
         (user : _string)
-        ((string-utf-8-length user) : _sqlsmallint)
+        ((if user (string-utf-8-length user) 0) : _sqlsmallint)
         (auth : _string)
-        ((string-utf-8-length auth) : _sqlsmallint)
+        ((if auth (string-utf-8-length auth) 0) : _sqlsmallint)
         -> _sqlreturn))
+
+(define-odbc SQLDriverConnect
+  (_fun (handle connection driver-completion) ::
+        (handle : _sqlhdbc)
+        (#f : _pointer)
+        (connection : _string)
+        ((if connection (string-utf-8-length connection) 0) : _sqlsmallint)
+        (#f : _bytes) ;; FIXME
+        (0 : _sqlsmallint)
+        (out-length : (_ptr o _sqlsmallint))
+        (driver-completion : _sqlusmallint)
+        -> (status : _sqlreturn)
+        -> status))
 
 (define-odbc SQLDataSources
   (_fun (handle direction) ::
@@ -84,8 +97,27 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (descr-length : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)
         -> (values status
-                   (and (zero? status) (bytes->string/utf-8 server-buf #f 0 server-length))
-                   (and (zero? status) (bytes->string/utf-8 descr-buf #f 0 descr-length)))))
+                   (and (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+                        (bytes->string/utf-8 server-buf #f 0 server-length))
+                   (and (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+                        (bytes->string/utf-8 descr-buf #f 0 descr-length)))))
+
+(define-odbc SQLDrivers
+  (_fun (handle direction) ::
+        (handle : _sqlhenv)
+        (direction : _sqlusmallint)
+        (driver-buf : _bytes = (make-bytes 1024)) ;; FIXME
+        ((bytes-length driver-buf) : _sqlsmallint)
+        (driver-length : (_ptr o _sqlsmallint))
+        (attrs-buf : _bytes = #f) ;; FIXME
+        (0 : _sqlsmallint)
+        (attrs-length : (_ptr o _sqlsmallint))
+        -> (status : _sqlreturn)
+        -> (values status
+                   (and (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+                        (bytes->string/utf-8 driver-buf #f 0 driver-length))
+                   (and (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+                        #f))))
 
 (define-odbc SQLPrepare
   (_fun (handle stmt) ::

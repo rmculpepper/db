@@ -5,7 +5,7 @@
           racket/sandbox
           "config.rkt")
 
-@title{Overview}
+@title[#:tag "overview"]{Overview}
 
 The following annotated program demonstrates how to connect to a
 database and perform simple queries. Some of the SQL syntax is

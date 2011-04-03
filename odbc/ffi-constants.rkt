@@ -10,6 +10,11 @@
 (define SQL_HANDLE_STMT           3)
 (define SQL_HANDLE_DESC           4)
 
+(define SQL_DRIVER_NOPROMPT       0)
+(define SQL_DRIVER_COMPLETE       1)
+(define SQL_DRIVER_PROMPT         2)
+(define SQL_DRIVER_COMPLETE_REQUIRED 3)
+
 (define SQL_IS_POINTER           -4)
 (define SQL_IS_UINTEGER          -5)
 (define SQL_IS_INTEGER           -6)

@@ -12,7 +12,7 @@
 This section describes functions for creating connections as well as
 administrative functions for managing connections.
 
-@section{Creating connections}
+@section[#:tag "creating-connections"]{Creating connections}
 
 Connections are made using the following functions.
 
@@ -190,8 +190,42 @@ Connections are made using the following functions.
      (new connection%)])
 }
 
+@defproc[(odbc-connect [#:database database string?]
+                       [#:user user (or/c string? #f) #f]
+                       [#:password password (or/c string? #f) #f])
+         connection?]{
 
-@section{Mangaging connections}
+  Creates a connection to the ODBC Data Source named
+  @racket[database]. The @racket[user] and @racket[password] arguments
+  are optional.
+}
+
+@defproc[(odbc-driver-connect [connection-string string?])
+         connection?]{
+
+  Creates a connection using a connection string containing a sequence
+  of keyword and value connection parameters.
+}
+
+@defproc[(odbc-data-sources)
+         (listof (list/c string? string?))]{
+
+  Returns a list of known ODBC Data Sources. Each data souce is
+  represented by a list of two strings; the first string is the name
+  of the data source, and the second is the name of its associated
+  driver.
+}
+
+@defproc[(odbc-drivers)
+         (listof (cons/c string? any/c))]{
+
+  Returns a list of known ODBC Drivers. Each driver is represented by
+  a list, the first element of which is the name of the driver. The
+  contents of the rest of each entry is currently undefined.
+}
+
+
+@section[#:tag "managing-connections"]{Mangaging connections}
 
 @defproc[(connection? [x any/c])
          boolean?]{
@@ -233,5 +267,44 @@ following:
 @item[@racket['postgresql]]
 @item[@racket['mysql]]
 @item[@racket['sqlite3]]
+@item[@racket['odbc]]
 ]
 }
+
+@section{System-specific modules}
+
+The @(my-racketmodname) module exports all of the functions listed in
+this manual. Database system-specific connection modules are loaded
+lazily to avoid unnecessary dependencies on foreign libraries.
+
+The following modules provide subsets of the bindings described in
+this manual.
+
+@(my-defmodule/nd base)
+
+Provides all generic connection operations, including those described
+in @secref{managing-connections}, @secref{query-api}, and
+@secref{sql-types}.
+
+@(my-defmodule/nd postgresql)
+
+Provides only @racket[postgresql-connect] and
+@racket[postgresql-guess-socket-path].
+
+@(my-defmodule/nd mysql)
+
+Provides only @racket[mysql-connect] and
+@racket[mysql-guess-socket-path].
+
+@(my-defmodule/nd sqlite3)
+
+Provides only @racket[sqlite3-connect]. In contrast to
+@(my-racketmodname), this module immediately attempts to load the
+@tt{libsqlite3} foreign library when required.
+
+@(my-defmodule/nd odbc)
+
+Provides only @racket[odbc-connect], @racket[odbc-driver-connect],
+@racket[odbc-data-sources], and @racket[odbc-drivers]. In contrast to
+@(my-racketmodname), this module immediately attempts to load the
+@tt{libodbc} foreign library when required.

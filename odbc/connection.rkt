@@ -49,8 +49,10 @@
 (define connection%
   (class* object% (connection<%>)
     (init db)
+    (init env)
 
     (define -db db)
+    (define -env env)
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
 
@@ -343,12 +345,16 @@
       (with-lock
        (when -db
          (let ([db -db]
+               [env -env]
                [statements (hash-map statement-table (lambda (k v) k))])
            (set! -db #f)
+           (set! -env #f)
            (set! statement-table #f)
            (for ([pst (in-list statements)])
              (send pst finalize))
            (handle-status 'disconnect (SQLDisconnect db) db)
+           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_DBC db))
+           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_ENV env))
            (void)))))
 
     (super-new)

@@ -4,4 +4,7 @@
 
 #lang racket/base
 (require (prefix-in odbc- "odbc/main.rkt"))
-(provide odbc-connect)
+(provide odbc-connect
+         odbc-driver-connect
+         odbc-data-sources
+         odbc-drivers)

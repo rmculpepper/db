@@ -50,7 +50,10 @@
   sqlite3-connect)
 
 (define-lazy-functions "odbc.rkt"
-  odbc-connect)
+  odbc-connect
+  odbc-driver-connect
+  odbc-data-sources
+  odbc-drivers)
 
 (provide/contract
  ;; Duplicates contracts at db/postgresql/main.rkt
@@ -90,5 +93,14 @@
 
  ;; Duplicates contracts at db/odbc/main.rkt
  [odbc-connect
-  (-> #:database string? #:user string? #:password string?
-      connection?)])
+  (->* (#:database string?)
+       (#:user (or/c string? #f)
+        #:password (or/c string? #f))
+       connection?)]
+ [odbc-driver-connect
+  (-> string?
+      connection?)]
+ [odbc-data-sources
+  (-> (listof (list/c string? string?)))]
+ [odbc-drivers
+  (-> (listof (cons/c string? any/c)))])

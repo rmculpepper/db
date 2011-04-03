@@ -225,12 +225,13 @@
     (send c query* 'query-exec (list sql) void-collector)
     (void)))
 
-;; -- Functions without auto-prep --
-
-;; query : connection Statement -> QueryResult
+;; query : connection Statement arg ... -> QueryResult
 ;; Uses the default 'vectorlist' collector
-(define (query c sql)
-  (query1 c 'query sql vectorlist-collector/fieldinfo))
+(define (query c sql . args)
+  (let ([sql (compose-statement 'query c sql args #f)])
+    (query1 c 'query sql vectorlist-collector/fieldinfo)))
+
+;; -- Functions without auto-prep --
 
 ;; query-multiple : connection (list-of Statement) -> (list-of QueryResult)
 (define (query-multiple c stmts)
@@ -330,6 +331,8 @@
 
 (defprepare prepare-query-exec query-exec)
 
+(defprepare prepare-query query)
+
 (defprepare prepare-query-map query-map
   [#:check check-results]
   [#:arg proc])
@@ -389,9 +392,9 @@
   (->* (connection? callable/c) () #:rest list? any)]
  [query-maybe-value
   (->* (connection? callable/c) () #:rest list? any)]
-
  [query
-  (-> connection? statement? any)]
+  (->* (connection? callable/c) () #:rest list? any)]
+
  [query-multiple
   (-> connection? (listof statement?) any)]
  [query-exec*
@@ -406,6 +409,8 @@
  [bind-prepared-statement
   (-> prepared-statement? list? any)]
 
+ [prepare-query
+  (-> connection? string? any)]
  [prepare-query-exec
   (-> connection? string? any)]
  [prepare-query-rows

@@ -300,11 +300,13 @@ Provides only @racket[mysql-connect] and
 
 Provides only @racket[sqlite3-connect]. In contrast to
 @(my-racketmodname), this module immediately attempts to load the
-@tt{libsqlite3} foreign library when required.
+@tt{libsqlite3} foreign library when required, and it raises an error
+if the foreign library cannot be found.
 
 @(my-defmodule/nd odbc)
 
 Provides only @racket[odbc-connect], @racket[odbc-driver-connect],
 @racket[odbc-data-sources], and @racket[odbc-drivers]. In contrast to
 @(my-racketmodname), this module immediately attempts to load the
-@tt{libodbc} foreign library when required.
+@tt{libodbc} foreign library when required, and it raises an error if
+the foreign library cannot be found.

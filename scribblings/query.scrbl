@@ -217,18 +217,24 @@ rely on the contents of the @racket[info] field; it varies based on
 database system and may change in future versions of this library.
 }
 
-@deftogether[[
 @defproc[(query [connection connection?]
-                [stmt (or/c string? statement-binding?)])
-         (or/c simple-result? recordset?)]
+                [stmt (or/c string? prepared-statement? statement-binding?)]
+                [arg any/c] ...)
+         (or/c simple-result? recordset?)]{
+
+  Executes a query, returning a structure that describes the
+  results. Unlike the more specialized query functions, @racket[query]
+  supports both recordset-returning and effect-only queries.
+}
+
 @defproc[(query-multiple [connection connection?]
                          [stmts (listof (or/c string? statement-binding?))])
-         (listof (or/c simple-result? recordset?))]]]{
+         (listof (or/c simple-result? recordset?))]{
 
   Executes queries, returning structures that describe the
   results. Unlike the more specialized query functions,
   @racket[query-multiple] supports a mixture of recordset-returning
-  queries and effect-only queries.
+  and effect-only queries.
 }
 
 @defproc[(query-exec* [connection connection?]
@@ -390,10 +396,13 @@ strongly.
                              [stmt string?]
                              [proc (_alpha _field _... -> _alpha)]
                              [init _alpha])
-         (_param _... -> _alpha)]]]{
+         (_param _... -> _alpha)]
+@defproc[(prepare-query [connection connection?]
+                        [stmt string?])
+         (_param _... -> (or/c simple-result? recordset?))]]]{
 
   Prepared versions of @racket[query-exec], @racket[query-rows],
   @racket[query-list], @racket[query-row], @racket[query-maybe-row],
-  @racket[query-value], @racket[query-maybe-value], and
-  @racket[query-fold], respectively.
+  @racket[query-value], @racket[query-maybe-value],
+  @racket[query-fold], and @racket[query], respectively.
 }

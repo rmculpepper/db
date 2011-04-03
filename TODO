@@ -1,12 +1,17 @@
 To do
 =====
 
+- actual contracts for sql-* structures
+
 - earlier param type checking (avoid checking within lock!)
 
-- add "[fatal]" to fatal error messages (where feasible)
+- add development section to docs
 
 - test odbc
-- document odbc
+
+----
+
+- add "[fatal]" to fatal error messages (where feasible)
 
 - some parts of docs are Linux-centric, especially ODBC part; broaden
 

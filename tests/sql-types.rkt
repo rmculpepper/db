@@ -6,9 +6,9 @@
 (require rackunit
          racket/class
          (prefix-in srfi: srfi/19)
-         "../generic/main.rkt"
-         "../generic/sql-convert.rkt"
-         "../generic/signatures.rkt"
+         "../private/generic/main.rkt"
+         "../private/generic/sql-convert.rkt"
+         "../private/generic/signatures.rkt"
          "config.rkt")
 (import config^ database^)
 (export test^)

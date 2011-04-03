@@ -3,6 +3,6 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require (prefix-in postgresql- "postgresql/main.rkt"))
+(require (prefix-in postgresql- "private/postgresql/main.rkt"))
 (provide postgresql-connect
          postgresql-guess-socket-path)

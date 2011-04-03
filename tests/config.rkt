@@ -4,8 +4,8 @@
 
 #lang racket/base
 (require racket/unit
-         "../generic/signatures.rkt"
-         "../generic/functions.rkt")
+         "../private/generic/signatures.rkt"
+         "../private/generic/functions.rkt")
 (provide test^
          config^
          config@)

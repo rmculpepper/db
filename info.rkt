@@ -5,8 +5,7 @@
 #lang setup/infotab
 (define name "db")
 (define compile-omit-paths
-  '("samples"
-    "tests"))
+  '("tests"))
 (define blurb
   '("This library provides a high-level, functional interface to PostgreSQL, "
     "MySQL, and SQLite databases. PostgreSQL and MySQL support is implemented "

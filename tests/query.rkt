@@ -4,11 +4,11 @@
 
 #lang racket/unit
 (require (for-syntax racket/base
-                     "../generic/unstable-syntax.rkt")
+                     "../private/generic/unstable-syntax.rkt")
          rackunit
          "config.rkt"
-         "../generic/signatures.rkt"
-         "../generic/main.rkt")
+         "../private/generic/signatures.rkt"
+         "../private/generic/main.rkt")
 (import database^ config^)
 (export test^)
 

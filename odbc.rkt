@@ -3,7 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require (prefix-in odbc- "odbc/main.rkt"))
+(require (prefix-in odbc- "private/odbc/main.rkt"))
 (provide odbc-connect
          odbc-driver-connect
          odbc-data-sources

@@ -3,5 +3,5 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require "generic/main.rkt")
-(provide (all-from-out "generic/main.rkt"))
+(require "private/generic/main.rkt")
+(provide (all-from-out "private/generic/main.rkt"))

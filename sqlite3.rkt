@@ -3,5 +3,5 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require (prefix-in sqlite3- "sqlite3/main.rkt"))
+(require (prefix-in sqlite3- "private/sqlite3/main.rkt"))
 (provide sqlite3-connect)

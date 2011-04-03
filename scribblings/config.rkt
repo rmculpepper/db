@@ -3,7 +3,7 @@
 ;; COPYRIGHT for terms).
 
 #lang racket/base
-(require (for-syntax racket/base "../generic/unstable-syntax.rkt")
+(require (for-syntax racket/base "../private/generic/unstable-syntax.rkt")
          scribble/manual
          scribble/eval
          racket/sandbox

@@ -6,11 +6,11 @@
 (require rackunit
          rackunit/gui
          racket/unit
-         "../generic/functions.rkt"
-         "../generic/signatures.rkt"
-         "../postgresql/unit.rkt"
-         "../mysql/unit.rkt"
-         "../sqlite3/unit.rkt"
+         "../private/generic/functions.rkt"
+         "../private/generic/signatures.rkt"
+         "../private/postgresql/unit.rkt"
+         "../private/mysql/unit.rkt"
+         "../private/sqlite3/unit.rkt"
          "config.rkt"
          "connection.rkt"
          "query.rkt"

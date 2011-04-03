@@ -6,7 +6,7 @@
 (require (for-syntax racket/base)
          rackunit
          "config.rkt"
-         "../generic/main.rkt")
+         "../private/generic/main.rkt")
 (import config^)
 (export test^)
 

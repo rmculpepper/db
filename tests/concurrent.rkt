@@ -5,9 +5,9 @@
 #lang racket/unit
 (require racket/class
          rackunit
-         "../generic/functions.rkt"
-         "../generic/query.rkt"
-         "../generic/signatures.rkt"
+         "../private/generic/functions.rkt"
+         "../private/generic/query.rkt"
+         "../private/generic/signatures.rkt"
          "config.rkt")
 (import database^ config^)
 (export test^)

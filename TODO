@@ -1,8 +1,6 @@
 To do
 =====
 
-- actual contracts for sql-* structures
-
 - earlier param type checking (avoid checking within lock!)
 
 - add development section to docs

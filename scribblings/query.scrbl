@@ -61,10 +61,10 @@ various types of queries. For example, @racket[query-value] is
 specialized to queries that return a recordset of exactly one column
 and exactly one row.
 
-This API also provides a simple interface to parameterized queries:
-the statement's parameters are given after the SQL statement. If any
-parameter values are given, the SQL statement must be either a string
-or prepared statement, not a statement-binding.
+If a statement takes parameters, the parameter values are given
+immediately after the SQL statement. Only a statement given as a
+string or prepared statement can be given parameters; if the statement
+is a statement-binding, no additional parameters are permitted.
 
 @defproc[(query-exec [connection connection?]
                      [stmt (or/c string? prepared-statement? statement-binding?)]
@@ -180,11 +180,17 @@ or prepared statement, not a statement-binding.
 
 @section{General query support}
 
-A statement is either a string containing a single non-parameterized
-SQL statement or a statement-binding value returned by
-@racket[bind-prepared-statement].
+A statement is one of the following:
+@itemlist[
+@item{a string containing a single SQL statement, possibly with
+parameters}
+@item{a @tech{prepared statement} produced by @racket[prepare] or
+@racket[prepare-multiple]}
+@item{a statement-binding value produced by
+@racket[bind-prepared-statement]}
+]
 
-A query result is either a @racket[simple-result] or a
+A general query result is either a @racket[simple-result] or a
 @racket[recordset].
 
 @defstruct*[simple-result
@@ -192,7 +198,6 @@ A query result is either a @racket[simple-result] or a
 
 Represents the result of a SQL statement that does not return a
 relation, such as an @tt{INSERT} or @tt{DELETE} statement.
-
 The @racket[info] field is an association list containing arbitrary
 information about the SQL statement's execution. Do not rely on the
 contents of the @racket[info] field; it varies based on database
@@ -255,11 +260,10 @@ database system and may change in future versions of this library.
       "insert into the_numbers values (1, 'the loneliest number')")
   ]
 
-  @bold{PostgreSQL note}: The set of statements passed to
+  @bold{PostgreSQL note}: The list of statements passed to
   @racket[query-exec*] are executed within their own
   ``mini-transaction''; if any statement fails, the effects of all
-  previous statements in the set are rolled back.
-
+  previous statements in the list are rolled back.
 }
 
 @defproc[(query-fold [connection connection?]

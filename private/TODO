@@ -1,6 +1,9 @@
 To do
 =====
 
+- remove statement-bindings from interface
+  - remove bind-prepared-statement, statement-binding?
+
 - earlier param type checking (avoid checking within lock!)
 
 - add development section to docs

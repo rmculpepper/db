@@ -57,9 +57,9 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
 (define-odbc SQLGetFunctions
   (_fun (handle : _sqlhdbc)
         (function-id : _sqlusmallint)
-        (supported? : (_ptr o _bool))
+        (supported? : (_ptr o _sqlusmallint))
         -> (status : _sqlreturn)
-        -> (values status supported?)))
+        -> (values status (positive? supported?))))
 
 (define-odbc SQLConnect
   (_fun (handle server user auth) ::

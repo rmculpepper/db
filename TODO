@@ -3,7 +3,7 @@ To do
 
 - add "[fatal]" to fatal error messages (where feasible)
 
-- export & test odbc
+- test odbc
 - document odbc
 
 - some parts of docs are Linux-centric, especially ODBC part; broaden
@@ -13,7 +13,7 @@ To do
 - export and doc kill-safe wrapper
 
 - permit type annotations for
-  - query params (would help mysql)
+  - query params (would help mysql, odbc)
   - extra conversions on result fields (eg sqlite, specify date field)
 
 - sqlite: opportunistic conversions based on decltype (eg date, time)

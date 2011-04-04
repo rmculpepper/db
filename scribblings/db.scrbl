@@ -21,7 +21,7 @@ systems. The following database systems are currently supported:
 @item{@bold{PostgreSQL versions 7.4 and later}}
 @item{@bold{MySQL versions 5 and later}}
 @item{@bold{SQLite version 3} --- requires @tt{libsqlite3} native library}
-@item{@bold{ODBC} --- requires @tt{libodbc} native library}
+@item{@bold{ODBC} --- experimental, requires @tt{libodbc} native library}
 ]
 Support for PostgreSQL and MySQL does not rely on any
 native client libraries; this package is everything you
@@ -36,7 +36,27 @@ can use a connection simultaneously.
 
 @bold{Acknowledgments} Thanks to Dave Gurnell, Noel Welsh, Mike Burns,
 and Doug Orleans for contributions to @tt{spgsql}, the PostgreSQL-only
-predecessor of this package.
+predecessor of this package. The SQLite support is based in part on
+code from Jay McCarthy's
+@hyperlink["http://planet.racket-lang.org/display.ss?package=sqlite.plt&owner=jaymccarthy"]{sqlite}
+package.
+
+@bold{Copying} This program is free software: you can redistribute
+it and/or modify it under the terms of the
+@hyperlink["http://www.gnu.org/licenses/lgpl.html"]{GNU Lesser General
+Public License} as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License and GNU Lesser General Public License for more
+details.
+
+@bold{Development} Development of this library is hosted by
+@hyperlink["http://github.com"]{GitHub} at the following project page:
+
+@centered{@hyperlink["https://github.com/rmculpepper/db"]{https://github.com/rmculpepper/db}}
 
 @include-section["introduction.scrbl"]
 @include-section["connect.scrbl"]

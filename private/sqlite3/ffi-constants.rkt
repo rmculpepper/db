@@ -2,6 +2,8 @@
 ;; Released under the terms of the LGPL version 3 or later.
 ;; See the file COPYRIGHT for details.
 
+;; Based in part on code Copyright 2009, 2010 Jay McCarthy
+
 #lang racket/base
 (provide (all-defined-out))
 

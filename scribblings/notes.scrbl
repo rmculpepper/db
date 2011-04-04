@@ -5,7 +5,7 @@
           racket/sandbox
           "config.rkt")
 
-@title{System-specific notes}
+@title[#:tag "system-specific-notes"]{System-specific notes}
 
 This section describes issues specific to particular database systems.
 

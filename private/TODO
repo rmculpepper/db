@@ -30,5 +30,3 @@ To do
 
 bug: mysql concurrency tests sometimes fail
   - temporary fix: always wrap mysql connection in kill-safe proxy
-
-bug: mysql blob parsing differs (text vs binary)

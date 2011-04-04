@@ -64,7 +64,7 @@
         [(expectation) (get-message* expectation #f)]
         [(expectation types) (get-message* expectation types)]))
 
-    (define/private (get-message* expectation param-types)
+    (define/private (get-message* expectation result-infos)
       (define (advance . ss)
         (unless (or (not expectation) 
                     (null? ss)
@@ -73,7 +73,7 @@
                  expectation)))
       (define (err packet)
         (error 'get-message "unexpected packet: ~s" packet))
-      (let-values ([(msg-num next) (parse-packet inport expectation param-types)])
+      (let-values ([(msg-num next) (parse-packet inport expectation result-infos)])
         (set! next-msg-num (add1 msg-num))
         (match next
           [(? handshake-packet?)
@@ -334,15 +334,20 @@
     ;; name-counter : number
     (define name-counter 0)
 
+    ;; NOTE: Always prepare statement so that query goes through the binary
+    ;; data path. See code in methods below marked TEXT for disabled code and
+    ;; comments about the disabled text data path. See also get-result-handlers.
+
     ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
     ;; The single point of control for the query engine
     (define/public (query* fsym stmts collector)
-      (let ([collector
-             (compose-collector-with-conversions (get-dbsystem) collector)])
-        (for ([stmt stmts])
-          (check-statement fsym stmt))
-        (for/list ([stmt stmts])
-          (query1 fsym stmt collector))))
+      (let ([collector collector])
+        ;; TEXT: (compose-collector-with-conversions (get-dbsystem) collector)
+        (let ([stmts
+               (for/list ([stmt (in-list stmts)])
+                 (check-statement fsym stmt))])
+          (for/list ([stmt (in-list stmts)])
+            (query1 fsym stmt collector)))))
 
     ;; query1 : symbol Statement Collector -> QueryResult
     (define/private (query1 fsym stmt collector)
@@ -350,41 +355,30 @@
       (query1:enqueue stmt)
       (query1:collect stmt collector))
 
-    ;; check-statement : symbol any -> void
+    ;; check-statement : symbol any -> statement-binding
     (define/private (check-statement fsym stmt)
-      (unless (or (string? stmt) (statement-binding? stmt))
-        (raise-type-error fsym "string or statement-binding" stmt))
-      (when (statement-binding? stmt)
-        (let ([pst (statement-binding-pst stmt)])
-          (send pst check-owner fsym this stmt))))
+      (cond [(statement-binding? stmt)
+             (let ([pst (statement-binding-pst stmt)])
+               (send pst check-owner fsym this stmt)
+               stmt)]
+            [(string? stmt)
+             ;; TEXT: leave string alone to re-enable text data path
+             (let ([pst (prepare1 fsym stmt)])
+               (send pst bind fsym null))]))
 
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
-      (cond
-       ;; FIXME: always go through prepared query path, for simplicity
-       ;; and uniformity (because they use different type conversions)
-        [(string? stmt)
-         (send-message (make-command-packet 'query stmt))]
-        [(statement-binding? stmt)
-         (let* ([pst (statement-binding-pst stmt)]
-                [id (send pst get-id)]
-                [params (statement-binding-params stmt)]
-                [null-map (map not params)]
-                [param-types
-                 (send pst get-param-types)])
-           #|
-           (define (send-param pos data)
-             (when data
-               (send-message (make-long-data-packet id pos 0 data))))
-           |#
-           #|
-           (let loop ([pos 0] [params params])
-             (when (pair? params)
-               (send-param pos (car params))
-               (loop (add1 pos) (cdr params))))
-           |#
-           (send-message
-            (make-execute-packet id null 1 null-map 1 param-types params)))]))
+      (cond [(string? stmt)
+             ;; TEXT: This clause is currently unreachable.
+             (send-message (make-command-packet 'query stmt))]
+            [(statement-binding? stmt)
+             (let* ([pst (statement-binding-pst stmt)]
+                    [id (send pst get-id)]
+                    [params (statement-binding-params stmt)]
+                    [null-map (map not params)]
+                    [param-types (send pst get-param-types)])
+               (send-message
+                (make-execute-packet id null 1 null-map 1 param-types params)))]))
 
     ;; query1:collect : Statement Collector -> QueryResult stream
     (define/private (query1:collect stmt collector)
@@ -393,10 +387,10 @@
          (query1:result #f collector)]
         [(statement-binding? stmt)
          (let* ([pst (statement-binding-pst stmt)]
-                [field-typeids (send pst get-result-typeids)])
-           (query1:result field-typeids collector))]))
+                [result-infos (send pst get-result-infos)])
+           (query1:result result-infos collector))]))
 
-    (define/private (query1:result binary? collector)
+    (define/private (query1:result result-infos collector)
       (let ([r (recv 'query* 'result)])
         (match r
           [(struct ok-packet (affected-rows insert-id status warnings message))
@@ -405,32 +399,32 @@
                             (status . ,status)
                             (message . ,message)))]
           [(struct result-set-header-packet (fields extra))
-           (query1:expect-fields binary? null collector)])))
+           (query1:expect-fields result-infos null collector)])))
 
-    (define/private (query1:expect-fields binary? fieldinfos collector)
+    (define/private (query1:expect-fields result-infos fieldinfos collector)
       (let ([r (recv 'query* 'field)])
         (match r
           [(? field-packet?)
-           (query1:expect-fields binary? 
+           (query1:expect-fields result-infos
                                  (cons (parse-field-info r) fieldinfos)
                                  collector)]
           [(struct eof-packet (warning-count status))
            (let-values ([(init combine finalize info)
-                         (collector (reverse fieldinfos) binary?)])
-             (query1:data-loop binary? init combine finalize info))])))
+                         (collector (reverse fieldinfos) result-infos)])
+             (query1:data-loop result-infos init combine finalize info))])))
 
-    (define/private (query1:get-data binary?)
-      (let ([r (recv 'query* (if binary? 'binary-data 'data) binary?)])
+    (define/private (query1:get-data result-infos)
+      (let ([r (recv 'query* (if result-infos 'binary-data 'data) result-infos)])
         (match r
           [(struct row-data-packet (data))
-           (cons data (query1:get-data binary?))]
+           (cons data (query1:get-data result-infos))]
           [(struct binary-row-data-packet (data))
-           (cons data (query1:get-data binary?))]
+           (cons data (query1:get-data result-infos))]
           [(struct eof-packet (warning-count status))
            null])))
 
-    (define/private (query1:data-loop binary? init combine finalize info)
-      (define data (query1:get-data binary?))
+    (define/private (query1:data-loop result-infos init combine finalize info)
+      (define data (query1:get-data result-infos))
       (let loop ([init init] [data data])
         (if (pair? data)
             (loop (combine init (list->vector (car data))) (cdr data))
@@ -438,39 +432,39 @@
 
     ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
     (define/public (prepare* fsym stmts)
-      (map (lambda (stmt) (prepare1 stmt)) stmts))
+      (map (lambda (stmt) (prepare1 fsym stmt)) stmts))
 
-    (define/private (prepare1 stmt)
+    (define/private (prepare1 fsym stmt)
       (fresh-exchange)
       (send-message (make-command-packet 'statement-prepare stmt))
-      (let ([r (recv 'prepare* 'prep-ok)])
+      (let ([r (recv fsym 'prep-ok)])
         (match r
           [(struct ok-prepared-statement-packet (id fields params))
            (let ([paraminfos
-                  (if (zero? params) null (prepare1:get-params))]
+                  (if (zero? params) null (prepare1:get-params fsym))]
                  [fieldinfos
-                  (if (zero? fields) null (prepare1:get-fields))])
+                  (if (zero? fields) null (prepare1:get-fields fsym))])
              (new prepared-statement%
                   (id id)
                   (param-infos paraminfos)
                   (result-infos fieldinfos)
                   (owner this)))])))
 
-    (define/private (prepare1:get-params)
-      (let ([r (recv 'prepare* 'field)])
+    (define/private (prepare1:get-params fsym)
+      (let ([r (recv fsym 'field)])
         (match r
           [(struct eof-packet (warning-count status))
            null]
           [(? field-packet?)
            (cons (parse-field-info r) (prepare1:get-params))])))
 
-    (define/private (prepare1:get-fields)
-      (let ([r (recv 'prepare* 'field)])
+    (define/private (prepare1:get-fields fsym)
+      (let ([r (recv fsym 'field)])
         (match r
           [(struct eof-packet (warning-count status))
            null]
           [(? field-packet?)
-           (cons (parse-field-info r) (prepare1:get-fields))])))
+           (cons (parse-field-info r) (prepare1:get-fields fsym))])))
     ))
 
 ;; connection%

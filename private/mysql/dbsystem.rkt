@@ -33,10 +33,18 @@
            param-infos))
 
     (define/public (get-result-handlers result-infos)
+      ;; We force all queries through prepared statement path so that
+      ;; all data transfer is done in binary format.
+      ;; To re-enable text format for string statement queries,
+      ;; change check-statement in connection.rkt and uncomment
+      ;; type->type-reader code below.
+      (error 'get-result-handlers "unsupported")
+      #|
       (map (lambda (result-info)
              (let ([type (wire-typeid->type (get-fi-typeid result-info))])
                (type->type-reader type)))
-           result-infos))
+           result-infos)
+      |#)
 
     (super-new)))
 
@@ -102,8 +110,8 @@
     ((numeric) 'decimal)
     (else alias)))
 
-;; FIXME: Only non-param'd query path uses type-readers;
-;; would be better to always take binary path, eliminate redundancy.
+#|
+;; Retained for debugging.
 
 ;; type->type-reader : symbol -> (string -> datum) or #f
 (define (type->type-reader type)
@@ -122,32 +130,4 @@
     ;; set
     ;; geometry
     (else #f)))
-
-#|
-
-;; Parameters sent as binary data, so handled at lower level.
-
-;; type->type-writer : symbol -> (datum -> string) or #f
-(define (type->type-writer type)
-  (case type
-    ((decimal) marshal-decimal)
-    ((tinyint) marshal-int1)
-    ((smallint) marshal-int2)
-    ((mediumint) marshal-int3)
-    ((int) marshal-int4)
-    ((bigint) marshal-int8)
-    ((float double) marshal-real)
-    ;; null
-    ;; timestamp year 
-    ((date) marshal-date)
-    ((time) marshal-time)
-    ((datetime) marshal-timestamp)
-    ((varchar var-string) marshal-string)
-    ((tinyblob mediumblob longblob blob) marshal-string)
-    ;; bit
-    ;; enum
-    ;; set
-    ;; geometry
-    (else #f)))
-
 |#

@@ -9,6 +9,7 @@ Based on protocol documentation here:
 
 #lang racket/base
 (require racket/match
+         "../generic/query.rkt"
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
          "../generic/io.rkt")
@@ -170,14 +171,14 @@ Based on protocol documentation here:
      (for-each (lambda (type param) (write-binary-datum out type param))
                param-types params)]))
 
-(define (parse-packet in expect param-types)
+(define (parse-packet in expect result-infos)
   (let* ([len (io:read-le-int24 in)]
          [num (io:read-byte in)]
          #|
          [_ (fprintf (current-error-port) "** Received packet #~s, length ~s\n" num len)]
          |#
          [inp (subport in len)]
-         [msg (parse-packet/1 inp expect len param-types)])
+         [msg (parse-packet/1 inp expect len result-infos)])
     (when (port-has-bytes? inp)
       (error 'parse-packet "bytes left over after parsing ~s; bytes were: ~s" 
              msg (io:read-bytes-to-eof inp)))
@@ -186,13 +187,13 @@ Based on protocol documentation here:
 (define (port-has-bytes? p)
   (not (eof-object? (peek-byte p))))
 
-(define (parse-packet/1 in expect len param-types)
+(define (parse-packet/1 in expect len result-infos)
   (let ([first (peek-byte in)])
     (if (eq? first #xFF)
         (parse-error-packet in len)
-        (parse-packet/2 in expect len param-types))))
+        (parse-packet/2 in expect len result-infos))))
 
-(define (parse-packet/2 in expect len param-types)
+(define (parse-packet/2 in expect len result-infos)
   (case expect
     ((handshake)
      (parse-handshake-packet in len))
@@ -215,7 +216,7 @@ Based on protocol documentation here:
     ((binary-data)
      (if (and (eq? (peek-byte in) #xFE) (< len 9))
          (parse-eof-packet in len)
-         (parse-binary-row-data-packet in len param-types)))
+         (parse-binary-row-data-packet in len result-infos)))
     ((prep-ok)
      (parse-ok-prepared-statement-packet in len))
     ((prep-params)
@@ -377,29 +378,40 @@ Based on protocol documentation here:
                            decimals
                            len)))
 
-(define (parse-binary-row-data-packet in0 len param-types)
+(define (parse-binary-row-data-packet in0 len result-infos)
   (define b (io:read-bytes-to-eof in0))
   (define in (open-input-bytes b))
   #|(printf "binary row: ~s or ~s\n" b (bytes->list b))|#
   (let* ([first (io:read-byte in)] ;; SKIP? seems to be always zero
-         [param-count (length param-types)]
+         [result-count (length result-infos)]
          ;; FIXME: avoid reifying null-map as list?
-         [null-map-length (floor (/ (+ 9 param-count) 8))]  ;; FIXME: use quotient?
+         [null-map-length (floor (/ (+ 9 result-count) 8))]  ;; FIXME: use quotient?
          [null-map-int (io:read-le-intN in null-map-length)]
-         [null-map (cddr (integer->null-map null-map-int (+ 2 param-count)))]
+         [null-map (cddr (integer->null-map null-map-int (+ 2 result-count)))]
          [fields
-          (let loop ([null-map null-map] [param-types param-types])
-            (cond [(pair? param-types)
+          (let loop ([null-map null-map] [result-infos result-infos])
+            (cond [(pair? result-infos)
                    (cons (if (not (car null-map))
-                             (read-binary-datum in (car param-types))
+                             (read-binary-datum in (car result-infos))
                              sql-null)
-                         (loop (cdr null-map) (cdr param-types)))]
+                         (loop (cdr null-map) (cdr result-infos)))]
                   [else null]))])
-    #| (printf "param-types ~s; null-map-length ~s; null-map ~s\n"
-               param-types null-map-length null-map) |#
     (make-binary-row-data-packet fields)))
 
-(define (read-binary-datum in type)
+(define (read-binary-datum in result-info)
+
+  ;; How to distinguish between character data and binary data?
+  ;; (Both are given type var-string.)
+
+  ;; There seem to be two differences:
+  ;;  1) character data has charset 33 (utf8_general_ci)
+  ;;     binary data has charset 63 (binary)
+  ;;  2) binary data has binary flag, character data does not
+
+  ;; We'll try using #2.
+
+  (define type (get-fi-typeid result-info))
+
   (case type
 
     ((tiny) (io:read-byte in))
@@ -407,7 +419,11 @@ Based on protocol documentation here:
     ((int24) (io:read-le-int24 in)) ;; or maybe send as long???
     ((long) (io:read-le-int32 in))
     ((longlong) (io:read-le-intN in 8))
-    ((varchar var-string) (io:read-length-coded-string in))
+    ((varchar var-string)
+     (let ([binary? (memq 'binary (or (assq 'flags result-info) '()))])
+       (if binary?
+           (io:read-length-coded-bytes in)
+           (io:read-length-coded-string in))))
     ((blob) (io:read-length-coded-bytes in))
 
     ((float)
@@ -441,14 +457,16 @@ Based on protocol documentation here:
 
     ((year) (io:read-le-int16 in))
 
+    ((newdecimal)
+     (parse-decimal (io:read-length-coded-string in)))
+
     ;; FIXME
-    ((decimal newdecimal)
+    ((decimal)
      (error 'get-param "unimplemented decimal type: ~s" type))
     ((bit enum set tiny-blob medium-blob long-blob geometry)
-     (error 'get-param "unimplemented type: ~s" type))
-
+     (error 'get-result "unimplemented type: ~s" type))
     (else
-     (error 'get-param "unknown type: ~s" type))))
+     (error 'get-result "unknown type: ~s" type))))
 
 (define (write-binary-datum out type param)
   (case type

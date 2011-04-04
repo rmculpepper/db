@@ -35,7 +35,7 @@
 
 ;; ----
 
-(define (check-param param)
+(define (check-param fsym index param-info param)
   (unless (or (string? param)
               (bytes? param)
               (rational? param)
@@ -43,7 +43,7 @@
               (sql-time? param)
               (sql-timestamp? param))
     ;; FIXME: need fsym propagation
-    (error 'bind* "cannot convert to ODBC unknown type: ~e" param))
+    (error fsym "cannot convert to ODBC unknown type: ~e" param))
   param)
 
 ;; ----

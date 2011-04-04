@@ -46,16 +46,14 @@
 
 ;; ========================================
 
-(define (check-param param)
+(define (check-param fsym index param-info param)
   (unless (or (string? param)
               (rational? param)
               (sql-date? param)
               (sql-time? param)
               (sql-timestamp? param))
-    ;; FIXME: need fsym propagation
-    (error 'bind* "cannot marshal as var-string: ~e" param))
+    (error fsym "cannot marshal as var-string: ~e" param))
   param)
-
 
 ;; ========================================
 

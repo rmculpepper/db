@@ -466,9 +466,9 @@ Based on protocol documentation here:
                   [(exact-integer? param) (number->string param)]
                   [(rational? param) (number->string param)] ;; inf, nan not allowed
                   ;; FIXME: can mysql interpret as date, time, etc?
-                  [(sql-date? param) (marshal-date param)]
-                  [(sql-time? param) (marshal-time param)]
-                  [(sql-timestamp? param) (marshal-timestamp param)]
+                  [(sql-date? param) (marshal-date 'send-param #f #f param)]
+                  [(sql-time? param) (marshal-time 'send-param #f #f param)]
+                  [(sql-timestamp? param) (marshal-timestamp 'send-param #f #f param)]
                   [else
                    (error 'send-param
                           "internal error: cannot marshal as var-string: ~e" param)])])

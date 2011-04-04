@@ -31,10 +31,9 @@
 
 ;; ========================================
 
-(define (check-param param)
+(define (check-param fsym index param-info param)
   (unless (or (real? param)
               (string? param)
               (bytes? param))
-    ;; FIXME: need fsym propagated
-    (error 'bind* "cannot convert to SQLite value: ~e" param))
+    (error fsym "cannot convert to SQLite value: ~e" param))
   param)

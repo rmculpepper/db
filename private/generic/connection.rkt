@@ -67,11 +67,12 @@
     (define/public (bind fsym params)
       (check-param-count fsym params param-infos)
       (let* ([params
-              (map (lambda (h p)
-                     (cond [(sql-null? p) sql-null]
-                           [else (h p)]))
-                   param-handlers
-                   params)])
+              (for/list ([handler (in-list param-handlers)]
+                         [index (in-naturals)]
+                         [param-info (in-list param-infos)]
+                         [param (in-list params)])
+                (cond [(sql-null? param) sql-null]
+                      [else (handler fsym index param-info param)]))])
         (statement-binding this #f params)))
 
     (define/private (check-param-count fsym params param-infos)

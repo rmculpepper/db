@@ -50,15 +50,18 @@
     typeids->types      ;; (listof typeid) -> (listof type)
     has-support?        ;; any -> boolean
 
-    ;; get-parameter-handlers : (listof alist) -> (listof (datum -> ???))
-    ;; Each system gets to choose its checked-param representation.
-    ;; Maybe check and convert to string. Maybe just check, do binary conversion later.
+    ;; get-parameter-handlers : (listof alist) -> (listof ParameterHandler)
     get-parameter-handlers
 
-    ;; get-result-handlers : (listof alist) -> (listof (U #f (-> ??? datum)))
-    ;; Not used by all systems.
+    ;; get-result-handlers : (listof alist) -> (listof ResultHandler)
+    ;; Only used by compose-collector-with-conversions, in postgresql and mysql.
     get-result-handlers))
 
+;; ParameterHandler = (fsym index alist datum -> ???)
+;; Each system gets to choose its checked-param representation.
+;; Maybe check and convert to string. Maybe just check, do binary conversion later.
+
+;; ResultHandler = #f or (??? -> datum)
 
 ;; ==== Prepared
 

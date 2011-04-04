@@ -16,16 +16,35 @@
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'odbc) ;; FIXME: need also underlying driver info
     (define/public (typeids->types typeids) (map typeid->type typeids))
-    (define/public (typeids->type-readers x) null)
-    (define/public (typeids->type-writers typeids)
-      (map (lambda (x) values) typeids)) ;; FIXME
-
     (define/public (get-known-types) (map cadr type-table))
     (define/public (has-support? x) #f)
+
+    (define/public (get-parameter-handlers param-infos)
+      (map (lambda (param-info)
+             ;; FIXME: do parameter checks! (for drivers that give param types)
+             check-param)
+           param-infos))
+
+    (define/public (get-result-handlers result-infos)
+      (error 'get-result-handlers "unsupported"))
+
     (super-new)))
 
 (define dbsystem
   (new odbc-dbsystem%))
+
+;; ----
+
+(define (check-param param)
+  (unless (or (string? param)
+              (bytes? param)
+              (rational? param)
+              (sql-date? param)
+              (sql-time? param)
+              (sql-timestamp? param))
+    ;; FIXME: need fsym propagation
+    (error 'bind* "cannot convert to ODBC unknown type: ~e" param))
+  param)
 
 ;; ----
 

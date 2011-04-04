@@ -355,16 +355,8 @@
       (unless (or (string? stmt) (statement-binding? stmt))
         (raise-type-error fsym "string or statement-binding" stmt))
       (when (statement-binding? stmt)
-        (check-prepared-statement fsym (statement-binding-pst stmt))))
-
-    ;; check-prepared-statement : symbol any -> void
-    (define/private (check-prepared-statement fsym pst)
-      (unless (and (is-a? pst prepared-statement%)
-                   (send pst check-owner this))
-        (raise-mismatch-error 
-         fsym
-         "prepared statement owned by another connection"
-         pst)))
+        (let ([pst (statement-binding-pst stmt)])
+          (send pst check-owner fsym this stmt))))
 
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)

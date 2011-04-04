@@ -5,34 +5,17 @@
 #lang racket/base
 (require racket/class
          "../generic/interfaces.rkt"
+         "../generic/query.rkt"
+         "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt")
 (provide (all-defined-out))
 
 (define mysql-dbsystem%
   (class* object% (dbsystem<%>)
-    (define/public (get-short-name) 'mysql)
 
+    (define/public (get-short-name) 'mysql)
     (define/public (typeids->types typeids)
       (map wire-typeid->type typeids))
-
-    (define/public (typeids->type-readers typeids)
-      (map (lambda (typeid)
-             (let ([type (wire-typeid->type typeid)])
-               (type->type-reader type)))
-           typeids))
-
-    (define/public (typeids->type-writers typeids)
-      #|
-      (map (lambda (typeid)
-             (let ([type (wire-typeid->type typeid)])
-               (or (type->type-writer type)
-                   (make-default-marshal type))))
-           typeids)
-      |#
-
-      ;; All params sent as binary data, so handled in message.rkt
-      (map (lambda (typeid) values) typeids))
-
     (define/public (get-known-types) known-types+aliases)
 
     (define/public (has-support? option)
@@ -41,10 +24,37 @@
         ((numeric-infinities) #f)
         (else #f)))
 
+    (define/public (get-parameter-handlers param-infos)
+      ;; All params sent as binary data, so handled in message.rkt
+      ;; Just need to check params for legal values here
+      ;; FIXME: for now, only possible param type is var-string;
+      ;; when that changes, will need to refine check-param.
+      (map (lambda (param-info) check-param)
+           param-infos))
+
+    (define/public (get-result-handlers result-infos)
+      (map (lambda (result-info)
+             (let ([type (wire-typeid->type (get-fi-typeid result-info))])
+               (type->type-reader type)))
+           result-infos))
+
     (super-new)))
 
 (define dbsystem
   (new mysql-dbsystem%))
+
+
+;; ========================================
+
+(define (check-param param)
+  (unless (or (string? param)
+              (rational? param)
+              (sql-date? param)
+              (sql-time? param)
+              (sql-timestamp? param))
+    ;; FIXME: need fsym propagation
+    (error 'bind* "cannot marshal as var-string: ~e" param))
+  param)
 
 
 ;; ========================================

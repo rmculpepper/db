@@ -9,14 +9,14 @@
          "sql-data.rkt")
 (provide compose-collector-with-conversions
          get-fi-name
-         get-fi-type)
+         get-fi-typeid)
 
 (define (get-fi-name alist)
   (cond [(assq 'name alist)
          => cdr]
         [else #f]))
 
-(define (get-fi-type alist)
+(define (get-fi-typeid alist)
   (cond [(assq '*type* alist)
          => cdr]
         [else #f]))
@@ -26,7 +26,7 @@
   (lambda (field-infos binary?)
     (let* ([type-function-v
             (list->vector
-             (send dbsystem typeids->type-readers (map get-fi-type field-infos)))]
+             (send dbsystem get-result-handlers field-infos))]
            [convert-row
             (lambda (row)
               ;; FIXME: vector-map vs vector-map! ... which is better?

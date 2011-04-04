@@ -5,36 +5,35 @@
 #lang racket/base
 (require racket/class
          "../generic/interfaces.rkt"
+         "../generic/query.rkt"
          "../generic/sql-convert.rkt")
 (provide (all-defined-out))
 
 (define postgresql-dbsystem%
   (class* object% (dbsystem<%>)
+
     (define/public (get-short-name) 'postgresql)
-
-    (define/public (typeids->types typeids)
-      (map typeid->type typeids))
-
-    (define/public (typeids->type-readers typeids)
-      (map (lambda (typeid)
-             (let ([type (typeid->type typeid)])
-               (type->type-reader type)))
-           typeids))
-
-    (define/public (typeids->type-writers typeids)
-      (map (lambda (typeid)
-             (let ([type (typeid->type typeid)])
-               (or (type->type-writer type)
-                   (make-default-marshal type))))
-           typeids))
-
     (define/public (get-known-types) known-types+aliases)
+    (define/public (typeids->types typeids) (map typeid->type typeids))
 
     (define/public (has-support? option)
       (case option
         ((real-infinities) #t)
         ((numeric-infinities) #t)
         (else #f)))
+
+    (define/public (get-parameter-handlers param-infos)
+      (map (lambda (param-info)
+             (let ([type (typeid->type (get-fi-typeid param-info))])
+               (or (type->type-writer type)
+                   (make-default-marshal type))))
+           param-infos))
+
+    (define/public (get-result-handlers result-infos)
+      (map (lambda (result-info)
+             (let ([type (typeid->type (get-fi-typeid result-info))])
+               (type->type-reader type)))
+           result-infos))
 
     (super-new)))
 

@@ -664,11 +664,7 @@
         (raise-type-error fsym "string or statement-binding" stmt))
       (when (statement-binding? stmt)
         (let ([pst (statement-binding-pst stmt)])
-          (unless (and (is-a? pst prepared-statement%)
-                       (send pst check-owner this))
-            (raise-mismatch-error 
-             fsym
-             "prepared statement owned by another connection" stmt)))))
+          (send pst check-owner fsym this stmt))))
 
     ;; generate-name : -> string
     (define/private (generate-name)

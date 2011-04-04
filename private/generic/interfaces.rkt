@@ -45,24 +45,19 @@
 ;; Represents brand of database system, SQL dialect, etc
 (define dbsystem<%>
   (interface ()
-    ;; get-short-name : -> symbol
-    get-short-name
+    get-short-name      ;; -> symbol
+    get-known-types     ;; -> (listof symbol)
+    typeids->types      ;; (listof typeid) -> (listof type)
+    has-support?        ;; any -> boolean
 
-    ;; get-known-types : #:can-read? [bool #t] #:can-write? [bool #t]
-    ;;                -> (listof symbol)
-    get-known-types
+    ;; get-parameter-handlers : (listof alist) -> (listof (datum -> ???))
+    ;; Each system gets to choose its checked-param representation.
+    ;; Maybe check and convert to string. Maybe just check, do binary conversion later.
+    get-parameter-handlers
 
-    ;; typeids->types : (listof typeid) -> (listof type)
-    typeids->types
-
-    ;; typeids->type-readers : (listof typeid) -> (listof (U #f (-> string datum)))
-    typeids->type-readers
-
-    ;; typeids->type-writers : (listof typeid) -> (listof (-> datum string))
-    typeids->type-writers
-
-    ;; has-support? : any -> boolean?
-    has-support?))
+    ;; get-result-handlers : (listof alist) -> (listof (U #f (-> ??? datum)))
+    ;; Not used by all systems.
+    get-result-handlers))
 
 
 ;; ==== Prepared
@@ -70,17 +65,18 @@
 ;; prepared-statement<%>
 (define prepared-statement<%>
   (interface ()
-
+    get-param-infos    ;; 
     get-param-count    ;; -> nat or #f
-    get-param-typeids  ;; -> (listof typeid) or #f
-    get-param-types    ;; -> (listof type) or #f
+    get-param-types    ;; -> (listof type)
 
+    get-result-infos   ;; -> (listof alist)
     get-result-count   ;; -> nat or #f
     get-result-typeids ;; -> (listof typeid) or #f
     get-result-types   ;; -> (listof type) or #f
 
-    ;; bind : symbol (listof param) -> StatementBinding
-    bind))
+    check-owner        ;; symbol connection any -> #t (or error)
+    bind               ;; symbol (listof param) -> statement-binding
+    ))
 
 
 ;; ==== Auxiliary structures

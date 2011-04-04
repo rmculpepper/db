@@ -8,6 +8,7 @@
          "../generic/main.rkt"
          "../generic/check-access.rkt"
          "connection.rkt"
+         "dbsystem.rkt"
          "ffi.rkt")
 
 ;; FIXME: Contracts duplicated at db/main.rkt

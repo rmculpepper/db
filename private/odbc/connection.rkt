@@ -88,11 +88,7 @@
             [(statement-binding? stmt)
              (let ([pst (statement-binding-pst stmt)]
                    [params (statement-binding-params stmt)])
-               (unless (and (is-a? pst prepared-statement%)
-                            (send pst check-owner this))
-                 (raise-mismatch-error fsym
-                                       "prepared statement owned by another connection"
-                                       stmt))
+               (send pst check-owner fsym this stmt)
                (query1/p fsym pst params collector))]))
 
     (define/private (query1/p fsym pst params collector)

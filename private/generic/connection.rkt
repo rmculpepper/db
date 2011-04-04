@@ -45,31 +45,32 @@
     (define owner (make-weak-box -owner))
     (define dbsystem (send -owner get-dbsystem))
 
-    ;; FIXME: store or recompute?
-    (define param-typeids (map get-fi-type param-infos))
-    (define result-typeids (and result-infos (map get-fi-type result-infos)))
-    (define type-writers (send dbsystem typeids->type-writers param-typeids))
+    (define param-handlers (send dbsystem get-parameter-handlers param-infos))
+    (define result-typeids (and result-infos (map get-fi-typeid result-infos)))
 
+    (define/public (get-param-infos) param-infos)
     (define/public (get-param-count) (length param-infos))
-    (define/public (get-param-typeids) param-typeids)
-    (define/public (get-param-types) (send dbsystem typeids->types param-typeids))
+    (define/public (get-param-types)
+      (send dbsystem typeids->types (map get-fi-typeid param-infos)))
+
+    (define/public (get-result-infos) result-infos)
     (define/public (get-result-count) (and result-infos (length result-infos)))
     (define/public (get-result-typeids) result-typeids)
     (define/public (get-result-types)
       (and (pair? result-typeids)
            (send dbsystem typeids->types result-typeids)))
-    (define/public (get-result-infos) result-infos)
 
-    (define/public (check-owner c)
-      (eq? c (weak-box-value owner)))
+    (define/public (check-owner fsym c obj)
+      (or (eq? c (weak-box-value owner))
+          (error fsym "prepared statement owned by another connection: ~e" obj)))
 
     (define/public (bind fsym params)
       (check-param-count fsym params param-infos)
       (let* ([params
-              (map (lambda (tw p)
+              (map (lambda (h p)
                      (cond [(sql-null? p) sql-null]
-                           [else (tw p)]))
-                   type-writers
+                           [else (h p)]))
+                   param-handlers
                    params)])
         (statement-binding this #f params)))
 

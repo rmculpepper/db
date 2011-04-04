@@ -469,10 +469,12 @@ Based on protocol documentation here:
                   [(sql-date? param) (marshal-date param)]
                   [(sql-time? param) (marshal-time param)]
                   [(sql-timestamp? param) (marshal-timestamp param)]
-                  [else (error 'send-param "cannot marshal as var-string: ~e" param)])])
+                  [else
+                   (error 'send-param
+                          "internal error: cannot marshal as var-string: ~e" param)])])
        (io:write-length-coded-string out param)))
 
-    (else (error 'send-param "unimplemented: ~s" type))))
+    (else (error 'send-param "internal error: unimplemented: ~s" type))))
 
 
 ;; ----

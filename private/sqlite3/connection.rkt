@@ -9,27 +9,13 @@
          ffi/unsafe
          ffi/unsafe/atomic
          "../generic/query.rkt"
+         "../generic/connection.rkt"
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
-         "ffi.rkt")
+         "ffi.rkt"
+         "dbsystem.rkt")
 (provide connection%
-         handle-status
-         dbsystem)
-
-(define sqlite-dbsystem%
-  (class* object% (dbsystem<%>)
-    (define/public (get-short-name) 'sqlite3)
-    (define/public (typeids->types x) null)
-    (define/public (typeids->type-readers x) null)
-    (define/public (typeids->type-writers x) null)
-    (define/public (get-known-types) '())
-    (define/public (has-support? x) #f)
-    (super-new)))
-
-(define dbsystem
-  (new sqlite-dbsystem%))
-
-;; ----
+         handle-status)
 
 (define will-executor (make-will-executor))
 
@@ -41,35 +27,10 @@
        (loop)))))
 
 (define prepared-statement%
-  (class* object% (prepared-statement<%>)
-    (init stmt ;; a sqlite_stmt
-          owner)
-
+  (class prepared-statement-base%
+    (init stmt) ;; a sqlite_stmt
     (define -stmt stmt)
-    (define -owner (make-weak-box owner))
-
-    (define param-count (sqlite3_bind_parameter_count -stmt))
-    (define result-count (sqlite3_column_count stmt))
-
-    (define/public (get-param-count) param-count)
-    (define/public (get-param-typeids) #f)
-    (define/public (get-param-types) (for/list ([i (in-range param-count)]) 'any))
-    (define/public (get-result-count) result-count)
-    (define/public (get-result-typeids) #f)
-    (define/public (get-result-types)
-      (and (positive? result-count)
-           (for/list ([i (in-range result-count)]) 'any)))
-
     (define/public (get-stmt) -stmt)
-
-    (define/public (check-owner c)
-      (eq? c (weak-box-value -owner)))
-
-    (define/public (bind fsym params)
-      (unless (= (length params) param-count)
-        (error fsym "prepared statement requires ~s arguments, given ~s"
-               param-count (length params)))
-      (statement-binding this #f params))
 
     (define/public (finalize)
       (call-as-atomic
@@ -118,11 +79,7 @@
             [(statement-binding? stmt)
              (let ([pst (statement-binding-pst stmt)]
                    [params (statement-binding-params stmt)])
-               (unless (and (is-a? pst prepared-statement%)
-                            (send pst check-owner this))
-                 (raise-mismatch-error fsym
-                                       "prepared statement owned by another connection"
-                                       stmt))
+               (send pst check-owner fsym this stmt)
                (query1/p fsym pst params collector))]))
 
     (define/private (query1/p fsym pst params collector)
@@ -217,9 +174,17 @@
          (when (handle-status fsym prep-status db)
            (or stmt
                (begin (free!) (error fsym "internal error in prepare"))))
-         (let ([pst (new prepared-statement%
-                         (stmt stmt)
-                         (owner this))])
+         (let* ([param-infos
+                 (for/list ([i (in-range (sqlite3_bind_parameter_count stmt))])
+                   `((*type* . any)))]
+                [result-infos
+                 (for/list ([i (in-range (sqlite3_column_count stmt))])
+                   `((*type* . any)))]
+                [pst (new prepared-statement%
+                          (stmt stmt)
+                          (param-infos param-infos)
+                          (result-infos result-infos)
+                          (owner this))])
            (hash-set! statement-table pst #t)
            (thread-resume finalizer-thread)
            (will-register will-executor pst (lambda (pst) (send pst finalize)))

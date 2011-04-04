@@ -1,8 +1,6 @@
 To do
 =====
 
-- earlier param type checking (avoid checking within lock!)
-
 - test odbc
 
 ----
@@ -25,8 +23,6 @@ To do
 
 - sqlite: opportunistic conversions based on decltype (eg date, time)
 
-- add fsym arguments to type-writers
-
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)
 
@@ -36,10 +32,3 @@ bug: mysql concurrency tests sometimes fail
   - temporary fix: always wrap mysql connection in kill-safe proxy
 
 bug: mysql blob parsing differs (text vs binary)
-
-----
-
-add extra sanity-checking mode (connection option?)
-  - check server_encoding, print message if SQL_ASCII
-    eg: (query-value c "show server_encoding") => "UTF8"
-  - check postgresql typeids as expected?

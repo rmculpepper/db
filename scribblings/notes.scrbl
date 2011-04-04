@@ -68,7 +68,7 @@ useful parameter type information, and ODBC connections vary in
 behavior based on the driver and even the connection parameters.
 
 
-@subsection{PostgreSQL authentication}
+@section{PostgreSQL authentication}
 
 PostgreSQL supports a large variety of authentication mechanisms,
 controlled by the @tt{pg_hba.conf} server configuration file. This

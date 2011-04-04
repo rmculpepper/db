@@ -456,7 +456,7 @@
           [(struct eof-packet (warning-count status))
            null]
           [(? field-packet?)
-           (cons (parse-field-info r) (prepare1:get-params))])))
+           (cons (parse-field-info r) (prepare1:get-params fsym))])))
 
     (define/private (prepare1:get-fields fsym)
       (let ([r (recv fsym 'field)])

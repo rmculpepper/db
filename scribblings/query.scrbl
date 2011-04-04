@@ -25,8 +25,9 @@ errors should never cause a connection to be disconnected:
   columns, or operations, etc}
 @item{violations of a specialized query function's expectations, such
   as @racket[query-value] getting a recordset with multiple columns}
-@item{supplying the wrong number of parameters to a prepared query,
-  executing a prepared query with the wrong connection, etc}
+@item{supplying the wrong number or wrong types of parameters to a
+  prepared query, executing a prepared query with the wrong
+  connection, etc}
 ]
 The following kinds of errors may cause a connection to be
 disconnected:
@@ -90,10 +91,12 @@ various types of queries. For example, @racket[query-value] is
 specialized to queries that return a recordset of exactly one column
 and exactly one row.
 
-If a statement takes parameters, the parameter values are given
-immediately after the SQL statement. Only a statement given as a
-string or prepared statement can be given parameters; if the statement
-is a statement-binding, no additional parameters are permitted.
+If a statement takes parameters, the parameter values are given as
+additional arguments immediately after the SQL statement. Only a
+statement given as a string, prepared statement, or automatically
+prepared statement can be given ``inline'' parameters; if the
+statement is a statement-binding, no additional parameters are
+permitted.
 
 @defproc[(query-exec [connection connection?]
                      [stmt statement?]

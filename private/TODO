@@ -5,6 +5,8 @@ To do
 
 ----
 
+- GC postgresql and mysql prepared-statements to close descriptors
+
 - sqlite: allow configurable behavior on SQLITE_BUSY
   eg retry n times, retry forever, retry w/ timeout, fail
   (is db locked only for write or for whole transaction?)

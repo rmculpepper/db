@@ -1,6 +1,6 @@
 ;; Copyright 2000-2011 Ryan Culpepper
-;; Released under the terms of the modified BSD license (see the file
-;; COPYRIGHT for terms).
+;; Released under the terms of the LGPL version 3 or later.
+;; See the file COPYRIGHT for details.
 
 #lang racket/unit
 (require (for-syntax racket/base

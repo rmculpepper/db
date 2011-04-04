@@ -7,6 +7,7 @@
          racket/match
          openssl/sha1
          "../generic/interfaces.rkt"
+         "../generic/connection.rkt"
          "../generic/sql-data.rkt"
          "../generic/query.rkt"
          "message.rkt"

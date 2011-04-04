@@ -4,27 +4,21 @@
 
 #lang racket/base
 (require racket/class)
-
 (provide connection<%>
-
          dbsystem<%>
+         prepared-statement<%>
 
          (struct-out simple-result)
          (struct-out recordset)
          (struct-out field-info)
 
-         prepared-statement<%>
          (struct-out statement-binding)
          (except-out (struct-out auto-prepare-statement)
                      auto-prepare-statement)
 
-         connector<%>
-         ssl-connector<%>
-         connection:admin<%>
-
          init-private)
 
-;; ==== Connection Interfaces
+;; ==== Connection
 
 ;; connection<%>
 (define connection<%>
@@ -45,7 +39,7 @@
     prepare*))
 
 
-;; ==== DBSystem Interface
+;; ==== DBSystem
 
 ;; dbsystem<%>
 ;; Represents brand of database system, SQL dialect, etc
@@ -70,7 +64,8 @@
     ;; has-support? : any -> boolean?
     has-support?))
 
-;; ==== Auxiliary Interfaces & Structures
+
+;; ==== Prepared
 
 ;; prepared-statement<%>
 (define prepared-statement<%>
@@ -86,6 +81,9 @@
 
     ;; bind : symbol (listof param) -> StatementBinding
     bind))
+
+
+;; ==== Auxiliary structures
 
 ;; A statement-binding is:
 ;;   - (statement-binding prepared-statement ??? (listof ???))
@@ -125,34 +123,7 @@
 ;; FIXME: in collector, why binary? flag?
 ;;   - not used by generic/functions
 
-
-;; == Internal staging interfaces
-
-;; connector<%>
-;; Manages making connections
-(define connector<%>
-  (interface ()
-    ;; attach-to-ports : input-port output-port -> void
-    attach-to-ports
-
-    ;; start-connection-protocol : string string string/#f -> void
-    start-connection-protocol
-    ))
-
-;; ssl-connector<%>
-(define ssl-connector<%>
-  (interface (connector<%>)
-    ;; set-ssl-options : YesNoOptional SSLMode -> void
-    set-ssl-options))
-
-;; connection:admin<%>
-(define connection:admin<%>
-  (interface ()
-    connected?
-    disconnect
-    get-dbsystem))
-
-;; === Class Utilities
+;; === Class utilities
 
 ;; Here just because ...
 

@@ -2,9 +2,6 @@
 ;; Released under the terms of the LGPL version 3 or later.
 ;; See the file COPYRIGHT for details.
 
-;; Implementation of connections, which communicate with a backend through
-;; structured messages.
-
 #lang racket/base
 (require mzlib/etc
          racket/class
@@ -12,23 +9,18 @@
          file/md5
          openssl/mzssl
          "../generic/interfaces.rkt"
+         "../generic/connection.rkt"
          "../generic/sql-data.rkt"
          "../generic/query.rkt"
          "msg.rkt"
          "exceptions.rkt"
          "dbsystem.rkt")
-(provide pure-connection%
-         connection%)
+(provide connection%)
 
 ;; Debugging
 (define DEBUG-RESPONSES #f)
 (define DEBUG-SENT-MESSAGES #f)
 
-(define prepared-statement%
-  (class prepared-statement-base%
-    (init-private name)
-    (define/public (get-name) name)
-    (super-new)))
 
 ;; base<%>
 ;; Manages communication
@@ -98,7 +90,21 @@
     ;; handle-scm-credential-authentication : -> void
     handle-scm-credential-authentication))
 
-;; ----
+;; ssl-connector<%>
+(define ssl-connector<%>
+  (interface (connector<%>)
+    ;; set-ssl-options : YesNoOptional SSLMode -> void
+    set-ssl-options))
+
+;; ========================================
+
+(define prepared-statement%
+  (class prepared-statement-base%
+    (init-private name)
+    (define/public (get-name) name)
+    (super-new)))
+
+;; ========================================
 
 ;; base%
 (define base%
@@ -670,15 +676,11 @@
         (set! name-counter (add1 name-counter))
         (format "λmz_~a_~a" process-id n)))))
 
-;; pure-connection%
-(define pure-connection% 
-  (class* (query-mixin
-           (connector-mixin
-            base%))
-      (connection<%>)
-    (super-new)))
-
 ;; connection%
 (define connection%
-  (class (ssl-connector-mixin pure-connection%)
+  (class* (ssl-connector-mixin
+           (query-mixin
+            (connector-mixin
+             base%)))
+          (connection<%>)
     (super-new)))

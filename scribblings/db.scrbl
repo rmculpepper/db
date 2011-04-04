@@ -41,6 +41,11 @@ code from Jay McCarthy's
 @hyperlink["http://planet.racket-lang.org/display.ss?package=sqlite.plt&owner=jaymccarthy"]{sqlite}
 package.
 
+@bold{Development} Development of this library is hosted by
+@hyperlink["http://github.com"]{GitHub} at the following project page:
+
+@centered{@hyperlink["https://github.com/rmculpepper/db"]{https://github.com/rmculpepper/db}}
+
 @bold{Copying} This program is free software: you can redistribute
 it and/or modify it under the terms of the
 @hyperlink["http://www.gnu.org/licenses/lgpl.html"]{GNU Lesser General
@@ -52,11 +57,6 @@ WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 General Public License and GNU Lesser General Public License for more
 details.
-
-@bold{Development} Development of this library is hosted by
-@hyperlink["http://github.com"]{GitHub} at the following project page:
-
-@centered{@hyperlink["https://github.com/rmculpepper/db"]{https://github.com/rmculpepper/db}}
 
 @include-section["introduction.scrbl"]
 @include-section["connect.scrbl"]

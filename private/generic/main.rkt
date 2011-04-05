@@ -3,7 +3,8 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require "interfaces.rkt"
+(require (except-in "interfaces.rkt"
+                    statement-generator)
          "signatures.rkt"
          "sql-data.rkt"
          "functions.rkt")
@@ -11,7 +12,7 @@
          (struct-out recordset)
          (struct-out field-info)
          statement-binding?
-         auto-prepare-statement?
+         statement-generator?
 
          sql-null
          sql-null?

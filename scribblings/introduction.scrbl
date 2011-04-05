@@ -129,8 +129,8 @@ Errors in queries are usually non-fatal.
 ]
 
 Queries may contain parameters. The easiest way to execute a
-parameterize query is to provide the parameters after the SQL
-statement in the query function call.
+parameterize query is to provide the parameters ``inline'' after the
+SQL statement in the query function call.
 
 @my-interaction[
 [(query-value pgc
@@ -154,22 +154,25 @@ applied later.
  (list 0 1)]
 ]
 
-For convenience, a prepared query may be encapsulated as a function.
+A @tech{prepared statement} is tied to the connection used to create
+it; attempting to use it with another connection results in an
+error. Unfortunately, with some database usage patterns, such as those
+exhibited by web servlets, the lifetimes of connections are short or
+difficult to track, making prepared statements difficult to use
+properly. In such cases, a better tool is the @tech{statement
+generator}, which prepares statements on demand and caches them for
+future use with the same connection.
 
 @my-interaction[
-[(define get-less-than
-   (prepare-query-list pgc "select n from the_numbers where n < $1"))
+[(define get-less-than-pst
+   (statement-generator "select n from the_numbers where n < $1"))
  (void)]
-[(get-less-than 2)
+[(code:line (query-list pgc1 get-less-than-pst 1) (code:comment "prepares statement for pgc1"))
+ (list 0)]
+[(code:line (query-list pgc2 get-less-than-pst 2) (code:comment "prepares statement for pgc2"))
  (list 0 1)]
-[(define next-largest
-   (prepare-query-maybe-value pgc
-    "select n from the_numbers where n < $1 order by n desc limit 1"))
- (void)]
-[(next-largest 2)
- 1]
-[(next-largest 0)
- #f]
+[(code:line (query-list pgc1 get-less-than-pst 3) (code:comment "uses existing prep. stmt."))
+ (list 0 1 2)]
 ]
 
 When a connection's work is done, it should be disconnected.

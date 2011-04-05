@@ -5,7 +5,8 @@
 #lang racket/base
 (require racket/contract
          racket/class
-         "interfaces.rkt"
+         (rename-in "interfaces.rkt"
+                    [statement-generator make-statement-generator])
          "query.rkt")
 
 ;; == Administrative procedures
@@ -34,7 +35,7 @@
 (define (statement? x)
   (or (string? x)
       (prepared-statement? x)
-      (auto-prepare-statement? x)
+      (statement-generator? x)
       (statement-binding? x)))
 
 #|
@@ -56,9 +57,9 @@
 (define (prepared-statement-result-types pst)
   (send pst get-result-types))
 
-(define (auto-prepare-statement gen)
-  (make-auto-prepare-statement (make-weak-hasheq)
-                               (if (string? gen) (lambda (_) gen) gen)))
+(define (statement-generator gen)
+  (make-statement-generator (make-weak-hasheq)
+                            (if (string? gen) (lambda (_) gen) gen)))
 
 ;; == Query procedures
 
@@ -159,18 +160,11 @@
 (define (compose-statement fsym c sql args checktype)
   (cond [(or (pair? args)
              (prepared-statement? sql)
-             (auto-prepare-statement? sql))
+             (statement-generator? sql))
          (let ([pst
                 (cond [(string? sql) (prepare c sql)]
-                      [(auto-prepare-statement? sql)
-                       (let ([table (auto-prepare-statement-table sql)]
-                             [gen (auto-prepare-statement-gen sql)])
-                         (let ([table-pst (hash-ref table c #f)])
-                           (or table-pst
-                               (let* ([sql-string (gen (send c get-dbsystem))]
-                                      [pst (prepare1 fsym c sql-string)])
-                                 (hash-set! table c pst)
-                                 pst))))]
+                      [(statement-generator? sql)
+                       (prepare1 fsym sql)]
                       [(prepared-statement? sql)
                        ;; Ownership check done later, by query* method.
                        sql]
@@ -318,9 +312,6 @@
          (check 'name pst sql) ...
          (lambda args (method c (send pst bind 'name args) arg ...))))]))
 
-(define (prepare1 fsym c sql)
-  (car (send c prepare* fsym (list sql))))
-
 (define (check-results name pst stmt)
   (unless (send pst get-result-count)
     (raise-user-error name "query does not return records")))
@@ -333,13 +324,30 @@
                         "query does not return a single column (returns ~a columns)"
                         (or results "no")))))
 
+(define (prepare1 fsym c stmt)
+  (cond [(string? stmt)
+         (car (send c prepare* fsym (list stmt)))]
+        [(statement-binding? stmt)
+         (let ([table (statement-generator-table stmt)]
+               [gen (statement-generator-gen stmt)])
+           (let ([table-pst (hash-ref table c #f)])
+             (or table-pst
+                 (let* ([sql-string (gen (send c get-dbsystem))]
+                        [pst (prepare1 fsym c sql-string)])
+                   (hash-set! table c pst)
+                   pst))))]))
+
 ;; Prepared query API procedures
+
+;; FIXME: Currently, to support (prepare c stmt-gen), handle stmts one by one.
+;; Should do something smarter.
 
 (define (prepare c stmt)
   (prepare1 'prepare c stmt))
 
 (define (prepare-multiple c stmts)
-  (send c prepare* 'prepare-multiple stmts))
+  (for/list ([stmt (in-list stmts)])
+    (prepare1 'prepare-multiple c stmt)))
 
 (defprepare prepare-query-rows query-rows)
 
@@ -380,6 +388,8 @@
 
 
 ;; == Contracts
+
+(define preparable/c (or/c string? statement-generator?))
 
 (provide/contract
  [connection?
@@ -433,31 +443,31 @@
   (-> connection? complete-statement? procedure? any/c any)]
 
  [prepare
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-multiple
-  (-> connection? (listof string?) any)]
+  (-> connection? (listof preparable/c) any)]
  [bind-prepared-statement
   (-> prepared-statement? list? any)]
 
- [auto-prepare-statement
+ [statement-generator
   (-> (or/c string? (-> dbsystem? string?))
-      any)]
+      statement-generator?)]
 
  [prepare-query
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-exec
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-rows
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-list
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-row
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-maybe-row
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-value
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-maybe-value
-  (-> connection? string? any)]
+  (-> connection? preparable/c any)]
  [prepare-query-fold
-  (-> connection? string? procedure? any/c any)])
+  (-> connection? preparable/c procedure? any/c any)])

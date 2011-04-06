@@ -97,19 +97,15 @@
          (let* ([db (get-db fsym)]
                 [stmt (send pst get-stmt)]
                 ;; FIXME: reset/clear
-                [result-infos (send pst get-result-infos)]
-                [pinned-buffers
-                 (for/list ([i (in-naturals 1)]
-                            [param (in-list params)]
-                            #:when #t
-                            [buf (in-list (load-param fsym db stmt i param))])
-                   buf)]
-                [_ (handle-status fsym (SQLExecute stmt) stmt)]
-                [rows (fetch* fsym stmt (send pst get-result-typeids))])
-           (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
-           (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
-           (for ([buf (in-list pinned-buffers)]) (free buf))
-           (values result-infos rows))))
+                [result-infos (send pst get-result-infos)])
+           (for ([i (in-naturals 1)]
+                 [param (in-list params)])
+             (load-param fsym db stmt i param))
+           (handle-status fsym (SQLExecute stmt) stmt)
+           (let ([rows (fetch* fsym stmt (send pst get-result-typeids))])
+             (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
+             (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
+             (values result-infos rows)))))
       (let-values ([(init combine finalize info)
                     (collector info0 #f)])
         (cond [(or (pair? info0) (pair? rows))
@@ -124,12 +120,11 @@
     (define/private (load-param fsym db stmt i param)
       ;; FIXME: for now we assume typeid is SQL_UNKNOWN_TYPE, but should
       ;; have paraminfos around in case (also need size, digits, etc?)
-      ;; FIXME: is there an easier way to alloc immobile bytes?
-      ;; param buffers must not move between bind and execute
+      ;; NOTE: param buffers must not move between bind and execute
       (define (copy-buffer buffer)
         (let* ([buffer (if (string? buffer) (string->bytes/utf-8 buffer) buffer)]
                [n (bytes-length buffer)]
-               [copy (make-sized-byte-string (malloc n 'raw) n)])
+               [copy (make-sized-byte-string (malloc n 'atomic-interior) n)])
           (memcpy copy buffer n)
           copy))
       (define (int->buffer n) (copy-buffer (integer->integer-bytes n 4 #t)))

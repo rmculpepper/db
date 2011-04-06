@@ -20,6 +20,7 @@
          (struct-out sql-date)
          (struct-out sql-time)
          (struct-out sql-timestamp)
+         (struct-out sql-interval)
 
          sql-datetime->srfi-date
          srfi-date->sql-date
@@ -27,5 +28,9 @@
          srfi-date->sql-time-tz
          srfi-date->sql-timestamp
          srfi-date->sql-timestamp-tz
+
+         sql-simple-interval?
+         sql-simple-interval->seconds
+         sql-simple-interval->sql-time
 
          (all-from-out "functions.rkt"))

@@ -44,6 +44,8 @@
                 #:mixin (testing-connection-mixin)))
       ((sqlite3)
        (connect #:database 'memory))
+      ((odbc)
+       (connect #:database (getenv "DBDB")))
       (else
        (error 'connect-for-test "unknown database system: ~e" dbsystem))))
 

@@ -27,7 +27,8 @@ No conversion may be passed sql-null.
          parse-time
          parse-time-tz
          parse-timestamp
-         parse-timestamp-tz)
+         parse-timestamp-tz
+         parse-interval)
 
 (define (parse-string s) s)
 
@@ -139,6 +140,37 @@ No conversion may be passed sql-null.
    (srfi:string->date t "~Y-~m-~d ~k:~M:~S~z")
    (ns-of t timestamp/ns-rx)))
 
+(define interval-rx
+  (regexp
+   (string-append "^"
+                  "(?:(-?[0-9]*) years? *)?"
+                  "(?:(-?[0-9]*) mons? *)?"
+                  "(?:(-?[0-9]*) days? *)?"
+                  "(?:(-?)([0-9]*):([0-9]*):([0-9]*)(?:\\.([0-9]*))?)?"
+                  "$")))
+
+(define (parse-interval s)
+  (define (to-num m)
+    (if m (string->number m) 0))
+  (define match-result (regexp-match interval-rx s))
+  (eprintf "match-result = ~s\n" match-result)
+  (match match-result
+    [(list _whole years months days tsign hours mins secs fsec)
+     (let* ([years (to-num years)]
+            [months (to-num months)]
+            [days (to-num days)]
+            [sg (if (equal? tsign "-") - +)]
+            [hours (sg (to-num hours))]
+            [mins (sg (to-num mins))]
+            [secs (sg (to-num secs))]
+            [nsecs (if fsec
+                       (let ([flen (string-length fsec)])
+                         (* (string->number (substring fsec 0 (min flen 9)))
+                            (expt 10 (min 0 (- 9 flen)))))
+                       0)])
+       (sql-interval years months days hours mins secs nsecs))]))
+
+
 ;; ----------------------------------------
 
 ;; parse-error : string string -> (raises error)
@@ -173,6 +205,8 @@ No conversion may be passed sql-null.
          marshal-time-tz
          marshal-timestamp
          marshal-timestamp-tz
+         marshal-simple-interval
+         marshal-interval
 
          marshal-error
          make-default-marshal)
@@ -306,19 +340,56 @@ No conversion may be passed sql-null.
   (if v "t" "f"))
 
 (define (marshal-date f i pi d)
+  (unless (sql-date? d)
+    (marshal-error f i pi "date" d))
   (srfi:date->string (sql-datetime->srfi-date d) "~Y-~m-~d"))
 
 (define (marshal-time f i pi t)
+  (unless (sql-time? t)
+    (marshal-error f i pi "time" t))
   (srfi:date->string (sql-datetime->srfi-date t) "~k:~M:~S.~N"))
 
 (define (marshal-time-tz f i pi t)
+  (unless (sql-time? t)
+    (marshal-error f i pi "time" t))
   (srfi:date->string (sql-datetime->srfi-date t) "~k:~M:~S.~N~z"))
 
 (define (marshal-timestamp f i pi t)
+  (unless (sql-timestamp? t)
+    (marshal-error f i pi "timestamp" t))
   (srfi:date->string (sql-datetime->srfi-date t) "~Y-~m-~d ~k:~M:~S.~N"))
 
 (define (marshal-timestamp-tz f i pi t)
+  (unless (sql-timestamp? t)
+    (marshal-error f i pi "timestamp" t))
   (srfi:date->string (sql-datetime->srfi-date t) "~Y-~m-~d ~k:~M:~S.~N~z"))
+
+(define (marshal-simple-interval f i pi t)
+  (unless (sql-simple-interval? t)
+    (marshal-error f i pi "simple time interval" t))
+  (let ([h (sql-interval-hours t)]
+        [m (abs (sql-interval-minutes t))]
+        [s (abs (sql-interval-seconds t))]
+        [ns (abs (sql-interval-nanoseconds t))])
+    (string-append (number->string h)
+                   (srfi:date->string (sql-datetime->srfi-date (sql-time 0 m s ns #f))
+                                      ":~M:~S.~N"))))
+
+(define (marshal-interval f i pi t)
+  (define (tag num unit)
+    (if (zero? num) "" (format "~a ~a " num unit)))
+  (match t
+    [(sql-interval years months days hours minutes seconds nanoseconds)
+     ;; Note: we take advantage of PostgreSQL's liberal interval parser
+     ;; and we acknowledge its micro-second precision.
+     (string-append (tag years "years")
+                    (tag months "months")
+                    (tag days "days")
+                    (tag minutes "minutes")
+                    (tag seconds "seconds")
+                    (tag (quotient nanoseconds 1000) "microseconds"))]
+    [else
+     (marshal-error f i pi "interval" t)]))
 
 ;; ----------------------------------------
 

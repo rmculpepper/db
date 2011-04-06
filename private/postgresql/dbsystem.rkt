@@ -54,13 +54,7 @@
     bigint serial8
     float real
     double
-    decimal
-    #|
-    time-without-time-zone
-    time-with-time-zone
-    timestamp-without-time-zone
-    timestamp-with-time-zone
-    |#))
+    decimal))
 
 (define known-types
   '(int2 int4 int8 tid xid cid oid
@@ -90,12 +84,6 @@
     ((float real) 'float4)
     ((double) 'float8)
     ((decimal) 'numeric)
-    #|
-    ((time-without-time-zone) 'time)
-    ((time-with-time-zone) 'timetz)
-    ((timestamp-without-time-zone) 'timestamp)
-    ((timestamp-with-time-zone) 'timestamptz)
-    |#
     (else alias)))
 
 ;; type->type-reader : symbol -> (string -> datum) or #f
@@ -113,6 +101,7 @@
     [(timetz) parse-time-tz]
     [(timestamp) parse-timestamp]
     [(timestamptz) parse-timestamp-tz]
+    [(interval) parse-interval]
     [else #f]))
 
 ;; type->type-writer : symbol -> (datum -> string) or #f
@@ -132,6 +121,7 @@
     [(timetz) marshal-time-tz]
     [(timestamp) marshal-timestamp]
     [(timestamptz) marshal-timestamp-tz]
+    [(interval) marshal-interval]
     [else #f]))
 
 ;; type <=> typeid from:
@@ -157,6 +147,7 @@
     ((1083) 'time)
     ((1114) 'timestamp)
     ((1184) 'timestamptz)
+    ((1186) 'interval)
     ((1266) 'timetz)
     ((1560) 'bit)
     ((1562) 'varbit)
@@ -183,6 +174,7 @@
     ((time) 1083)
     ((timestamp) 1114)
     ((timestamptz) 1184)
+    ((interval) 1186)
     ((timetz) 1266)
     ((bit) 1560)
     ((varbit) 1562)

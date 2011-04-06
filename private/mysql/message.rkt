@@ -431,10 +431,11 @@ Based on protocol documentation here:
     ((double)
      (floating-point-bytes->real (io:read-bytes-as-bytes in 8) #f))
 
-    ((date datetime time timestamp newdate) ;; ???
+    ((date datetime timestamp newdate) ;; ???
      (let* ([bs (io:read-length-coded-bytes in)])
-       ;; format is YYMDhmsNNNN (N = nanoseconds)
+       ;; format is YYMDhmsUUUU (U = microseconds)
        ;; but trailing zeros can be dropped
+       ;; (Apparently, docs lie; get microseconds, not nanoseconds)
        (define (get-int start len)
          (if (<= (+ start len) (bytes-length bs))
              (cond [(= len 1) (bytes-ref bs start)]
@@ -446,7 +447,7 @@ Based on protocol documentation here:
              [hour  (get-int 4 1)]
              [min   (get-int 5 1)]
              [sec   (get-int 6 1)]
-             [nsec  (get-int 7 4)])
+             [nsec  (* 1000 (get-int 7 4))])
          (case type
            ((date newdate)
             (sql-date year month day))
@@ -454,6 +455,23 @@ Based on protocol documentation here:
             (sql-timestamp year month day hour min sec nsec #f))
            ((time)
             (sql-time hour min sec nsec #f))))))
+
+    ((time) ;; FIXME: mysql TIME represents time intervals, not time-of-day
+     (let* ([bs (io:read-length-coded-bytes in)])
+       (define (get-int start len)
+         (if (<= (+ start len) (bytes-length bs))
+             (cond [(= len 1) (bytes-ref bs start)]
+                   [else (integer-bytes->integer bs #t #f start (+ start len))])
+             0))
+       ;; format is gDDDDhmsUUUU (g = sign, 0=pos, 1=neg; U = microseconds)
+       ;; (Apparently, docs lie; get microseconds, not nanoseconds)
+       (let* ([sg   (if (zero? (get-int 0 1)) + -)]
+              [days (sg (get-int 1 4))]
+              [hour (sg (get-int 5 1))]
+              [min  (sg (get-int 6 1))]
+              [sec  (sg (get-int 7 1))]
+              [nsec (* 1000 (sg (get-int 8 4)))])
+         (sql-interval 0 0 0 (+ hour (* 24 days)) min sec nsec))))
 
     ((year) (io:read-le-int16 in))
 
@@ -487,6 +505,8 @@ Based on protocol documentation here:
                   [(sql-date? param) (marshal-date 'send-param #f #f param)]
                   [(sql-time? param) (marshal-time 'send-param #f #f param)]
                   [(sql-timestamp? param) (marshal-timestamp 'send-param #f #f param)]
+                  [(sql-simple-interval? param)
+                   (marshal-simple-interval 'send-param #f #f param)]
                   [else
                    (error 'send-param
                           "internal error: cannot marshal as var-string: ~e" param)])])

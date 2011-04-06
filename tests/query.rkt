@@ -21,7 +21,8 @@
 (define (sql str)
   (case (dbsystem-name dbsystem)
     ((postgresql) str)
-    ((mysql sqlite3) (regexp-replace* #rx"\\$[0-9]" str "?"))))
+    ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
+    (else (error 'sql "bad dbsystem: ~s" (dbsystem-name dbsystem)))))
 
 ;; prep-mode:
 ;;   'string = query w/ string
@@ -175,19 +176,22 @@
                         (case (dbsystem-name dbsystem)
                           ((postgresql) '(int4 varchar))
                           ((mysql) '(int var-string))
-                          ((sqlite3) '(any any)))))
+                          ((sqlite3) '(any any))
+                          ((odbc) '(integer varchar)))))
         (let ([pst (prepare c (sql "select n from the_numbers where n = $1"))])
           (check-equal? (prepared-statement-parameter-types pst)
                         (case (dbsystem-name dbsystem)
                           ((postgresql) '(int4))
                           ((mysql) '(var-string))
-                          ((sqlite3) '(any)))))
+                          ((sqlite3) '(any))
+                          ((odbc) '(unknown))))) ;; FIXME, may vary
         (let ([pst (prepare c (sql "insert into the_numbers values ($1, $2)"))])
           (check-equal? (prepared-statement-parameter-types pst)
                         (case (dbsystem-name dbsystem)
                           ((postgresql) '(int4 varchar))
                           ((mysql) '(var-string var-string))
-                          ((sqlite3) '(any any))))
+                          ((sqlite3) '(any any))
+                          ((odbc) '(unknown unknown))))
           (check-equal? (prepared-statement-result-types pst) #f))))))
 
 (define misc-tests

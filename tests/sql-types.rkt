@@ -97,7 +97,9 @@
       ((postgresql)
        "select length($1)")
       ((mysql)
-       "select char_length(?)")))
+       "select char_length(?)")
+      ((sqlite3)
+       "select length(?)")))
   (when (string? psql)
     (check-equal? ((prepare-query-value c psql) value)
                   (string-length value))))
@@ -125,8 +127,19 @@
                    value))
            ((mysql)
             ;; FIXME: can do better once prepare supports types
-            (when (eq? (current-type) 'varchar)
-              (check ((prepare-query-value c "select ?") value) value))))))]))
+            (let ([stmt
+                   (case (current-type)
+                     ((varchar) "select cast(? as char)")
+                     ;;((blob) "select cast(? as binary)")
+                     ((integer) "select cast(? as signed integer)")
+                     ((real) #f)
+                     ((numeric) "select cast(? as decimal)")
+                     ((date) "select cast(? as date)")
+                     ((time) "select cast(? as time)")
+                     ((datetime) "select cast (? as datetime)")
+                     (else #f))])
+              (when stmt
+                (check ((prepare-query-value c stmt) value) value)))))))]))
 
 (define string-tests
   (test-suite "String escaping"
@@ -155,7 +168,7 @@
        (lambda (c)
          (check-roundtrip c #t)
          (check-roundtrip c #f))))
-    (type-test-case '(bytea)
+    (type-test-case '(bytea blob)
       (call-with-connection
        (lambda (c)
          (check-roundtrip c #"this is the time to remember")

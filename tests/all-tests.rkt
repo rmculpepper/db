@@ -11,6 +11,7 @@
          "../private/postgresql/unit.rkt"
          "../private/mysql/unit.rkt"
          "../private/sqlite3/unit.rkt"
+         "../private/odbc/unit.rkt"
          "config.rkt"
          "connection.rkt"
          "query.rkt"
@@ -59,6 +60,10 @@
 (define-values/invoke-unit (specialize-test sqlite3@)
   (import)
   (export (prefix sqlite3: test^)))
+
+(define-values/invoke-unit (specialize-test odbc@)
+  (import)
+  (export (prefix odbc: test^)))
 
 #|
 ;; Normal testing:

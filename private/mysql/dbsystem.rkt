@@ -59,7 +59,8 @@
               (rational? param)
               (sql-date? param)
               (sql-time? param)
-              (sql-timestamp? param))
+              (sql-timestamp? param)
+              (sql-simple-interval? param))
     (error fsym "cannot marshal as var-string: ~e" param))
   param)
 

@@ -53,6 +53,7 @@ along with their corresponding Racket representations.
   @tt{timetz}        @& @tt{}                   @& @scheme[sql-time?] @//
   @tt{timestamp}     @& @tt{}                   @& @scheme[sql-timestamp?] @//
   @tt{timestamptz}   @& @tt{}                   @& @scheme[sql-timestamp?] @//
+  @tt{interval}      @& @tt{}                   @& @scheme[sql-interval?] @//
   @tt{oid}           @& @tt{}                   @& @scheme[exact-integer?]
 }
 
@@ -107,7 +108,7 @@ with their corresponding Racket representations.
   @tt{varchar}       @& @tt{}                            @& @scheme[string?] @//
   @tt{var-string}    @& @tt{}                            @& @scheme[string?], but see below @//
   @tt{date}          @& @tt{}                            @& @scheme[sql-date?] @//
-  @tt{time}          @& @tt{}                            @& @scheme[sql-time?] @//
+  @tt{time}          @& @tt{}                            @& @scheme[sql-simple-interval?] @//
   @tt{datetime}      @& @tt{}                            @& @scheme[sql-timestamp?]
 @;{FIXME: blob types?}
 }
@@ -122,6 +123,10 @@ NaN) and SQL date/time structures (@racket[sql-date?],
 A SQL value of type @tt{decimal} (aka @tt{numeric}) is always
 converted to an exact rational (MySQL seems not to support infinite
 @tt{decimal} values).
+
+Note that in MySQL, the @tt{time} type represents time intervals,
+which may not correspond to times of day (for example, the interval
+may be negative).
 
 
 @subsection[#:tag "sqlite-types"]{SQLite}
@@ -295,4 +300,45 @@ no existing close analogues.
   [(sql-datetime->srfi-date
     (query-value pgc "select timestamp 'epoch'"))
    (sql-datetime->srfi-date (make-sql-timestamp 1970 1 1 0 0 0 0 #f))])
+}
+
+@defstruct*[sql-interval
+            ([years exact-integer?]
+             [months exact-integer?]
+             [days exact-integer?]
+             [hours exact-integer?]
+             [minutes exact-integer?]
+             [seconds exact-integer?]
+             [nanoseconds exact-integer?])]{
+
+  Represents lengths of time. An interval may contain a mixture of
+  positive and negative fields.
+}
+
+@defproc[(sql-simple-interval? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is a @racket[sql-interval] value
+  with the following constraints:
+  @itemlist[
+  @item{the @racket[_years], @racket[_months], and @racket[_days] fields are zero}
+  @item{the @racket[_hours], @racket[_minutes], @racket[_seconds], and
+  @racket[_nanoseconds] fields are either all non-negative or all
+  non-positive}
+  ]
+}
+
+@defproc[(sql-simple-interval->sql-time [interval sql-simple-interval?]
+                                        [default any/c (lambda () (error ....))])
+         any]{
+
+  If @racket[interval] is a @racket[sql-interval] that represents a
+  time of day, returns the corresponding @racket[sql-time] value. If
+  @racket[interval] is out of range, the @racket[default] value is
+  called, if it is a procedure, or returned, otherwise.
+}
+
+@defproc[(sql-simple-interval->seconds [interval sql-simple-interval?])
+         rational?]{
+
+  Returns the length of @racket[interval] in seconds.
 }

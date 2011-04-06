@@ -8,6 +8,7 @@
          "../private/generic/functions.rkt"
          "../private/generic/query.rkt"
          "../private/generic/signatures.rkt"
+         "../private/generic/killsafe.rkt"
          "config.rkt")
 (import database^ config^)
 (export test^)
@@ -15,7 +16,8 @@
 (define (sql str)
   (case (dbsystem-name dbsystem)
     ((postgresql) str)
-    ((mysql sqlite3) (regexp-replace* #rx"\\$[0-9]" str "?"))))
+    ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
+    (else (error 'sql "unsupported dbsystem: ~e" (dbsystem-name dbsystem)))))
 
 (define (test-concurrency workers)
   (test-case (format "lots of threads (~s)" workers)

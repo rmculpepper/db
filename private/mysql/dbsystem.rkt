@@ -8,14 +8,14 @@
          "../generic/query.rkt"
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt")
-(provide (all-defined-out))
+(provide dbsystem)
 
 (define mysql-dbsystem%
   (class* object% (dbsystem<%>)
 
     (define/public (get-short-name) 'mysql)
     (define/public (typeids->types typeids)
-      (map wire-typeid->type typeids))
+      (map typeid->type typeids))
     (define/public (get-known-types) known-types+aliases)
 
     (define/public (has-support? option)
@@ -41,7 +41,7 @@
       (error 'get-result-handlers "unsupported")
       #|
       (map (lambda (result-info)
-             (let ([type (wire-typeid->type (get-fi-typeid result-info))])
+             (let ([type (typeid->type (get-fi-typeid result-info))])
                (type->type-reader type)))
            result-infos)
       |#)
@@ -66,69 +66,34 @@
 
 ;; ========================================
 
-(define (wire-typeid->type id)
-  (case id
-    ((decimal newdecimal) 'decimal) ;; ???
-    ((tiny) 'tinyint)
-    ((short) 'smallint)
-    ((int24) 'mediumint)
-    ((long) 'int)
-    ((longlong) 'bigint)
-    ((float) 'float)
-    ((double) 'double)
-    ((null) 'null) ;; ???!!!
-    ((date newdate) 'date) ;; ???
-    ((time) 'time)
-    ((datetime) 'datetime)
-    ((varchar) 'varchar)
-    ((var-string) 'var-string)
-    ((tiny-blob) 'tinyblob)
-    ((medium-blob) 'mediumblob)
-    ((long-blob) 'longblob)
-    ((blob) 'blob)
-    (else (error 'typeid->type "unknown type id: ~s" id))))
+(define-type-table (known-type-aliases
+                    known-types
+                    type-alias->type
+                    typeid->type
+                    type->typeid
+                    type->type-reader
+                    type->type-writer)
 
-(define known-types
-  '(decimal
-    tinyint smallint mediumint int bigint
-    float double
-    date time datetime
-    varchar var-string
-    tinyblob mediumblob longblob blob))
+  (newdecimal  decimal     ()    parse-decimal   #f)
+  (tiny        tinyint     ()    parse-integer   #f)
+  (short       smallint    ()    parse-integer   #f)
+  (int24       mediumint   ()    parse-integer   #f)
+  (long        integer     (int) parse-integer   #f)
+  (longlong    bigint      ()    parse-integer   #f)
+  (float       real        ()    parse-real      #f)
+  (double      double      ()    parse-real      #f)
+  (newdate     date        ()    parse-date      #f)
+  (time        time        ()    parse-time      #f)
+  (datetime    datetime    ()    parse-timestamp #f)
+  (varchar     varchar     ()    parse-string    #f)
+  (var-string  var-string  ()    parse-string    #f)
+  (tiny-blob   tinyblob    ()    #f              #f)
+  (medium-blob mediumblob  ()    #f              #f)
+  (long-blob   longblob    ()    #f              #f)
+  (blob        blob        ()    #f              #f))
 
-(define known-type-aliases
-  '(integer real numeric))
+;; decimal, date typeids not used (?)
+;; type-readers retained for debugging
 
 (define known-types+aliases
-  (append known-type-aliases known-types))
-
-;; type-alias->type : symbol -> symbol
-;; FIXME: fill in?
-(define (type-alias->type alias)
-  (case alias
-    ((integer) 'int)
-    ((real) 'float)
-    ((numeric) 'decimal)
-    (else alias)))
-
-#|
-;; Retained for debugging.
-
-;; type->type-reader : symbol -> (string -> datum) or #f
-(define (type->type-reader type)
-  (case type
-    ((decimal) parse-decimal)
-    ((tinyint smallint mediumint int bigint) parse-integer)
-    ((float double) parse-real)
-    ;; null timestamp year 
-    ((date) parse-date)
-    ((time) parse-time)
-    ((datetime) parse-timestamp)
-    ((varchar var-string) parse-string)
-    ((tinyblob mediumblob longblob blob) parse-string)
-    ;; bit
-    ;; enum
-    ;; set
-    ;; geometry
-    (else #f)))
-|#
+  (append known-types known-type-aliases))

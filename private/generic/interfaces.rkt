@@ -15,7 +15,9 @@
          (struct-out statement-binding)
          (struct-out statement-generator)
 
-         init-private)
+         init-private
+
+         define-type-table)
 
 ;; ==== Connection
 
@@ -131,3 +133,38 @@
 (define-syntax-rule (init-private1 iid)
   (begin (init ([private-iid iid]))
          (define iid private-iid)))
+
+
+;; === Util for defining type tables
+
+(define-syntax-rule (define-type-table (known-type-aliases
+                                        known-types
+                                        type-alias->type
+                                        typeid->type
+                                        type->typeid
+                                        type->type-reader
+                                        type->type-writer)
+                      (typeid type (alias ...) reader writer) ...)
+  (begin
+    (define known-type-aliases '(alias ... ...))
+    (define known-types '(type ...))
+    (define (type-alias->type x)
+      (case x
+        ((alias ...) 'type) ...
+        (else x)))
+    (define (typeid->type x)
+      (case x
+        ((typeid) 'type) ...
+        (else #f)))
+    (define (type->typeid x)
+      (case x
+        ((type) 'typeid) ...
+        (else #f)))
+    (define (type->type-reader x)
+      (case x
+        ((type) reader) ...
+        (else #f)))
+    (define (type->type-writer x)
+      (case x
+        ((type) writer) ...
+        (else #f)))))

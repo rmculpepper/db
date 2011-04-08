@@ -14,6 +14,8 @@ To do
 
 ----
 
+- add sql-bits datatype for BIT, VARBIT types
+
 - printers for sql-* structs
 
 - GC postgresql and mysql prepared-statements to close descriptors

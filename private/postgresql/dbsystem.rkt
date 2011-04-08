@@ -7,7 +7,7 @@
          "../generic/interfaces.rkt"
          "../generic/query.rkt"
          "../generic/sql-convert.rkt")
-(provide (all-defined-out))
+(provide dbsystem)
 
 (define postgresql-dbsystem%
   (class* object% (dbsystem<%>)
@@ -45,138 +45,35 @@
 ;; Derived from 
 ;; http://www.us.postgresql.org/users-lounge/docs/7.2/postgres/datatype.html
 
-(define known-type-aliases
-  '(boolean
-    character
-    string
-    smallint
-    integer int serial serial4
-    bigint serial8
-    float real
-    double
-    decimal))
-
-(define known-types
-  '(int2 int4 int8 tid xid cid oid
-    float4 float8
-    numeric
-    text varchar bpchar
-    bytea
-    bool char1
-    date
-    time
-    timetz
-    timestamp
-    timestamptz))
+(define-type-table (known-type-aliases
+                    known-types
+                    type-alias->type
+                    typeid->type
+                    type->typeid
+                    type->type-reader
+                    type->type-writer)
+  (16   boolean    (bool)          parse-boolean      marshal-bool)
+  (17   bytea      ()              parse-bytea        marshal-bytea)
+  (18   char1      ()              parse-char1        marshal-char1)
+  (19   name       ()              parse-string       marshal-string)
+  (20   bigint     (int8)          parse-integer      marshal-int8)
+  (21   smallint   (int2)          parse-integer      marshal-int2)
+  (23   integer    (int int4)      parse-integer      marshal-int4)
+  (25   text       ()              parse-string       marshal-string)
+  (26   oid        ()              parse-integer      marshal-int4)
+  (700  real       (float float4)  parse-real         marshal-real)
+  (701  double     (float8)        parse-real         marshal-real)
+  (1042 character  (bpchar)        parse-string       marshal-string)
+  (1043 varchar    ()              parse-string       marshal-string)
+  (1082 date       ()              parse-date         marshal-date)
+  (1083 time       ()              parse-time         marshal-time)
+  (1114 timestamp  ()              parse-timestamp    marshal-timestamp)
+  (1184 timestamptz()              parse-timestamp-tz marshal-timestamp-tz)
+  (1186 interval   ()              parse-interval     marshal-interval)
+  (1266 timetz     ()              parse-time-tz      marshal-time-tz)
+  ;(1560 bit        ())
+  ;(1562 varbit     ())
+  (1700 decimal    (numeric)       parse-decimal     marshal-decimal))
 
 (define known-types+aliases
   (append known-type-aliases known-types))
-
-;; type-alias->type : symbol -> symbol
-(define (type-alias->type alias)
-  (case alias
-    ((boolean) 'bool)
-    ((character) 'bpchar)
-    ((string) 'text)
-    ((smallint) 'int2)
-    ((integer int serial serial4) 'int4)
-    ((bigint serial8) 'int8)
-    ((float real) 'float4)
-    ((double) 'float8)
-    ((decimal) 'numeric)
-    (else alias)))
-
-;; type->type-reader : symbol -> (string -> datum) or #f
-(define (type->type-reader type)
-  (case type
-    [(int2 int4 int8 tid xid cid oid) parse-integer]
-    [(float4 float8) parse-real]
-    [(numeric) parse-decimal]
-    [(text varchar bpchar) parse-string]
-    [(bytea) parse-bytea]
-    [(bool) parse-boolean]
-    [(char1) parse-char1]
-    [(date) parse-date]
-    [(time) parse-time]
-    [(timetz) parse-time-tz]
-    [(timestamp) parse-timestamp]
-    [(timestamptz) parse-timestamp-tz]
-    [(interval) parse-interval]
-    [else #f]))
-
-;; type->type-writer : symbol -> (datum -> string) or #f
-(define (type->type-writer type)
-  (case type
-    [(int2) marshal-int2]
-    [(int4 xid cid oid) marshal-int4]
-    [(int8 tid) marshal-int8]
-    [(float4 float8) marshal-real]
-    [(numeric) marshal-decimal]
-    [(text varchar char) marshal-string]
-    [(bytea) marshal-bytea]
-    [(bool) marshal-bool]
-    [(char1) marshal-char1]
-    [(date) marshal-date]
-    [(time) marshal-time]
-    [(timetz) marshal-time-tz]
-    [(timestamp) marshal-timestamp]
-    [(timestamptz) marshal-timestamp-tz]
-    [(interval) marshal-interval]
-    [else #f]))
-
-;; type <=> typeid from:
-;; http://doxygen.postgresql.org/include_2catalog_2pg__type_8h-source.html
-
-(define (typeid->type typeid)
-  (case typeid
-    ((16) 'bool)
-    ((17) 'bytea)
-    ((18) 'char1)
-    ((19) 'name)
-    ((20) 'int8)
-    ((21) 'int2)
-    ((23) 'int4)
-    ((25) 'text)
-    ((26) 'oid)
-    ((27) 'tid)
-    ((700) 'float4)
-    ((701) 'float8)
-    ((1042) 'bpchar)
-    ((1043) 'varchar)
-    ((1082) 'date)
-    ((1083) 'time)
-    ((1114) 'timestamp)
-    ((1184) 'timestamptz)
-    ((1186) 'interval)
-    ((1266) 'timetz)
-    ((1560) 'bit)
-    ((1562) 'varbit)
-    ((1700) 'numeric)
-    (else #f)))
-
-(define (type->typeid type)
-  (case type
-    ((bool) 16)
-    ((bytea) 17)
-    ((char1) 18)
-    ((name) 19)
-    ((int8) 20)
-    ((int2) 21)
-    ((int4) 23)
-    ((text) 25)
-    ((oid) 26)
-    ((tid) 27)
-    ((float4) 700)
-    ((float8) 701)
-    ((bpchar) 1042)
-    ((varchar) 1043)
-    ((date) 1082)
-    ((time) 1083)
-    ((timestamp) 1114)
-    ((timestamptz) 1184)
-    ((interval) 1186)
-    ((timetz) 1266)
-    ((bit) 1560)
-    ((varbit) 1562)
-    ((numeric) 1700)
-    (else #f)))

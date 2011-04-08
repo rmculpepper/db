@@ -63,7 +63,7 @@
   (26   oid        ()              parse-integer      marshal-int4)
   (700  real       (float float4)  parse-real         marshal-real)
   (701  double     (float8)        parse-real         marshal-real)
-  (1042 character  (bpchar)        parse-string       marshal-string)
+  (1042 character  (char bpchar)   parse-string       marshal-string)
   (1043 varchar    ()              parse-string       marshal-string)
   (1082 date       ()              parse-date         marshal-date)
   (1083 time       ()              parse-time         marshal-time)

@@ -1,8 +1,6 @@
 To do
 =====
 
-- change type names back -- prefer SQL standard type names
-
 - fsym => who
 
 - better constraints, normalization of sql-intervals

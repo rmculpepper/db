@@ -48,30 +48,31 @@
 
 ;; ----
 
-(define type-table
-  '((0 unknown)
-    (1 char)
-    (2 numeric)
-    (3 decimal)
-    (4 integer)
-    (5 smallint)
-    (6 float)
-    (7 real)
-    (8 double)
-    (9 datetime)
-    (12 varchar)
-    (91 date)
-    (92 time)
-    (93 timestamp)
-    (-1 longvarchar)
-    (-2 binary)
-    (-3 varbinary)
-    (-4 longvarbinary)
-    (-5 bigint)
-    (-6 tinyint)
-    (-7 bit)))
-
-(define (typeid->type typeid)
-  (cond [(assoc typeid type-table)
-         => cadr]
-        [else 'unsupported]))
+(define-type-table (known-type-aliases
+                    known-types
+                    type-alias->type
+                    typeid->type
+                    type->typeid
+                    type->type-reader
+                    type->type-writer)
+  (0  unknown        ()           #f #f)
+  (1  character      (char)       #f #f)
+  (2  numeric        ()           #f #f)
+  (3  decimal        ()           #f #f)
+  (4  integer        (int)        #f #f)
+  (5  smallint       ()           #f #f)
+  (6  float          ()           #f #f)
+  (7  real           ()           #f #f)
+  (8  double         ()           #f #f)
+  (9  datetime       ()           #f #f)
+  (12 varchar        ()           #f #f)
+  (91 date           ()           #f #f)
+  (92 time           ()           #f #f)
+  (93 timestamp      ()           #f #f)
+  (-1 longvarchar    ()           #f #f)
+  (-2 binary         ()           #f #f)
+  (-3 varbinary      ()           #f #f)
+  (-4 longvarbinary  ()           #f #f)
+  (-5 bigint         ()           #f #f)
+  (-6 tinyint        ()           #f #f)
+  (-7 bit1           ()           #f #f)) ;; not bit(n), always single bit

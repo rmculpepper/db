@@ -34,21 +34,19 @@ along with their corresponding Racket representations.
 
 @tabbing{
   @bold{PostgreSQL type} @& @bold{Aliases}      @& @bold{Racket type} @//
-  @tt{bool}          @& @tt{boolean}            @& @scheme[boolean?] @//
+  @tt{boolean}       @& @tt{bool}               @& @scheme[boolean?] @//
   @tt{char1}         @& @tt{}                   @& @scheme[char?] @//
-  @tt{int2}          @& @tt{smallint}           @& @scheme[exact-integer?] @//
-  @tt{int4}          @& @tt{integer int}        @& @scheme[exact-integer?] @//
-  @tt{int8}          @& @tt{bigint}             @& @scheme[exact-integer?] @//
-  @tt{float4}        @& @tt{real}               @& @scheme[real?] @//
-  @tt{float8}        @& @tt{double}             @& @scheme[real?] @//
-  @tt{numeric}       @& @tt{decimal}            @& @scheme[number?] @//
-  @tt{serial4}       @& @tt{serial}             @& @scheme[exact-integer?] @//
-  @tt{serial8}       @& @tt{bigserial}          @& @scheme[exact-integer?] @//
-  @tt{bpchar}        @& @tt{character}          @& @scheme[string?] @//
+  @tt{smallint}      @& @tt{int2}               @& @scheme[exact-integer?] @//
+  @tt{integer}       @& @tt{int int4}           @& @scheme[exact-integer?] @//
+  @tt{bigint}        @& @tt{int8}               @& @scheme[exact-integer?] @//
+  @tt{real}          @& @tt{float4}             @& @scheme[real?] @//
+  @tt{double}        @& @tt{float8}             @& @scheme[real?] @//
+  @tt{decimal}       @& @tt{numeric}            @& @scheme[number?] @//
+  @tt{character}     @& @tt{char bpchar}        @& @scheme[string?] @//
   @tt{varchar}       @& @tt{}                   @& @scheme[string?] @//
+  @tt{text}          @& @tt{}                   @& @scheme[string?] @//
   @tt{bytea}         @& @tt{}                   @& @scheme[bytes?] @//
   @tt{date}          @& @tt{}                   @& @scheme[sql-date?] @//
-  @tt{text}          @& @tt{}                   @& @scheme[string?] @//
   @tt{time}          @& @tt{}                   @& @scheme[sql-time?] @//
   @tt{timetz}        @& @tt{}                   @& @scheme[sql-time?] @//
   @tt{timestamp}     @& @tt{}                   @& @scheme[sql-timestamp?] @//
@@ -57,10 +55,9 @@ along with their corresponding Racket representations.
   @tt{oid}           @& @tt{}                   @& @scheme[exact-integer?]
 }
 
-The type name @tt{bpchar} corresponds to the standard SQL blank-padded
-string type written @tt{character} and abbreviated @tt{char}. The type
-@tt{char1} is a one-byte integer type written @tt{"char"} in PostgreQL
-syntax (the quotation marks are significant).
+The @tt{char1} type, written @tt{"char"} in PostgreSQL's SQL syntax
+(the quotation marks are significant), is always one byte, essentially
+a tiny integer written as a character.
 
 A SQL value of type @tt{numeric} is always converted to either an
 exact rational or @scheme[+nan.0]. When converting Scheme values to
@@ -97,12 +94,12 @@ with their corresponding Racket representations.
 
 @tabbing{
   @bold{MySQL type}  @& @bold{Aliases}                   @& @bold{Racket type} @//
-  @tt{int}           @& @tt{integer}                     @& @scheme[exact-integer?] @//
+  @tt{integer}       @& @tt{int}                         @& @scheme[exact-integer?] @//
   @tt{tinyint}       @& @tt{}                            @& @scheme[exact-integer?] @//
   @tt{smallint}      @& @tt{}                            @& @scheme[exact-integer?] @//
   @tt{mediumint}     @& @tt{}                            @& @scheme[exact-integer?] @//
-  @tt{biginteger}    @& @tt{bigint}                      @& @scheme[exact-integer?] @//
-  @tt{float}         @& @tt{real}                        @& @scheme[real?] @//
+  @tt{bigint}        @& @tt{biginteger}                  @& @scheme[exact-integer?] @//
+  @tt{real}          @& @tt{float}                       @& @scheme[real?] @//
   @tt{double}        @& @tt{}                            @& @scheme[real?] @//
   @tt{decimal}       @& @tt{numeric}                     @& @scheme[number?] @//
   @tt{varchar}       @& @tt{}                            @& @scheme[string?] @//
@@ -120,9 +117,8 @@ addition to strings, numbers (@racket[rational?]---no infinities or
 NaN) and SQL date/time structures (@racket[sql-date?],
 @racket[sql-time?], and @racket[sql-timestamp?]).
 
-A SQL value of type @tt{decimal} (aka @tt{numeric}) is always
-converted to an exact rational (MySQL seems not to support infinite
-@tt{decimal} values).
+A SQL value of type @tt{decimal} is always converted to an exact
+rational (MySQL seems not to support infinite @tt{decimal} values).
 
 Note that in MySQL, the @tt{time} type represents time intervals,
 which may not correspond to times of day (for example, the interval
@@ -167,7 +163,7 @@ along with their corresponding Racket representations.
 
 @tabbing{
   @bold{ODBC type}  @& @bold{Racket type} @//
-  @tt{char}         @& @scheme[string?] @//
+  @tt{character}    @& @scheme[string?] @//
   @tt{varchar}      @& @scheme[string?] @//
   @tt{longvarchar}  @& @scheme[string?] @//
   @tt{numeric}      @& @scheme[rational?] @//
@@ -186,7 +182,7 @@ along with their corresponding Racket representations.
   @tt{binary}       @& @scheme[bytes?] @//
   @tt{varbinary}    @& @scheme[bytes?] @//
   @tt{longvarbinary}@& @scheme[bytes?] @//
-  @tt{bit}          @& @scheme[boolean?]
+  @tt{bit1}         @& @scheme[boolean?]
 }
 
 Not all ODBC drivers provide parameter type information for prepared
@@ -196,6 +192,8 @@ parameters accepts strings, bytes, numbers (@racket[rational?]---no
 infinities or NaN) and SQL date/time structures (@racket[sql-date?],
 @racket[sql-time?], and @racket[sql-timestamp?]).
 
+The ODBC type @tt{bit1} always represents a single bit, unlike the
+standard SQL @tt{bit(N)} type.
 
 @;{----------------------------------------}
 

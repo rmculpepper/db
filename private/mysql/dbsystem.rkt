@@ -60,7 +60,7 @@
               (sql-date? param)
               (sql-time? param)
               (sql-timestamp? param)
-              (sql-simple-interval? param))
+              (sql-day-time-interval? param))
     (error fsym "cannot marshal as var-string: ~e" param))
   param)
 
@@ -83,7 +83,7 @@
   (float       real        ()    parse-real      #f)
   (double      double      ()    parse-real      #f)
   (newdate     date        ()    parse-date      #f)
-  (time        time        ()    parse-time      #f)
+  (time        time        ()    #f              #f)
   (datetime    datetime    ()    parse-timestamp #f)
   (varchar     varchar     ()    parse-string    #f)
   (var-string  var-string  ()    parse-string    #f)

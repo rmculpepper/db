@@ -16,7 +16,7 @@
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'odbc) ;; FIXME: need also underlying driver info
     (define/public (typeids->types typeids) (map typeid->type typeids))
-    (define/public (get-known-types) (map cadr type-table))
+    (define/public (get-known-types) known-types+aliases)
     (define/public (has-support? x) #f)
 
     (define/public (get-parameter-handlers param-infos)
@@ -76,3 +76,6 @@
   (-5 bigint         ()           #f #f)
   (-6 tinyint        ()           #f #f)
   (-7 bit1           ()           #f #f)) ;; not bit(n), always single bit
+
+(define known-types+aliases
+  (append known-types known-type-aliases))

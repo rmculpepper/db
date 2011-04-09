@@ -32,7 +32,22 @@
 ;; but, should probably normalize within HMS.N
 (define-struct sql-interval
   (years months days hours minutes seconds nanoseconds)
-  #:transparent)
+  #:transparent
+  #:guard (lambda (years months days hours minutes seconds nanoseconds _name)
+            ;; Normalize years/months, hours/minutes/seconds/nanoseconds
+            ;; Recall: quotient, remainder results have sign of first arg
+            ;;   (if second arg is positive)
+            (let ([total-months (+ months (* years 12))]
+                  [total-nsecs (+ nanoseconds
+                                  (* (+ seconds
+                                        (* minutes 60)
+                                        (* hours 60 60))
+                                     #e1e9))])
+              (let*-values ([(years months) (quotient/remainder total-months 12)]
+                            [(left-secs nsecs) (quotient/remainder total-nsecs #e1e9)]
+                            [(left-mins secs) (quotient/remainder left-secs 60)]
+                            [(hours mins) (quotient/remainder left-mins 60)])
+                (values years months days hours mins secs nsecs)))))
 
 ;; ----
 
@@ -85,68 +100,72 @@
 
 ;; ----
 
-;; A interval is "simple" if it involves only hours, minutes, seconds, nsecs
-;; In that case, it represents a definite amount of time.
-;; For convenience elsewhere, require all HMS.N have same sign (or are zero).
-(define (sql-simple-interval? x)
-  (define (same-signs? w x y z)
-    (define some-pos? (or (positive? w) (positive? x) (positive? y) (positive? z)))
-    (define some-neg? (or (negative? w) (negative? x) (negative? y) (negative? z)))
-    (not (and some-pos? some-neg?)))
+(define (sql-day-time-interval? x)
   (and (sql-interval? x)
        (zero? (sql-interval-years x))
-       (zero? (sql-interval-months x))
-       (zero? (sql-interval-days x))
-       (same-signs? (sql-interval-hours x)
-                    (sql-interval-minutes x)
-                    (sql-interval-seconds x)
-                    (sql-interval-nanoseconds x))))
+       (zero? (sql-interval-months x))))
 
-(define (sql-simple-interval->seconds x)
+(define (sql-year-month-interval? x)
+  (and (sql-interval? x)
+       (zero? (sql-interval-days x))
+       (zero? (sql-interval-hours x))
+       (zero? (sql-interval-minutes x))
+       (zero? (sql-interval-seconds x))
+       (zero? (sql-interval-nanoseconds x))))
+
+(define (sql-day-time-interval->seconds x)
   (+ (* (sql-interval-hours x) 60 60)
      (* (sql-interval-minutes x) 60)
      (sql-interval-seconds x)
      (/ (sql-interval-nanoseconds x) #e1e9)))
 
+(define (same-signs? w x y z)
+  (define some-pos? (or (positive? w) (positive? x) (positive? y) (positive? z)))
+  (define some-neg? (or (negative? w) (negative? x) (negative? y) (negative? z)))
+  (not (and some-pos? some-neg?)))
+
 (define no-arg (gensym))
 
-(define (sql-simple-interval->sql-time x [default no-arg])
+(define (sql-interval->sql-time x [default no-arg])
   (let ([h (sql-interval-hours x)]
         [m (sql-interval-minutes x)]
         [s (sql-interval-seconds x)]
         [ns (sql-interval-nanoseconds x)])
-    (cond [(and (<= 0 h 23)
+    (cond [(and (sql-day-time-interval? x)
+                (<= 0 h 23)
                 (<= 0 m 59)
                 (<= 0 s 59)
-                (<= 0 ns (- #e1e9 1)))
+                (<= 0 ns (sub1 #e1e9)))
            (sql-time h m s ns #f)]
           [else
            (cond [(eq? default no-arg)
-                  (error 'sql-interval->sql-time
+                  (error 'sql-day-time-interval->sql-time
                          "cannot convert interval to time: ~e" x)]
                  [(procedure? default) (default)]
                  [else default])])))
 
 ;; ----
 
+;; Note: MySQL allows 0 month, 0 day, etc.
+
 (provide sql-null
          sql-null?)
 (provide/contract
  [struct sql-date ([year exact-integer?]
-                   [month exact-nonnegative-integer?]
-                   [day exact-nonnegative-integer?])]
- [struct sql-time ([hour exact-nonnegative-integer?]
-                   [minute exact-nonnegative-integer?]
-                   [second exact-nonnegative-integer?]
-                   [nanosecond exact-nonnegative-integer?]
+                   [month (integer-in 0 12)]
+                   [day (integer-in 0 31)])]
+ [struct sql-time ([hour (integer-in 0 23)]
+                   [minute (integer-in 0 59)]
+                   [second (integer-in 0 61)] ;; leap seconds
+                   [nanosecond (integer-in 0 (sub1 #e1e9))]
                    [tz (or/c #f exact-integer?)])]
  [struct sql-timestamp ([year exact-integer?]
-                        [month exact-nonnegative-integer?]
-                        [day exact-nonnegative-integer?]
-                        [hour exact-nonnegative-integer?]
-                        [minute exact-nonnegative-integer?]
-                        [second exact-nonnegative-integer?]
-                        [nanosecond exact-nonnegative-integer?]
+                        [month (integer-in 0 12)]
+                        [day (integer-in 0 31)]
+                        [hour (integer-in 0 23)]
+                        [minute (integer-in 0 59)]
+                        [second (integer-in 0 61)]
+                        [nanosecond (integer-in 0 (sub1 #e1e9))]
                         [tz (or/c #f exact-integer?)])]
  [struct sql-interval ([years exact-integer?]
                        [months exact-integer?]
@@ -174,10 +193,12 @@
   (->* (srfi:date?) ((or/c exact-nonnegative-integer? #f))
        sql-timestamp?)]
 
- [sql-simple-interval?
+ [sql-day-time-interval?
   (-> any/c boolean?)]
- [sql-simple-interval->seconds
-  (-> sql-simple-interval? rational?)]
- [sql-simple-interval->sql-time
-  (->* (sql-simple-interval?) (any/c)
+ [sql-year-month-interval?
+  (-> any/c boolean?)]
+ [sql-day-time-interval->seconds
+  (-> sql-day-time-interval? rational?)]
+ [sql-interval->sql-time
+  (->* (sql-interval?) (any/c)
        any)])

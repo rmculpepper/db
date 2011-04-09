@@ -205,7 +205,7 @@ No conversion may be passed sql-null.
          marshal-time-tz
          marshal-timestamp
          marshal-timestamp-tz
-         marshal-simple-interval
+         marshal-day-time-interval
          marshal-interval
 
          marshal-error
@@ -364,8 +364,8 @@ No conversion may be passed sql-null.
     (marshal-error f i pi "timestamp" t))
   (srfi:date->string (sql-datetime->srfi-date t) "~Y-~m-~d ~k:~M:~S.~N~z"))
 
-(define (marshal-simple-interval f i pi t)
-  (unless (sql-simple-interval? t)
+(define (marshal-day-time-interval f i pi t)
+  (unless (sql-day-time-interval? t)
     (marshal-error f i pi "simple time interval" t))
   (let ([h (sql-interval-hours t)]
         [m (abs (sql-interval-minutes t))]

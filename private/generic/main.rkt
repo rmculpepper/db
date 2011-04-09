@@ -29,8 +29,9 @@
          srfi-date->sql-timestamp
          srfi-date->sql-timestamp-tz
 
-         sql-simple-interval?
-         sql-simple-interval->seconds
-         sql-simple-interval->sql-time
+         sql-year-month-interval?
+         sql-day-time-interval?
+         sql-day-time-interval->seconds
+         sql-interval->sql-time
 
          (all-from-out "functions.rkt"))

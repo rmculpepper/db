@@ -1,8 +1,6 @@
 To do
 =====
 
-- fsym => who
-
 - better constraints, normalization of sql-intervals
 
 - test sql-interval type

@@ -219,9 +219,15 @@ New Racket datatypes are also provided for a few SQL types that have
 no existing close analogues.
 
 @defstruct*[sql-date
-            ([year exact-nonnegative-integer?]
-             [month exact-nonnegative-integer?]
-             [day exact-nonnegative-integer?])]
+            ([year exact-integer?]
+             [month (integer-in 0 12)]
+             [day (integer-in 0 31)])]{
+
+  Represents a SQL date.
+
+  MySQL allows @tt{DATE} values with zero components as an extension.
+}
+
 @defstruct*[sql-time
             ([hour exact-nonnegative-integer?]
              [minute exact-nonnegative-integer?]
@@ -238,8 +244,12 @@ no existing close analogues.
              [nanosecond exact-nonnegative-integer?]
              [tz (or/c exact-integer? #f)])]{
 
-  Representations of SQL dates, times, and timestamps. The @scheme[tz]
-  field may be @scheme[#f] to indicate no time zone information.
+  Represents SQL times and timestamps.
+
+  The @scheme[tz] field indicates the time zone offset as the number
+  of seconds east of GMT (as in SRFI 19). If @racket[tz] is
+  @racket[#f], the time or timestamp does not carry time zone
+  information.
 
   The @scheme[sql-time] and @scheme[sql-timestamp] structures store
   fractional seconds to nanosecond precision for compatibility with
@@ -311,31 +321,61 @@ no existing close analogues.
 
   Represents lengths of time. An interval may contain a mixture of
   positive and negative fields.
-}
 
-@defproc[(sql-simple-interval? [x any/c]) boolean?]{
-
-  Returns @racket[#t] if @racket[x] is a @racket[sql-interval] value
-  with the following constraints:
+  On construction, intervals are normalized to satisfy the following
+  constraints:
   @itemlist[
-  @item{the @racket[_years], @racket[_months], and @racket[_days] fields are zero}
-  @item{the @racket[_hours], @racket[_minutes], @racket[_seconds], and
-  @racket[_nanoseconds] fields are either all non-negative or all
-  non-positive}
+  @item{@racket[years] and @racket[months] have the same sign}
+  @item{@racket[months] ranges from @racket[-11] to @racket[11]}
+  @item{@racket[hours], @racket[minutes], @racket[seconds], and
+    @racket[nanoseconds] all have the same sign}
+  @item{@racket[minutes] and @racket[seconds] range from @racket[-59]
+    to @racket[59]} 
+  @item{@racket[nanoseconds] ranges from
+    @racket[(- (sub1 #, @racketvalfont{#e1e9}))] to
+  @racket[(sub1 #, @racketvalfont{#e1e9})]}
   ]
 }
 
-@defproc[(sql-simple-interval->sql-time [interval sql-simple-interval?]
-                                        [default any/c (lambda () (error ....))])
-         any]{
+@defproc[(sql-day-time-interval? [x any/c]) boolean?]{
 
-  If @racket[interval] is a @racket[sql-interval] that represents a
-  time of day, returns the corresponding @racket[sql-time] value. If
-  @racket[interval] is out of range, the @racket[default] value is
-  called, if it is a procedure, or returned, otherwise.
+  Returns @racket[#t] if @racket[x] is a @racket[sql-interval] value
+  where the @racket[years], @racket[months], and @racket[days]
+  fields are zero.
 }
 
-@defproc[(sql-simple-interval->seconds [interval sql-simple-interval?])
+@defproc[(sql-year-month-interval? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is a @racket[sql-interval] value
+  where the @racket[days], @racket[hours], @racket[minutes],
+  @racket[seconds], and @racket[nanoseconds] fields are zero.
+}
+
+
+@defproc[(sql-interval->sql-time [interval sql-interval?]
+                                 [failure any/c (lambda () (error ....))])
+         any]{
+
+  If @racket[interval] is a @racket[sql-day-time-interval] that
+  represents a time of day, returns the corresponding
+  @racket[sql-time] value. In particular, the following must be true:
+  @itemlist[
+  @item{@racket[hours], @racket[minutes], @racket[seconds], and
+    @racket[nanoseconds] must all be non-negative}
+  @item{@racket[hours] must be between @racket[0] and @racket[23]}
+  ]
+  The corresponding constraints on @racket[minutes], etc are
+  enforced by the constructor.
+
+  If @racket[interval] is out of range, the @racket[failure] value is
+  called, if it is a procedure, or returned, otherwise.
+
+  The @racket[sql-interval->sql-time] function can be used as a
+  predicate for intervals representing times of day by passing
+  @racket[#f] as the @racket[failure] argument.
+}
+
+@defproc[(sql-day-time-interval->seconds [interval sql-day-time-interval?])
          rational?]{
 
   Returns the length of @racket[interval] in seconds.

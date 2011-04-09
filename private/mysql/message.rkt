@@ -505,8 +505,8 @@ Based on protocol documentation here:
                   [(sql-date? param) (marshal-date 'send-param #f #f param)]
                   [(sql-time? param) (marshal-time 'send-param #f #f param)]
                   [(sql-timestamp? param) (marshal-timestamp 'send-param #f #f param)]
-                  [(sql-simple-interval? param)
-                   (marshal-simple-interval 'send-param #f #f param)]
+                  [(sql-day-time-interval? param)
+                   (marshal-day-time-interval 'send-param #f #f param)]
                   [else
                    (error 'send-param
                           "internal error: cannot marshal as var-string: ~e" param)])])

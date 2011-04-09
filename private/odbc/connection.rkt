@@ -321,15 +321,15 @@
              (let-values ([(status type size digits nullable)
                            (SQLDescribeParam stmt i)])
                (handle-status fsym status stmt)
-               `((*type* . ,type) (size . ,size) (digits . ,digits)))]
+               `((typeid . ,type) (size . ,size) (digits . ,digits)))]
             [else
-             `((*type* . ,SQL_UNKNOWN_TYPE))]))
+             `((typeid . ,SQL_UNKNOWN_TYPE))]))
 
     (define/private (describe-result-column fsym stmt i)
       (let-values ([(status name type size digits nullable)
                     (SQLDescribeCol stmt i)])
         (handle-status fsym status stmt)
-        `((name . ,name) (*type* . ,type) (size . ,size) (digits . ,digits))))
+        `((name . ,name) (typeid . ,type) (size . ,size) (digits . ,digits))))
 
     (define/public (disconnect)
       (with-lock

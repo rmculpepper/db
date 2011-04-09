@@ -1,6 +1,9 @@
 To do
 =====
 
+- clean up mysql classes
+- rewrite postgresl msg layer (?)
+
 - doc: enumerate errors
 
 - strict mode by default: error if backend result type unknown

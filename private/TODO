@@ -1,7 +1,7 @@
 To do
 =====
 
-- better constraints, normalization of sql-intervals
+- strict mode by default: error if backend result type unknown
 
 - test sql-interval type
   - and add to ODBC (easy as result, complicated as param (I think))

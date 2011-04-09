@@ -5,9 +5,7 @@
 #lang racket/base
 (require racket/class
          "../generic/interfaces.rkt"
-         "../generic/query.rkt"
-         "../generic/sql-data.rkt"
-         "../generic/sql-convert.rkt")
+         "../generic/sql-data.rkt")
 (provide dbsystem)
 
 (define mysql-dbsystem%
@@ -33,18 +31,7 @@
            param-infos))
 
     (define/public (get-result-handlers result-infos)
-      ;; We force all queries through prepared statement path so that
-      ;; all data transfer is done in binary format.
-      ;; To re-enable text format for string statement queries,
-      ;; change check-statement in connection.rkt and uncomment
-      ;; type->type-reader code below.
-      (error 'get-result-handlers "unsupported")
-      #|
-      (map (lambda (result-info)
-             (let ([type (typeid->type (get-fi-typeid result-info))])
-               (type->type-reader type)))
-           result-infos)
-      |#)
+      (error 'get-result-handlers "unsupported"))
 
     (super-new)))
 
@@ -74,26 +61,25 @@
                     type->type-reader
                     type->type-writer)
 
-  (newdecimal  decimal     ()    parse-decimal   #f)
-  (tiny        tinyint     ()    parse-integer   #f)
-  (short       smallint    ()    parse-integer   #f)
-  (int24       mediumint   ()    parse-integer   #f)
-  (long        integer     (int) parse-integer   #f)
-  (longlong    bigint      ()    parse-integer   #f)
-  (float       real        ()    parse-real      #f)
-  (double      double      ()    parse-real      #f)
-  (newdate     date        ()    parse-date      #f)
-  (time        time        ()    #f              #f)
-  (datetime    datetime    ()    parse-timestamp #f)
-  (varchar     varchar     ()    parse-string    #f)
-  (var-string  var-string  ()    parse-string    #f)
-  (tiny-blob   tinyblob    ()    #f              #f)
-  (medium-blob mediumblob  ()    #f              #f)
-  (long-blob   longblob    ()    #f              #f)
-  (blob        blob        ()    #f              #f))
+  (newdecimal  decimal     ()    #f #f)
+  (tiny        tinyint     ()    #f #f)
+  (short       smallint    ()    #f #f)
+  (int24       mediumint   ()    #f #f)
+  (long        integer     (int) #f #f)
+  (longlong    bigint      ()    #f #f)
+  (float       real        ()    #f #f)
+  (double      double      ()    #f #f)
+  (newdate     date        ()    #f #f)
+  (time        time        ()    #f #f)
+  (datetime    datetime    ()    #f #f)
+  (varchar     varchar     ()    #f #f)
+  (var-string  var-string  ()    #f #f)
+  (tiny-blob   tinyblob    ()    #f #f)
+  (medium-blob mediumblob  ()    #f #f)
+  (long-blob   longblob    ()    #f #f)
+  (blob        blob        ()    #f #f))
 
 ;; decimal, date typeids not used (?)
-;; type-readers retained for debugging
 
 (define known-types+aliases
   (append known-types known-type-aliases))

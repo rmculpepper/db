@@ -334,15 +334,10 @@
     ;; name-counter : number
     (define name-counter 0)
 
-    ;; NOTE: Always prepare statement so that query goes through the binary
-    ;; data path. See code in methods below marked TEXT for disabled code and
-    ;; comments about the disabled text data path. See also get-result-handlers.
-
     ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
     ;; The single point of control for the query engine
     (define/public (query* fsym stmts collector)
       (let ([collector collector])
-        ;; TEXT: (compose-collector-with-conversions (get-dbsystem) collector)
         (let ([stmts
                (for/list ([stmt (in-list stmts)])
                  (check-statement fsym stmt))])
@@ -362,33 +357,24 @@
                (send pst check-owner fsym this stmt)
                stmt)]
             [(string? stmt)
-             ;; TEXT: leave string alone to re-enable text data path
              (let ([pst (prepare1 fsym stmt)])
                (send pst bind fsym null))]))
 
-    ;; query1:enqueue : Statement -> void
+    ;; query1:enqueue : statement-binding -> void
     (define/private (query1:enqueue stmt)
-      (cond [(string? stmt)
-             ;; TEXT: This clause is currently unreachable.
-             (send-message (make-command-packet 'query stmt))]
-            [(statement-binding? stmt)
-             (let* ([pst (statement-binding-pst stmt)]
-                    [id (send pst get-id)]
-                    [params (statement-binding-params stmt)]
-                    [null-map (map not params)]
-                    [param-types (send pst get-param-types)])
-               (send-message
-                (make-execute-packet id null 1 null-map 1 param-types params)))]))
+      (let* ([pst (statement-binding-pst stmt)]
+             [id (send pst get-id)]
+             [params (statement-binding-params stmt)]
+             [null-map (map not params)]
+             [param-types (send pst get-param-types)])
+        (send-message
+         (make-execute-packet id null 1 null-map 1 param-types params))))
 
-    ;; query1:collect : Statement Collector -> QueryResult stream
+    ;; query1:collect : statement-binding Collector -> QueryResult stream
     (define/private (query1:collect stmt collector)
-      (cond
-        [(string? stmt)
-         (query1:result #f collector)]
-        [(statement-binding? stmt)
-         (let* ([pst (statement-binding-pst stmt)]
-                [result-infos (send pst get-result-infos)])
-           (query1:result result-infos collector))]))
+      (let* ([pst (statement-binding-pst stmt)]
+             [result-infos (send pst get-result-infos)])
+        (query1:result result-infos collector)))
 
     (define/private (query1:result result-infos collector)
       (let ([r (recv 'query* 'result)])
@@ -414,7 +400,7 @@
              (query1:data-loop result-infos init combine finalize info))])))
 
     (define/private (query1:get-data result-infos)
-      (let ([r (recv 'query* (if result-infos 'binary-data 'data) result-infos)])
+      (let ([r (recv 'query* 'binary-data result-infos)])
         (match r
           [(struct row-data-packet (data))
            (cons data (query1:get-data result-infos))]

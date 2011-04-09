@@ -25,9 +25,6 @@
              check-param)
            param-infos))
 
-    (define/public (get-result-handlers result-infos)
-      (error 'get-result-handlers "unsupported"))
-
     (super-new)))
 
 (define dbsystem

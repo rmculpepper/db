@@ -7,7 +7,9 @@
          "../generic/interfaces.rkt"
          "../generic/query.rkt"
          "../generic/sql-convert.rkt")
-(provide dbsystem)
+(provide dbsystem
+         typeid->type
+         type->type-reader)
 
 (define postgresql-dbsystem%
   (class* object% (dbsystem<%>)

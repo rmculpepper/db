@@ -319,16 +319,22 @@
                   (cdr s)))
       s))
 
-(define (parse-field-info info)
-  `((name . ,(list-ref info 0))
-    (type-oid . ,(list-ref info 3))
-    (*type* . ,(list-ref info 3))))
+;; parse-field-dvec : list (from RowDescription) -> field-dvec
+;; layout is #(name table-oid col-oid typeid typelen typemod text/binary)
+(define (parse-field-dvec info)
+  (list->vector info))
+
+(define (field-dvec->typeid dvec)
+  (vector-ref dvec 3))
+
+(define (field-dvec->field-info dvec)
+  (field-description->alist (vector->list dvec)))
 
 (define (field-description->alist fi)
   (match fi
     [(list name table column type-oid type-size type-mod format-code)
      `((name . ,name)
-       (*type* . ,type-oid)
+       (typeid . ,type-oid)
        (type-size . ,type-size)
        (type-mod . ,type-mod))]))
 

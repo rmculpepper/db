@@ -87,56 +87,54 @@
                     sql
                     (mk-folding-collector base f))))
 
-;; standard-info : (listof ???) -> (listof field-info)
-(define (standard-info field-records)
-  (map (lambda (fr) (field-info (get-field-name fr) fr))
-       field-records))
-
-(define (get-field-name alist)
-  (cond [(assq 'name alist)
-         => cdr]
-        [else #f]))
-
-;; collector = ((listof ??) bool)
-;;          -> (values _a
-;;                     (_a (vectorof field) -> _a)
-;;                     (_a -> _a)
-;;                     _info
+;; collector = (nat order -> headers? init combine finish)
+;;   where init : A
+;;         combine : A vector -> A
+;;         finish : A -> A
+;;         order is #t for normal order, #f for reversed
 
 ;; vectorlist-collector : collector
 (define vectorlist-collector
-  (lambda (fields binary?)
+  (lambda (fields ordered?)
     (values null
             (lambda (b fieldv) (cons fieldv b))
-            reverse
+            (if ordered? reverse values)
             #f)))
 
 ;; vectorlist-collector : collector
 (define vectorlist-collector/fieldinfo
-  (lambda (fields binary?)
+  (lambda (fields ordered?)
     (values null
             (lambda (b fieldv) (cons fieldv b))
-            reverse
-            (standard-info fields))))
+            (if ordered? reverse values)
+            #t)))
 
 ;; void-collector : collector
 (define void-collector
-  (lambda (fields binary?)
+  (lambda (fields ordered?)
     (values #f void void #f)))
 
 (define (mk-folding-collector base f)
-  (lambda (fields binary?)
-    (values base f values #f)))
+  (lambda (fields ordered?)
+    (if ordered?
+        (values base f values #f)
+        (values null
+                (lambda (b fieldv) (cons fieldv b))
+                (lambda (rows)
+                  (for/fold ([acc base])
+                      ([row (in-list rows)])
+                    (f acc row)))
+                #f))))
 
-(define (mk-single-column-collector function sql)
-  (lambda (fields binary?)
-    (unless (= 1 (length fields))
-      (raise-mismatch-error function 
-                            "query did not return exactly one column: "
-                            sql))
+(define (mk-single-column-collector fsym sql)
+  (lambda (fields ordered?)
+    (case fields
+      ((0) (error fsym "query returned zero columns: ~e " sql))
+      ((1) 'ok)
+      (else (error 'fsym "query returned multiple columns: ~e" sql)))
     (values null
             (lambda (b av) (cons (vector-ref av 0) b))
-            reverse
+            (if ordered? reverse values)
             #f)))
 
 (define (recordset->one-row fsym rs sql)

@@ -3,9 +3,9 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require mzlib/etc
-         racket/class
+(require racket/class
          racket/match
+         racket/vector
          file/md5
          openssl/mzssl
          "../generic/interfaces.rkt"
@@ -281,21 +281,19 @@
     ;; query* : symbol (list-of Statement) Collector
     ;;       -> (list-of QueryResult)
     (define/public (query* fsym stmts collector)
-      (let ([collector (compose-collector-with-conversions (get-dbsystem) collector)])
-        (for ([stmt (in-list stmts)])
-          (check-statement fsym stmt))
-        (let ([thunks
-               (call-with-lock fsym
-                 (lambda ()
-                   (for ([stmt (in-list stmts)])
-                     (query1:enqueue stmt))
-                   (send-message (make-Sync))
-                   (let ([thunks
-                          (for/list ([stmt (in-list stmts)])
-                            (query1:collect fsym stmt collector))])
-                     (check-ready-for-query fsym #f)
-                     thunks)))])
-          (map (lambda (p) (p)) thunks))))
+      (for ([stmt (in-list stmts)])
+        (check-statement fsym stmt))
+      (let ([results
+             (call-with-lock fsym
+               (lambda ()
+                 (for ([stmt (in-list stmts)])
+                   (query1:enqueue stmt))
+                 (send-message (make-Sync))
+                 (begin0 (for/list ([stmt (in-list stmts)])
+                           (query1:collect fsym stmt))
+                   (check-ready-for-query fsym #f))))])
+        (map (lambda (result) (query1:process-result fsym collector result))
+             results)))
 
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
@@ -306,68 +304,64 @@
                  [pst-name (send pst get-name)]
                  [params (statement-binding-params stmt)])
             (buffer-message (make-Bind "" pst-name null params null))))
-      (buffer-message (begin-lifted (make-Describe 'portal "")))
-      (buffer-message (begin-lifted (make-Execute "" 0)))
-      (buffer-message (begin-lifted (make-Close 'portal ""))))
+      (buffer-message (make-Describe 'portal ""))
+      (buffer-message (make-Execute "" 0))
+      (buffer-message (make-Close 'portal "")))
 
-    ;; query1:collect : symbol Statement Collector -> QueryResult stream
-    (define/private (query1:collect fsym stmt collector)
+    ;; query1:collect : symbol Statement bool bool -> QueryResult stream
+    (define/private (query1:collect fsym stmt)
       (if (string? stmt)
-          (query1:expect-parse-complete fsym collector)
-          (query1:expect-bind-complete fsym collector)))
-    (define/private (query1:expect-parse-complete fsym collector)
+          (query1:expect-parse-complete fsym)
+          (query1:expect-bind-complete fsym)))
+
+    (define/private (query1:expect-parse-complete fsym)
       (let ([r (recv-message fsym)])
         (match r
           [(struct ParseComplete ())
-           (query1:expect-bind-complete fsym collector)]
+           (query1:expect-bind-complete fsym)]
           [_ (query1:error-recovery fsym r)])))
-    (define/private (query1:expect-bind-complete fsym collector)
+
+    (define/private (query1:expect-bind-complete fsym)
       (let ([r (recv-message fsym)])
         (match r
           [(struct BindComplete ())
-           (query1:expect-portal-description fsym collector)]
+           (query1:expect-portal-description fsym)]
           [_ (query1:error-recovery fsym r)])))
-    (define/private (query1:expect-portal-description fsym collector)
+
+    (define/private (query1:expect-portal-description fsym)
       (let ([r (recv-message fsym)])
         (match r
           [(struct RowDescription (rows))
-           (query1:data-loop fsym collector (map parse-field-info rows) null)]
+           (query1:data-loop fsym (map parse-field-dvec rows) null)]
           [(struct NoData ())
            (query1:expect-completion fsym)]
           [_ (query1:error-recovery fsym r)])))
-    (define/private (query1:data-loop fsym collector field-infos rows)
+
+    (define/private (query1:data-loop fsym field-dvecs rows)
       (let ([r (recv-message fsym)])
         (match r
           [(struct DataRow (value))
-           (query1:data-loop fsym collector field-infos (cons value rows))]
+           (query1:data-loop fsym field-dvecs (cons (list->vector value) rows))]
           [(struct CommandComplete (command))
-           (query1:finalize fsym
-                            (lambda ()
-                              (let-values ([(init combine finalize info)
-                                            (collector field-infos #f)])
-                                (recordset info
-                                           (finalize
-                                            (for/fold ([accum init])
-                                                ([value (in-list (reverse rows))])
-                                              (combine accum (list->vector value))))))))]
+           (query1:finalize fsym (vector 'recordset field-dvecs rows))]
           [_ (query1:error-recovery fsym r)])))
+
     (define/private (query1:expect-completion fsym)
       (let ([r (recv-message fsym)])
         (match r
           [(struct CommandComplete (command))
-           (query1:finalize fsym
-                            (lambda ()
-                              (simple-result
-                               `((command . ,(string->command command))))))]
+           (query1:finalize fsym (vector 'command command))]
           [(struct EmptyQueryResponse ())
            (query1:finalize fsym (lambda () (simple-result '())))]
           [_ (query1:error-recovery fsym r)])))
+
     (define/private (query1:finalize fsym result)
       (let ([r (recv-message fsym)])
         (match r
           [(struct CloseComplete ())
            result]
           [_ (query1:error-recovery fsym r)])))
+
     (define/private (query1:error-recovery fsym r)
       (match r
         [(struct CopyInResponse (format column-formats))
@@ -375,6 +369,42 @@
         [(struct CopyOutResponse (format column-formats))
          (error fsym (nosupport "COPY OUT statements"))]
         [_ (error fsym "internal error: unexpected message")]))
+
+    (define/private (query1:process-result fsym collector result)
+      (match result
+        [(vector 'recordset field-dvecs rows)
+         (let-values ([(init combine finalize headers?)
+                       (collector (length field-dvecs) #f)])
+           (let* ([type-reader-v
+                   (list->vector (query1:get-type-readers fsym field-dvecs))]
+                  [row-length (length field-dvecs)]
+                  [convert-row
+                   (lambda (row)
+                     (vector-map! (lambda (value type-reader)
+                                    (cond [(sql-null? value) sql-null]
+                                          [type-reader (type-reader value)]
+                                          [else value]))
+                                  row
+                                  type-reader-v))])
+             (recordset (and headers?
+                             (map field-dvec->field-info field-dvecs))
+                        (finalize
+                         (for/fold ([accum init]) ([row (in-list rows)])
+                           (combine accum (convert-row row)))))))]
+        [(vector 'command command-string)
+         (simple-result `((command . ,command-string)))]))
+
+    (define/private (query1:get-type-readers fsym field-dvecs)
+      (map (lambda (dvec)
+             (let* ([typeid (field-dvec->typeid dvec)]
+                    [type (or (typeid->type typeid)
+                              (error fsym "unsupported type: (typeid ~a)" typeid))])
+               (or (type->type-reader type)
+                   (error fsym "unsupported type: ~a" type))))
+           field-dvecs))
+
+
+    ;; == Prepare
 
     ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
     (define/public (prepare* fsym stmts)
@@ -405,12 +435,14 @@
           [(struct ParseComplete ())
            (prepare1:describe-params fsym name stmt)]
           [else (prepare1:error fsym r stmt)])))
+
     (define/private (prepare1:describe-params fsym name stmt)
       (let ([r (recv-message fsym)])
         (match r
           [(struct ParameterDescription (param-types))
            (prepare1:describe-result fsym name stmt param-types)]
           [else (prepare1:error fsym r stmt)])))
+
     (define/private (prepare1:describe-result fsym name stmt param-types)
       (let ([r (recv-message fsym)])
         (match r
@@ -419,12 +451,14 @@
           [(struct NoData ())
            (prepare1:finish fsym name stmt param-types #f)]
           [else (prepare1:error fsym r stmt)])))
+
     (define/private (prepare1:error fsym r stmt)
-      (error fsym "internal error: unexpected message processing ~s: ~s" stmt r))
+      (error fsym "internal error: unexpected message processing ~s" stmt))
+
     (define/private (prepare1:finish fsym name stmt param-types result-fields)
       (new prepared-statement%
            (name name)
-           (param-infos (map (lambda (t) `((*type* . ,t))) param-types))
+           (param-infos (map (lambda (t) `((typeid . ,t))) param-types))
            (result-infos result-fields)
            (owner this)))
 

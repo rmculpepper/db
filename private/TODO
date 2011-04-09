@@ -1,13 +1,13 @@
 To do
 =====
 
-- rewrite postgresl msg layer (?)
-
 - avoid creating *-infos, keep as vectors, interp by dbsys
 
-- doc: enumerate errors
+- add sql-bits datatype for BIT, VARBIT types
 
 - strict mode by default: error if backend result type unknown
+
+- doc: enumerate errors
 
 - test sql-interval type
   - and add to ODBC (easy as result, complicated as param (I think))
@@ -16,8 +16,6 @@ To do
 
 ----
 
-- add sql-bits datatype for BIT, VARBIT types
-
 - printers for sql-* structs
 
 - GC postgresql and mysql prepared-statements to close descriptors
@@ -25,8 +23,6 @@ To do
 - sqlite: allow configurable behavior on SQLITE_BUSY
   eg retry n times, retry forever, retry w/ timeout, fail
   (is db locked only for write or for whole transaction?)
-
-- add "[fatal]" to fatal error messages (where feasible)
 
 - some parts of docs are Linux-centric, especially ODBC part; broaden
 
@@ -42,8 +38,3 @@ To do
 
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)
-
-----
-
-bug: mysql concurrency tests sometimes fail
-  - temporary fix: always wrap mysql connection in kill-safe proxy

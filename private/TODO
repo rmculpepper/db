@@ -1,7 +1,6 @@
 To do
 =====
 
-- clean up mysql classes
 - rewrite postgresl msg layer (?)
 
 - avoid creating *-infos, keep as vectors, interp by dbsys

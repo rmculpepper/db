@@ -28,25 +28,26 @@
 
 ;; Intervals must be "pre-multiplied" rather than carry extra sign field.
 ;; Rationale: postgresql, at least, allows mixture of signs, eg "1 month - 30 days"
-;; No "normalization" requirement; may have 2 months + 37 days + 60 hours...
-;; but, should probably normalize within HMS.N
 (define-struct sql-interval
   (years months days hours minutes seconds nanoseconds)
   #:transparent
   #:guard (lambda (years months days hours minutes seconds nanoseconds _name)
-            ;; Normalize years/months, hours/minutes/seconds/nanoseconds
+            ;; Normalize years/months, days/hours/minutes/seconds/nanoseconds
             ;; Recall: quotient, remainder results have sign of first arg
             ;;   (if second arg is positive)
             (let ([total-months (+ months (* years 12))]
+                  ;; FIXME: avoid overflow to bignums
                   [total-nsecs (+ nanoseconds
                                   (* (+ seconds
                                         (* minutes 60)
-                                        (* hours 60 60))
+                                        (* hours 60 60)
+                                        (* days 60 60 24))
                                      #e1e9))])
               (let*-values ([(years months) (quotient/remainder total-months 12)]
                             [(left-secs nsecs) (quotient/remainder total-nsecs #e1e9)]
                             [(left-mins secs) (quotient/remainder left-secs 60)]
-                            [(hours mins) (quotient/remainder left-mins 60)])
+                            [(left-hours mins) (quotient/remainder left-mins 60)]
+                            [(days hours) (quotient/remainder left-hours 24)])
                 (values years months days hours mins secs nsecs)))))
 
 ;; ----
@@ -127,11 +128,13 @@
 (define no-arg (gensym))
 
 (define (sql-interval->sql-time x [default no-arg])
-  (let ([h (sql-interval-hours x)]
+  (let ([d (sql-interval-days x)]
+        [h (sql-interval-hours x)]
         [m (sql-interval-minutes x)]
         [s (sql-interval-seconds x)]
         [ns (sql-interval-nanoseconds x)])
     (cond [(and (sql-day-time-interval? x)
+                (zero? d)
                 (<= 0 h 23)
                 (<= 0 m 59)
                 (<= 0 s 59)
@@ -143,6 +146,13 @@
                          "cannot convert interval to time: ~e" x)]
                  [(procedure? default) (default)]
                  [else default])])))
+
+(define (sql-time->sql-interval x)
+  (sql-interval 0 0 0
+                (sql-time-hour x)
+                (sql-time-minute x)
+                (sql-time-second x)
+                (sql-time-nanosecond x)))
 
 ;; ----
 
@@ -201,4 +211,6 @@
   (-> sql-day-time-interval? rational?)]
  [sql-interval->sql-time
   (->* (sql-interval?) (any/c)
-       any)])
+       any)]
+ [sql-time->sql-interval
+  (-> sql-time? sql-day-time-interval?)])

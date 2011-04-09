@@ -93,20 +93,20 @@ The following table lists the MySQL types known to this package, along
 with their corresponding Racket representations.
 
 @tabbing{
-  @bold{MySQL type}  @& @bold{Aliases}                   @& @bold{Racket type} @//
-  @tt{integer}       @& @tt{int}                         @& @scheme[exact-integer?] @//
-  @tt{tinyint}       @& @tt{}                            @& @scheme[exact-integer?] @//
-  @tt{smallint}      @& @tt{}                            @& @scheme[exact-integer?] @//
-  @tt{mediumint}     @& @tt{}                            @& @scheme[exact-integer?] @//
-  @tt{bigint}        @& @tt{biginteger}                  @& @scheme[exact-integer?] @//
-  @tt{real}          @& @tt{float}                       @& @scheme[real?] @//
-  @tt{double}        @& @tt{}                            @& @scheme[real?] @//
-  @tt{decimal}       @& @tt{numeric}                     @& @scheme[number?] @//
-  @tt{varchar}       @& @tt{}                            @& @scheme[string?] @//
-  @tt{var-string}    @& @tt{}                            @& @scheme[string?], but see below @//
-  @tt{date}          @& @tt{}                            @& @scheme[sql-date?] @//
-  @tt{time}          @& @tt{}                            @& @scheme[sql-simple-interval?] @//
-  @tt{datetime}      @& @tt{}                            @& @scheme[sql-timestamp?]
+  @bold{MySQL type}  @& @bold{Aliases}      @& @bold{Racket type} @//
+  @tt{integer}       @& @tt{int}            @& @scheme[exact-integer?] @//
+  @tt{tinyint}       @& @tt{}               @& @scheme[exact-integer?] @//
+  @tt{smallint}      @& @tt{}               @& @scheme[exact-integer?] @//
+  @tt{mediumint}     @& @tt{}               @& @scheme[exact-integer?] @//
+  @tt{bigint}        @& @tt{biginteger}     @& @scheme[exact-integer?] @//
+  @tt{real}          @& @tt{float}          @& @scheme[real?] @//
+  @tt{double}        @& @tt{}               @& @scheme[real?] @//
+  @tt{decimal}       @& @tt{numeric}        @& @scheme[number?] @//
+  @tt{varchar}       @& @tt{}               @& @scheme[string?] @//
+  @tt{var-string}    @& @tt{}               @& @scheme[string?], but see below @//
+  @tt{date}          @& @tt{}               @& @scheme[sql-date?] @//
+  @tt{time}          @& @tt{}          @& @scheme[sql-time?] or @racket[sql-day-time-interval?] @//
+  @tt{datetime}      @& @tt{}               @& @scheme[sql-timestamp?]
 @;{FIXME: blob types?}
 }
 
@@ -115,14 +115,18 @@ instead assigning them the type @tt{var-string}. Consequently,
 conversion of Racket values to @tt{var-string} parameters accepts, in
 addition to strings, numbers (@racket[rational?]---no infinities or
 NaN) and SQL date/time structures (@racket[sql-date?],
-@racket[sql-time?], and @racket[sql-timestamp?]).
+@racket[sql-time?], @racket[sql-timestamp?], and
+@racket[sql-day-time-interval?]).
 
 A SQL value of type @tt{decimal} is always converted to an exact
 rational (MySQL seems not to support infinite @tt{decimal} values).
 
 Note that in MySQL, the @tt{time} type represents time intervals,
 which may not correspond to times of day (for example, the interval
-may be negative).
+may be negative). In conversion from MySQL results to Racket values,
+those @tt{time} values that represent times of day are converted to
+@racket[sql-time] values; the rest are represented by
+@racket[sql-interval] values.
 
 
 @subsection[#:tag "sqlite-types"]{SQLite}
@@ -327,21 +331,23 @@ no existing close analogues.
   @itemlist[
   @item{@racket[years] and @racket[months] have the same sign}
   @item{@racket[months] ranges from @racket[-11] to @racket[11]}
-  @item{@racket[hours], @racket[minutes], @racket[seconds], and
-    @racket[nanoseconds] all have the same sign}
+  @item{@racket[days], @racket[hours], @racket[minutes],
+    @racket[seconds], and @racket[nanoseconds] all have the same sign}
+  @item{@racket[hours] range from @racket[-23] to @racket[23]}
   @item{@racket[minutes] and @racket[seconds] range from @racket[-59]
     to @racket[59]} 
   @item{@racket[nanoseconds] ranges from
     @racket[(- (sub1 #, @racketvalfont{#e1e9}))] to
-  @racket[(sub1 #, @racketvalfont{#e1e9})]}
+    @racket[(sub1 #, @racketvalfont{#e1e9})]}
   ]
-}
 
-@defproc[(sql-day-time-interval? [x any/c]) boolean?]{
-
-  Returns @racket[#t] if @racket[x] is a @racket[sql-interval] value
-  where the @racket[years], @racket[months], and @racket[days]
-  fields are zero.
+  That is, an interval consists of two groups of components:
+  year-month and day-time, and normalization is done only within
+  groups. In fact, the SQL standard recognizes those two types of
+  intervals separately (see @racket[sql-year-month-interval?] and
+  @racket[sql-day-time-interval?], below), and does not permit
+  combining them. Representing intervals such as @tt{1 month 3 days}
+  is a PostgreSQL extension.
 }
 
 @defproc[(sql-year-month-interval? [x any/c]) boolean?]{
@@ -351,6 +357,18 @@ no existing close analogues.
   @racket[seconds], and @racket[nanoseconds] fields are zero.
 }
 
+@defproc[(sql-day-time-interval? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is a @racket[sql-interval] value
+  where the @racket[years], @racket[months], and @racket[days]
+  fields are zero.
+}
+
+@defproc[(sql-day-time-interval->seconds [interval sql-day-time-interval?])
+         rational?]{
+
+  Returns the length of @racket[interval] in seconds.
+}
 
 @defproc[(sql-interval->sql-time [interval sql-interval?]
                                  [failure any/c (lambda () (error ....))])
@@ -375,8 +393,9 @@ no existing close analogues.
   @racket[#f] as the @racket[failure] argument.
 }
 
-@defproc[(sql-day-time-interval->seconds [interval sql-day-time-interval?])
-         rational?]{
+@defproc[(sql-time->sql-interval [time sql-time?])
+         sql-day-time-interval?]{
 
-  Returns the length of @racket[interval] in seconds.
+  Converts @racket[time] to an interval. If @racket[time] has
+  time-zone information, it is ignored.
 }

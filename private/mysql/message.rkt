@@ -471,7 +471,8 @@ Based on protocol documentation here:
               [min  (sg (get-int 6 1))]
               [sec  (sg (get-int 7 1))]
               [nsec (* 1000 (sg (get-int 8 4)))])
-         (sql-interval 0 0 0 (+ hour (* 24 days)) min sec nsec))))
+         (let ([iv (sql-interval 0 0 days hour min sec nsec)])
+           (sql-interval->sql-time iv iv)))))
 
     ((year) (io:read-le-int16 in))
 

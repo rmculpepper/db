@@ -27,6 +27,8 @@
     (define/public (get-id) id)
     (super-new)))
 
+;; ========================================
+
 (define mysql-base<%>
   (interface ()
     recv
@@ -39,40 +41,94 @@
     connected?
     after-connect))
 
-(define mysql-backend-link%
-  (class object%
-    (init-field inport
-                outport)
+(define connection%
+  (class* object% (connection<%>)
+
+    (define inport #f)
+    (define outport #f)
+
+    (super-new)
+
+    ;; with-disconnect-on-error
+    (define-syntax with-disconnect-on-error
+      (syntax-rules ()
+        [(with-disconnect-on-error . body)
+         (with-handlers ([exn:fail? (lambda (e) (disconnect* #f) (raise e))])
+           . body)]))
+
+    ;; ========================================
+
+    ;; == Communication locking
+
+    ;; Lock; all communication occurs within lock.
+    (define wlock (make-semaphore 1))
+
+    ;; Delay async handler calls until unlock.
+    (define delayed-handler-calls null)
+
+    (define/private (lock who)
+      (semaphore-wait wlock)
+      (unless outport
+        (semaphore-post wlock)
+        (error who "not connected")))
+
+    (define/private (unlock)
+      (let ([handler-calls delayed-handler-calls])
+        (set! delayed-handler-calls null)
+        (semaphore-post wlock)
+        (for-each (lambda (p) (p)) handler-calls)))
+
+    (define/private (call-with-lock who proc)
+      (lock who)
+      (with-handlers ([values (lambda (e) (unlock) (raise e))])
+        (begin0 (proc) (unlock))))
+
+    ;; == Communication
+    ;; (Must be called with lock acquired.)
+
     (define next-msg-num 0)
 
-    (define/public (encode msg)
-      (write-packet outport msg next-msg-num)
-      (set! next-msg-num (add1 next-msg-num)))
-
-    (define/public (fresh-exchange)
+    (define/private (fresh-exchange)
       (set! next-msg-num 0))
 
-    (define/public (flush)
-      (flush-output outport))
+    ;; send-message : message -> void
+    (define/private (send-message msg)
+      (buffer-message msg)
+      (flush-message-buffer))
 
-    (define/public (close)
-      (close-output-port outport)
-      (close-input-port inport))
+    ;; buffer-message : message -> void
+    (define/private (buffer-message msg)
+      (when DEBUG-SENT-MESSAGES
+        (fprintf (current-error-port) "  >> ~s\n" msg))
+      (with-disconnect-on-error
+       (write-packet outport msg next-msg-num)
+       (set! next-msg-num (add1 next-msg-num))))
 
-    (define/public get-message
-      (case-lambda 
-        [(expectation) (get-message* expectation #f)]
-        [(expectation types) (get-message* expectation types)]))
+    ;; flush-message-buffer : -> void
+    (define/private (flush-message-buffer)
+      (with-disconnect-on-error
+       (flush-output outport)))
 
-    (define/private (get-message* expectation field-dvecs)
+    ;; recv : symbol/#f [(list-of symbol)] -> message
+    ;; Automatically handles asynchronous messages
+    (define/private (recv fsym expectation [field-dvecs #f])
+      (define r
+        (with-disconnect-on-error
+         (recv* fsym expectation field-dvecs)))
+      (when DEBUG-RESPONSES
+        (eprintf "  << ~s\n" r))
+      (when (error-packet? r)
+        (raise-backend-error fsym r))
+      r)
+
+    (define/private (recv* fsym expectation field-dvecs)
       (define (advance . ss)
         (unless (or (not expectation) 
                     (null? ss)
                     (memq expectation ss))
-          (error 'get-message "unexpected packet (wanted ~s)"
-                 expectation)))
+          (error fsym "internal error: unexpected packet")))
       (define (err packet)
-        (error 'get-message "unexpected packet: ~s" packet))
+        (error fsym "internal error: unexpected packet"))
       (let-values ([(msg-num next) (parse-packet inport expectation field-dvecs)])
         (set! next-msg-num (add1 msg-num))
         (match next
@@ -100,84 +156,7 @@
            (err next)])
         next))
 
-    (define/public (alive?)
-      (not (port-closed? outport)))
-
-    (super-new)))
-
-(define disconnected-backend-link%
-  (class object%
-    (define/public (close)
-      (void))
-    (define/public (encode . args)
-      (illegal))
-    (define/public (flush)
-      (illegal))
-    (define/public (fresh-exchange)
-      (illegal))
-    (define/public (get-message . s)
-      (illegal))
-
-    (define/public (alive?) #f)
-
-    (define/private (illegal)
-      (error 'backend-link "not connected"))
-    (super-new)))
-
-(define disconnected-backend-link
-  (new disconnected-backend-link%))
-
-;; mysql-base%
-(define mysql-base%
-  (class* object% (mysql-base<%> connection:admin<%>)
-    (init-field [backend-link disconnected-backend-link])
-    (super-new)
-
-    ;; with-disconnect-on-error
-    ;; Specialized to use direct method call rather than 'send'
-    (define-syntax with-disconnect-on-error
-      (syntax-rules ()
-        [(with-disconnect-on-error expr)
-         (with-handlers ([exn:fail?
-                          (lambda (e)
-                            (disconnect* #f)
-                            (raise e))])
-           expr)]))
-
-    ;; Communication Methods
-
-    ;; recv : symbol/#f [(list-of symbol)] -> message
-    ;; Automatically handles asynchronous messages
-    (define/public (recv behalf . args)
-      (define r
-        (with-disconnect-on-error
-            (send/apply backend-link get-message args)))
-      (when DEBUG-RESPONSES
-        (fprintf (current-error-port) "  << ~s\n" r))
-      (when (error-packet? r)
-        (raise-backend-error behalf r))
-      r)
-
-    ;; send-message : message -> void
-    (define/public (send-message msg)
-      (buffer-message msg)
-      (flush-message-buffer))
-
-    ;; fresh-exchange : -> void
-    (define/public (fresh-exchange)
-      (send backend-link fresh-exchange))
-
-    ;; buffer-message : message -> void
-    (define/public (buffer-message msg)
-      (when DEBUG-SENT-MESSAGES
-        (fprintf (current-error-port) "  >> ~s\n" msg))
-      (with-disconnect-on-error
-          (send backend-link encode msg)))
-
-    ;; flush-message-buffer : -> void
-    (define/public (flush-message-buffer)
-      (with-disconnect-on-error
-          (send backend-link flush)))
+    ;; ========================================
 
     ;; Connection management
 
@@ -185,28 +164,224 @@
     (define/public (disconnect)
       (disconnect* #t))
 
-    (define/public (disconnect* politely?)
+    (define/private (disconnect* lock-not-held?)
+      ;; If we don't hold the lock, try to acquire it and disconnect politely.
+      (define politely? lock-not-held?)
       (when (connected?)
         (when politely?
+          (lock 'disconnect)
           (fresh-exchange)
           (send-message (make-command-packet 'quit "")))
-        (send backend-link close)
-        (set! backend-link disconnected-backend-link)))
+        (when DEBUG-SENT-MESSAGES
+          (eprintf "  ** Disconnecting\n"))
+        (when inport
+          (close-input-port inport)
+          (set! inport #f))
+        (when outport
+          (close-output-port outport)
+          (set! outport #f))
+        (when politely?
+          (unlock))))
 
     ;; connected? : -> boolean
     (define/public (connected?)
-      (send backend-link alive?))
-
-    ;; System
+      (let ([outport outport])
+        (and outport (not (port-closed? outport)))))
 
     (define/public (get-dbsystem)
       dbsystem)
 
-    ;; Initialization
+    ;; ========================================
 
+    ;; == Connect
+
+    ;; attach-to-ports : input-port output-port -> void
+    (define/public (attach-to-ports in out)
+      (set! inport in)
+      (set! outport out))
+
+    ;; start-connection-protocol : string string string/#f -> void
+    (define/public (start-connection-protocol dbname username password)
+      (with-disconnect-on-error
+        (fresh-exchange)
+        (let ([r (recv 'mysql-connect 'handshake)])
+          (match r
+            [(struct handshake-packet (pver sver tid scramble capabilities charset status))
+             (check-required-flags capabilities)
+             (send-message
+              (make-client-authentication-packet
+               (desired-capabilities capabilities)
+               MAX-PACKET-LENGTH
+               'utf8-general-ci ;; charset
+               username
+               (scramble-password scramble password)
+               dbname))
+             (expect-auth-confirmation)]
+            [_
+             (error 'mysql-connect
+                    "internal error: unknown message during authentication")]))))
+
+    (define/private (check-required-flags capabilities)
+      (for-each (lambda (rf)
+                  (unless (memq rf capabilities)
+                    (error 'mysql-connect
+                           "server does not support required capability: ~s"
+                           rf)))
+                REQUIRED-CAPABILITIES))
+
+    (define/private (desired-capabilities capabilities)
+      (cons 'interactive
+            (filter (lambda (c) (memq c DESIRED-CAPABILITIES))
+                    capabilities)))
+
+    ;; expect-auth-confirmation : -> void
+    (define/private (expect-auth-confirmation)
+      (let ([r (recv 'connect 'auth)])
+        (match r
+          [(struct ok-packet (_ _ status warnings message))
+           (after-connect)]
+          [_
+           (error 'mysql-connect
+                  "internal error: unknown message after authentication")])))
+
+    ;; Set connection to use utf8 encoding
     (define/public (after-connect)
+      (query* 'mysql-connect (list "set names 'utf8'")
+              (lambda (fields ordered?) (values #f void void #f)))
       (void))
-    ))
+
+
+    ;; ========================================
+
+    ;; == Query
+
+    ;; name-counter : number
+    (define name-counter 0)
+
+    ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
+    (define/public (query* fsym stmts collector)
+      (let ([results
+             (call-with-lock fsym
+               (lambda ()
+                 (let ([stmts
+                        (for/list ([stmt (in-list stmts)])
+                          (check-statement fsym stmt))])
+                   (for/list ([stmt (in-list stmts)])
+                     (query1 fsym stmt)))))])
+        (map (lambda (result) (query1:process-result fsym collector result))
+             results)))
+
+    ;; query1 : symbol Statement Collector -> QueryResult
+    (define/private (query1 fsym stmt)
+      (fresh-exchange)
+      (query1:enqueue stmt)
+      (query1:collect fsym))
+
+    ;; check-statement : symbol any -> statement-binding
+    (define/private (check-statement fsym stmt)
+      (cond [(statement-binding? stmt)
+             (let ([pst (statement-binding-pst stmt)])
+               (send pst check-owner fsym this stmt)
+               stmt)]
+            [(string? stmt)
+             (let ([pst (prepare1 fsym stmt)])
+               (send pst bind fsym null))]))
+
+    ;; query1:enqueue : statement-binding -> void
+    (define/private (query1:enqueue stmt)
+      (let* ([pst (statement-binding-pst stmt)]
+             [id (send pst get-id)]
+             [params (statement-binding-params stmt)]
+             [null-map (map not params)]
+             [param-types (send pst get-param-types)])
+        (send-message
+         (make-execute-packet id null 1 null-map 1 param-types params))))
+
+    ;; query1:collect : symbol -> QueryResult stream
+    (define/private (query1:collect fsym)
+      (let ([r (recv fsym 'result)])
+        (match r
+          [(struct ok-packet (affected-rows insert-id status warnings message))
+           (vector 'command `((affected-rows . ,affected-rows)
+                              (insert-id . ,insert-id)
+                              (status . ,status)
+                              (message . ,message)))]
+          [(struct result-set-header-packet (fields extra))
+           (query1:expect-fields fsym null)])))
+
+    (define/private (query1:expect-fields fsym r-field-dvecs)
+      (let ([r (recv fsym 'field)])
+        (match r
+          [(? field-packet?)
+           (query1:expect-fields fsym (cons (parse-field-dvec r) r-field-dvecs))]
+          [(struct eof-packet (warning-count status))
+           (let ([field-dvecs (reverse r-field-dvecs)])
+             (vector 'recordset field-dvecs (query1:get-rows fsym field-dvecs)))])))
+
+    (define/private (query1:get-rows fsym field-dvecs)
+      (let ([r (recv fsym 'binary-data field-dvecs)])
+        (match r
+          [(struct row-data-packet (data))
+           (cons data (query1:get-rows fsym field-dvecs))]
+          [(struct binary-row-data-packet (data))
+           (cons data (query1:get-rows fsym field-dvecs))]
+          [(struct eof-packet (warning-count status))
+           null])))
+
+    (define/private (query1:process-result fsym collector result)
+      (match result
+        [(vector 'recordset field-dvecs rows)
+         (let-values ([(init combine finalize headers?)
+                       (collector (length field-dvecs) #t)])
+           (recordset (and headers? (map field-dvec->field-info field-dvecs))
+                      (finalize
+                       (for/fold ([acc init]) ([row (in-list rows)])
+                         (combine acc row)))))]
+        [(vector 'command command-info)
+         (simple-result command-info)]))
+
+    ;; == Prepare
+
+    ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
+    (define/public (prepare* fsym stmts)
+      (call-with-lock fsym
+        (lambda ()
+          (map (lambda (stmt) (prepare1 fsym stmt)) stmts))))
+
+    (define/private (prepare1 fsym stmt)
+      (fresh-exchange)
+      (send-message (make-command-packet 'statement-prepare stmt))
+      (let ([r (recv fsym 'prep-ok)])
+        (match r
+          [(struct ok-prepared-statement-packet (id fields params))
+           (let ([paraminfos
+                  (if (zero? params) null (prepare1:get-params fsym))]
+                 [fieldinfos
+                  (if (zero? fields) null (prepare1:get-fields fsym))])
+             (new prepared-statement%
+                  (id id)
+                  (param-infos paraminfos)
+                  (result-infos fieldinfos)
+                  (owner this)))])))
+
+    (define/private (prepare1:get-params fsym)
+      (let ([r (recv fsym 'field)])
+        (match r
+          [(struct eof-packet (warning-count status))
+           null]
+          [(? field-packet?)
+           (cons (parse-field-info r) (prepare1:get-params fsym))])))
+
+    (define/private (prepare1:get-fields fsym)
+      (let ([r (recv fsym 'field)])
+        (match r
+          [(struct eof-packet (warning-count status))
+           null]
+          [(? field-packet?)
+           (cons (parse-field-info r) (prepare1:get-fields fsym))])))))
+
+
+;; ========================================
 
 ;; scramble-password : bytes string -> bytes
 (define (scramble-password scramble password)
@@ -242,230 +417,3 @@
     protocol-41
     secure-connection
     connect-with-db))
-
-;; connector-mixin%
-(define connector-mixin
-  (mixin (mysql-base<%>) (connector<%>)
-    (inherit-field backend-link)
-    (inherit recv
-             send-message
-             fresh-exchange
-             disconnect
-             disconnect*
-             after-connect)
-    (super-new)
-
-    ;; with-disconnect-on-error
-    ;; Specialized to use direct method call rather than 'send'
-    (define-syntax with-disconnect-on-error
-      (syntax-rules ()
-        [(with-disconnect-on-error . body)
-         (with-handlers ([exn:fail?
-                          (lambda (e)
-                            (disconnect* #f)
-                            (raise e))])
-           . body)]))
-
-    ;; attach-to-ports : input-port output-port -> void
-    (define/public (attach-to-ports in out)
-      (set! backend-link
-            (new mysql-backend-link% (inport in) (outport out))))
-
-    ;; start-connection-protocol : string string string/#f -> void
-    (define/public (start-connection-protocol dbname username password)
-      (with-disconnect-on-error
-          (fresh-exchange)
-        (let ([r (recv 'connect 'handshake)])
-          (match r
-            [(struct handshake-packet
-                     (pver sver tid scramble capabilities charset status))
-             (check-required-flags capabilities)
-             (send-message
-              (make-client-authentication-packet
-               (desired-capabilities capabilities)
-               MAX-PACKET-LENGTH
-               'utf8-general-ci ;; charset
-               username
-               (scramble-password scramble password)
-               dbname))
-             (expect-auth-confirmation)]
-            [_
-             (error 'connect
-                    "authentication failed (backend sent unexpected message)")]))))
-
-    (define/private (check-required-flags capabilities)
-      (for-each (lambda (rf)
-                  (unless (memq rf capabilities)
-                    (error 'connect
-                           "server does not support required capability: ~s"
-                           rf)))
-                REQUIRED-CAPABILITIES))
-
-    (define/private (desired-capabilities capabilities)
-      (cons 'interactive
-            (filter (lambda (c) (memq c DESIRED-CAPABILITIES))
-                    capabilities)))
-
-    ;; expect-auth-confirmation : -> void
-    (define/private (expect-auth-confirmation)
-      (let ([r (recv 'connect 'auth)])
-        (match r
-          [(struct ok-packet (_ _ status warnings message))
-           (after-connect)]
-          [_
-           (error 'connect
-                  (string-append "connection failed after authentication "
-                                 "(backend sent unexpected message)"))])))
-
-    ))
-
-;; query-mixin
-;; Handles the mechanics of connection creations, queries, etc.
-;; Provides functionality, not usability. See connection% for friendly 
-;; interface.
-(define query-mixin
-  (mixin (mysql-base<%> connection:admin<%>) ()
-    (inherit recv
-             send-message
-             fresh-exchange
-             get-dbsystem)
-    (super-new)
-
-    ;; name-counter : number
-    (define name-counter 0)
-
-    ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
-    ;; The single point of control for the query engine
-    (define/public (query* fsym stmts collector)
-      (let ([stmts
-             (for/list ([stmt (in-list stmts)])
-               (check-statement fsym stmt))])
-        (for/list ([stmt (in-list stmts)])
-          (query1 fsym stmt collector))))
-
-    ;; query1 : symbol Statement Collector -> QueryResult
-    (define/private (query1 fsym stmt collector)
-      (fresh-exchange)
-      (query1:enqueue stmt)
-      (query1:collect stmt collector))
-
-    ;; check-statement : symbol any -> statement-binding
-    (define/private (check-statement fsym stmt)
-      (cond [(statement-binding? stmt)
-             (let ([pst (statement-binding-pst stmt)])
-               (send pst check-owner fsym this stmt)
-               stmt)]
-            [(string? stmt)
-             (let ([pst (prepare1 fsym stmt)])
-               (send pst bind fsym null))]))
-
-    ;; query1:enqueue : statement-binding -> void
-    (define/private (query1:enqueue stmt)
-      (let* ([pst (statement-binding-pst stmt)]
-             [id (send pst get-id)]
-             [params (statement-binding-params stmt)]
-             [null-map (map not params)]
-             [param-types (send pst get-param-types)])
-        (send-message
-         (make-execute-packet id null 1 null-map 1 param-types params))))
-
-    ;; query1:collect : statement-binding Collector -> QueryResult stream
-    (define/private (query1:collect stmt collector)
-      (let* ([pst (statement-binding-pst stmt)])
-        (query1:result collector)))
-
-    (define/private (query1:result collector)
-      (let ([r (recv 'query* 'result)])
-        (match r
-          [(struct ok-packet (affected-rows insert-id status warnings message))
-           (simple-result `((affected-rows . ,affected-rows)
-                            (insert-id . ,insert-id)
-                            (status . ,status)
-                            (message . ,message)))]
-          [(struct result-set-header-packet (fields extra))
-           (query1:expect-fields null collector)])))
-
-    (define/private (query1:expect-fields r-field-dvecs collector)
-      (let ([r (recv 'query* 'field)])
-        (match r
-          [(? field-packet?)
-           (query1:expect-fields (cons (parse-field-dvec r) r-field-dvecs)
-                                 collector)]
-          [(struct eof-packet (warning-count status))
-           (let ([field-dvecs (reverse r-field-dvecs)])
-             (let-values ([(init combine finalize headers?)
-                           (collector (length r-field-dvecs) #t)])
-               (query1:data-loop field-dvecs init combine finalize
-                                 (and headers?
-                                      (map field-dvec->field-info field-dvecs)))))])))
-
-    (define/private (query1:data-loop field-dvecs init combine finalize info)
-      (define rows (query1:get-rows field-dvecs))
-      (recordset info
-                 (finalize
-                  (for/fold ([acc init]) ([row (in-list rows)])
-                    (combine acc row)))))
-
-    (define/private (query1:get-rows field-dvecs)
-      (let ([r (recv 'query* 'binary-data field-dvecs)])
-        (match r
-          [(struct row-data-packet (data))
-           (cons data (query1:get-rows field-dvecs))]
-          [(struct binary-row-data-packet (data))
-           (cons data (query1:get-rows field-dvecs))]
-          [(struct eof-packet (warning-count status))
-           null])))
-
-    ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
-    (define/public (prepare* fsym stmts)
-      (map (lambda (stmt) (prepare1 fsym stmt)) stmts))
-
-    (define/private (prepare1 fsym stmt)
-      (fresh-exchange)
-      (send-message (make-command-packet 'statement-prepare stmt))
-      (let ([r (recv fsym 'prep-ok)])
-        (match r
-          [(struct ok-prepared-statement-packet (id fields params))
-           (let ([paraminfos
-                  (if (zero? params) null (prepare1:get-params fsym))]
-                 [fieldinfos
-                  (if (zero? fields) null (prepare1:get-fields fsym))])
-             (new prepared-statement%
-                  (id id)
-                  (param-infos paraminfos)
-                  (result-infos fieldinfos)
-                  (owner this)))])))
-
-    (define/private (prepare1:get-params fsym)
-      (let ([r (recv fsym 'field)])
-        (match r
-          [(struct eof-packet (warning-count status))
-           null]
-          [(? field-packet?)
-           (cons (parse-field-info r) (prepare1:get-params fsym))])))
-
-    (define/private (prepare1:get-fields fsym)
-      (let ([r (recv fsym 'field)])
-        (match r
-          [(struct eof-packet (warning-count status))
-           null]
-          [(? field-packet?)
-           (cons (parse-field-info r) (prepare1:get-fields fsym))])))
-    ))
-
-;; connection%
-(define connection% 
-  (class* (query-mixin
-           (connector-mixin
-            mysql-base%))
-      (connection<%>)
-    (super-new)
-    (inherit query*)
-
-    ;; Set connection to use utf8 encoding
-    (define/override (after-connect)
-      (super after-connect)
-      (query* 'after-connect (list "set names 'utf8'")
-              (lambda (fields binary?)
-                (values #f void void #f)))
-      (void))))

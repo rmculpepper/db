@@ -27,8 +27,7 @@
         #:ssl (symbols 'yes 'no 'optional)
         #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
         #:notice-handler (or/c 'output 'error output-port? procedure?)
-        #:notification-handler (or/c 'output 'error output-port? procedure?)
-        #:mixin any/c)
+        #:notification-handler (or/c 'output 'error output-port? procedure?))
        any/c)]
  [guess-socket-path
   (-> (or/c string? path?))])
@@ -46,8 +45,7 @@
                  #:ssl [ssl 'no]
                  #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
                  #:notice-handler [notice-handler 'error]
-                 #:notification-handler [notification-handler 'error]
-                 #:mixin [mixin values])
+                 #:notification-handler [notification-handler 'error])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0)
@@ -69,7 +67,7 @@
       (unless (and input-port output-port)
         (raise-user-error 'connect
                           "must give input-port and output-port arguments together")))
-    (let ([c (new (mixin connection%)
+    (let ([c (new connection%
                   (notice-handler notice-handler)
                   (notification-handler notification-handler)
                   (allow-cleartext-password? allow-cleartext-password?))])

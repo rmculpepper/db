@@ -198,7 +198,8 @@
 
     ;; connected? : -> boolean
     (define/public (connected?)
-      (and outport (not (port-closed? outport))))
+      (let ([outport outport])
+        (and outport (not (port-closed? outport)))))
 
     ;; == System
 

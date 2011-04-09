@@ -19,7 +19,6 @@
      (syntax-rules ()
        [(with-connection c . body)
         (call-with-connection (lambda (c) . body))]))
-   testing-connection-mixin
    test-data
    set-equal?))
 
@@ -27,21 +26,17 @@
   (import database^)
   (export config^)
 
-  (define testing-connection-mixin (make-parameter values))
-
   (define (connect-for-test)
     (case (dbsystem-name dbsystem)
       ((postgresql)
        (connect #:user (getenv "DBUSER")
                 #:database (or (getenv "DBDB") (getenv "DBUSER"))
                 #:password (getenv "DBPASSWORD")
-                #:notice-handler void
-                #:mixin (testing-connection-mixin)))
+                #:notice-handler void))
       ((mysql)
        (connect #:user (getenv "DBUSER")
                 #:database (or (getenv "DBDB") (getenv "DBUSER"))
-                #:password (getenv "DBPASSWORD")
-                #:mixin (testing-connection-mixin)))
+                #:password (getenv "DBPASSWORD")))
       ((sqlite3)
        (connect #:database 'memory))
       ((odbc)

@@ -25,8 +25,7 @@
         #:socket (or/c string? path? false/c)
         #:input-port (or/c input-port? false/c)
         #:output-port (or/c output-port? false/c)
-        #:allow-cleartext-password? boolean?
-        #:mixin any/c)
+        #:allow-cleartext-password? boolean?)
        any/c)]
  [guess-socket-path
   (-> (or/c string? path?))])
@@ -40,8 +39,7 @@
                  #:socket [socket #f]
                  #:input-port [input-port #f]
                  #:output-port [output-port #f]
-                 #:allow-cleartext-password? [allow-cleartext-password? #f]
-                 #:mixin [mixin values])
+                 #:allow-cleartext-password? [allow-cleartext-password? #f])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0)
@@ -55,7 +53,7 @@
     (unless (and input-port output-port)
       (raise-user-error 'connect
                         "must give input-port and output-port arguments together")))
-  (let ([c (new (mixin connection%))])
+  (let ([c (new connection%)])
     (cond [socket
            (let-values ([(in out)
                          (unix-socket-connect socket)])
@@ -68,7 +66,7 @@
              (let-values ([(in out) (tcp-connect server port)])
                (send c attach-to-ports in out)))])
     (send c start-connection-protocol database user password)
-    (new kill-safe-connection% (connection c))))
+    c))
 
 (define socket-paths
   '("/var/run/mysqld/mysqld.sock"))

@@ -333,8 +333,8 @@
     (define/private (query1:expect-portal-description fsym)
       (let ([r (recv-message fsym)])
         (match r
-          [(struct RowDescription (rows))
-           (query1:data-loop fsym (map parse-field-dvec rows) null)]
+          [(struct RowDescription (field-dvecs))
+           (query1:data-loop fsym field-dvecs null)]
           [(struct NoData ())
            (query1:expect-completion fsym)]
           [_ (query1:error-recovery fsym r)])))
@@ -448,8 +448,8 @@
     (define/private (prepare1:describe-result fsym name stmt param-types)
       (let ([r (recv-message fsym)])
         (match r
-          [(struct RowDescription (fields))
-           (prepare1:finish fsym name stmt param-types (map field-description->alist fields))]
+          [(struct RowDescription (field-dvecs))
+           (prepare1:finish fsym name stmt param-types (map field-dvec->field-info field-dvecs))]
           [(struct NoData ())
            (prepare1:finish fsym name stmt param-types #f)]
           [else (prepare1:error fsym r stmt)])))

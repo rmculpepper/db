@@ -73,9 +73,30 @@
   (1184 timestamptz()              parse-timestamp-tz marshal-timestamp-tz)
   (1186 interval   ()              parse-interval     marshal-interval)
   (1266 timetz     ()              parse-time-tz      marshal-time-tz)
-  ;(1560 bit        ())
-  ;(1562 varbit     ())
-  (1700 decimal    (numeric)       parse-decimal     marshal-decimal))
+  (1560 bit        () #f #f)
+  (1562 varbit     () #f #f)
+  (1700 decimal    (numeric)       parse-decimal     marshal-decimal)
+
+  ;; The following types are not supported.
+  ;; (But putting their names here yields better not-supported errors.)
+
+  (142 xml       () #f #f)
+  (600 point     () #f #f)
+  (601 lseg      () #f #f)
+  (602 path      () #f #f)
+  (603 box       () #f #f)
+  (604 polygon   () #f #f)
+  (628 line      () #f #f)
+  (702 abstime   () #f #f)
+  (703 reltime   () #f #f)
+  (704 tinterval () #f #f)
+  (705 unknown   () #f #f)
+  (718 circle    () #f #f)
+  (790 money     () #f #f)
+  (829 macaddr   () #f #f)
+  (869 inet      () #f #f)
+  (650 cidr      () #f #f))
+
 
 (define known-types+aliases
   (append known-type-aliases known-types))

@@ -1,6 +1,8 @@
 To do
 =====
 
+- doc: enumerate errors
+
 - strict mode by default: error if backend result type unknown
 
 - test sql-interval type

@@ -10,7 +10,6 @@
 
          (struct-out simple-result)
          (struct-out recordset)
-         (struct-out field-info)
 
          (struct-out statement-binding)
          (struct-out statement-generator)
@@ -99,23 +98,14 @@
 (struct simple-result (info) #:transparent)
 (struct recordset (info data) #:transparent)
 
-;; A Header is one of
-;;  - field-info
-;;  - list of field-info
-;;  - #f
+;; A Header is either (listof alist) | #f
 
-;; A field-info is (field-info string alist)
-(struct field-info (name info) #:transparent)
+;; Collector = (nat order -> headers? init combine finish)
+;;   where init : A
+;;         combine : A vector -> A
+;;         finish : A -> A
+;;         order is #t for normal order, #f for reversed
 
-;; A Collector is
-;;   (-> (listof alist) boolean
-;;       (values b (b vector -> b) (b -> c) Header))
-;;
-;; (collector row-descriptions binary?)
-;;   = (values init-accum (accum row -> accum) (accum -> final) header)
-
-;; FIXME: in collector, why binary? flag?
-;;   - not used by generic/functions
 
 ;; === Class utilities
 

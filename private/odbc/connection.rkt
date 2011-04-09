@@ -107,15 +107,13 @@
              (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
              (values result-infos rows)))))
       (let-values ([(init combine finalize info)
-                    (collector info0 #f)])
+                    (collector (length info0) #t)])
         (cond [(or (pair? info0) (pair? rows))
-               (recordset
-                info
-                (finalize
-                 (for/fold ([accum init]) ([row (in-list rows)])
-                   (combine accum row))))]
-              [else
-               (simple-result '())])))
+               (recordset info0
+                          (finalize
+                           (for/fold ([accum init]) ([row (in-list rows)])
+                             (combine accum row))))]
+              [else (simple-result '())])))
 
     (define/private (load-param fsym db stmt i param)
       ;; FIXME: for now we assume typeid is SQL_UNKNOWN_TYPE, but should

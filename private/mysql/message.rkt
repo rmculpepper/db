@@ -171,14 +171,14 @@ Based on protocol documentation here:
      (for-each (lambda (type param) (write-binary-datum out type param))
                param-types params)]))
 
-(define (parse-packet in expect result-infos)
+(define (parse-packet in expect field-dvecs)
   (let* ([len (io:read-le-int24 in)]
          [num (io:read-byte in)]
          #|
          [_ (fprintf (current-error-port) "** Received packet #~s, length ~s\n" num len)]
          |#
          [inp (subport in len)]
-         [msg (parse-packet/1 inp expect len result-infos)])
+         [msg (parse-packet/1 inp expect len field-dvecs)])
     (when (port-has-bytes? inp)
       (error 'parse-packet "bytes left over after parsing ~s; bytes were: ~s" 
              msg (io:read-bytes-to-eof inp)))
@@ -187,13 +187,13 @@ Based on protocol documentation here:
 (define (port-has-bytes? p)
   (not (eof-object? (peek-byte p))))
 
-(define (parse-packet/1 in expect len result-infos)
+(define (parse-packet/1 in expect len field-dvecs)
   (let ([first (peek-byte in)])
     (if (eq? first #xFF)
         (parse-error-packet in len)
-        (parse-packet/2 in expect len result-infos))))
+        (parse-packet/2 in expect len field-dvecs))))
 
-(define (parse-packet/2 in expect len result-infos)
+(define (parse-packet/2 in expect len field-dvecs)
   (case expect
     ((handshake)
      (parse-handshake-packet in len))
@@ -216,7 +216,7 @@ Based on protocol documentation here:
     ((binary-data)
      (if (and (eq? (peek-byte in) #xFE) (< len 9))
          (parse-eof-packet in len)
-         (parse-binary-row-data-packet in len result-infos)))
+         (parse-binary-row-data-packet in len field-dvecs)))
     ((prep-ok)
      (parse-ok-prepared-statement-packet in len))
     ((prep-params)
@@ -347,12 +347,13 @@ Based on protocol documentation here:
 
 (define (parse-row-data-packet in len)
   (make-row-data-packet
-   (let loop ()
-     (if (at-eof? in)
-         null
-         (let* ([datum (io:read-length-coded-string in)])
-           (cons (or datum sql-null)
-                 (loop)))))))
+   (list->vector
+    (let loop ()
+      (if (at-eof? in)
+          null
+          (let* ([datum (io:read-length-coded-string in)])
+            (cons (or datum sql-null)
+                  (loop))))))))
 
 (define (parse-ok-prepared-statement-packet in len)
   (let* ([ok (io:read-byte in)]
@@ -378,27 +379,27 @@ Based on protocol documentation here:
                            decimals
                            len)))
 
-(define (parse-binary-row-data-packet in0 len result-infos)
+(define (parse-binary-row-data-packet in0 len field-dvecs)
   (define b (io:read-bytes-to-eof in0))
   (define in (open-input-bytes b))
   #|(printf "binary row: ~s or ~s\n" b (bytes->list b))|#
   (let* ([first (io:read-byte in)] ;; SKIP? seems to be always zero
-         [result-count (length result-infos)]
+         [result-count (length field-dvecs)]
          ;; FIXME: avoid reifying null-map as list?
          [null-map-length (floor (/ (+ 9 result-count) 8))]  ;; FIXME: use quotient?
          [null-map-int (io:read-le-intN in null-map-length)]
          [null-map (cddr (integer->null-map null-map-int (+ 2 result-count)))]
-         [fields
-          (let loop ([null-map null-map] [result-infos result-infos])
-            (cond [(pair? result-infos)
-                   (cons (if (not (car null-map))
-                             (read-binary-datum in (car result-infos))
-                             sql-null)
-                         (loop (cdr null-map) (cdr result-infos)))]
-                  [else null]))])
-    (make-binary-row-data-packet fields)))
+         [field-v (make-vector result-count)])
+    (for ([i (in-range result-count)]
+          [field-dvec (in-list field-dvecs)]
+          [is-null? (in-list null-map)])
+      (vector-set! field-v i
+                   (if is-null?
+                       sql-null
+                       (read-binary-datum in field-dvec))))
+    (make-binary-row-data-packet field-v)))
 
-(define (read-binary-datum in result-info)
+(define (read-binary-datum in field-dvec)
 
   ;; How to distinguish between character data and binary data?
   ;; (Both are given type var-string.)
@@ -410,7 +411,7 @@ Based on protocol documentation here:
 
   ;; We'll try using #2.
 
-  (define type (get-fi-typeid result-info))
+  (define type (field-dvec->typeid field-dvec))
 
   (case type
 
@@ -420,7 +421,7 @@ Based on protocol documentation here:
     ((long) (io:read-le-int32 in))
     ((longlong) (io:read-le-intN in 8))
     ((varchar var-string)
-     (let ([binary? (memq 'binary (or (assq 'flags result-info) '()))])
+     (let ([binary? (memq 'binary (field-dvec->flags field-dvec))])
        (if binary?
            (io:read-length-coded-bytes in)
            (io:read-length-coded-string in))))
@@ -704,10 +705,20 @@ Based on protocol documentation here:
 (define (at-eof? in)
   (eof-object? (peek-byte in)))
 
-(define (parse-field-info fp)
+(define (parse-field-dvec fp)
   (match fp
-    [(struct field-packet
-             (cat db tab otab name oname _ len type flags _ _))
+    [(struct field-packet (cat db tab otab name oname _ len type flags _ _))
+     (vector cat db tab otab name oname len type flags)]))
+
+(define (field-dvec->typeid dvec)
+  (vector-ref dvec 7))
+
+(define (field-dvec->flags dvec)
+  (vector-ref dvec 8))
+
+(define (field-dvec->field-info dvec)
+  (match dvec
+    [(vector cat db tab otab name oname len type flags)
      `((catalog . ,cat)
        (database . ,db)
        (table . ,tab)
@@ -715,6 +726,8 @@ Based on protocol documentation here:
        (name . ,name)
        (original-name . ,oname)
        (length . ,len)
-       (type . ,type)
-       (*type* . ,type)
+       (typeid . ,type)
        (flags . ,flags))]))
+
+(define (parse-field-info fp)
+  (field-dvec->field-info (parse-field-dvec fp)))

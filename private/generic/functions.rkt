@@ -87,11 +87,8 @@
                     sql
                     (mk-folding-collector base f))))
 
-;; collector = (nat order -> headers? init combine finish)
-;;   where init : A
-;;         combine : A vector -> A
-;;         finish : A -> A
-;;         order is #t for normal order, #f for reversed
+
+;; Collectors (see type def in interfaces)
 
 ;; vectorlist-collector : collector
 (define vectorlist-collector
@@ -127,6 +124,8 @@
                 #f))))
 
 (define (mk-single-column-collector fsym sql)
+  ;; The field count check is usually redundant, only needed for string queries
+  ;; that don't go through prepare path.
   (lambda (fields ordered?)
     (case fields
       ((0) (error fsym "query returned zero columns: ~e " sql))

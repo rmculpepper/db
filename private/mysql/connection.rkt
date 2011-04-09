@@ -64,7 +64,7 @@
         [(expectation) (get-message* expectation #f)]
         [(expectation types) (get-message* expectation types)]))
 
-    (define/private (get-message* expectation result-infos)
+    (define/private (get-message* expectation field-dvecs)
       (define (advance . ss)
         (unless (or (not expectation) 
                     (null? ss)
@@ -73,7 +73,7 @@
                  expectation)))
       (define (err packet)
         (error 'get-message "unexpected packet: ~s" packet))
-      (let-values ([(msg-num next) (parse-packet inport expectation result-infos)])
+      (let-values ([(msg-num next) (parse-packet inport expectation field-dvecs)])
         (set! next-msg-num (add1 msg-num))
         (match next
           [(? handshake-packet?)
@@ -337,12 +337,11 @@
     ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
     ;; The single point of control for the query engine
     (define/public (query* fsym stmts collector)
-      (let ([collector collector])
-        (let ([stmts
-               (for/list ([stmt (in-list stmts)])
-                 (check-statement fsym stmt))])
-          (for/list ([stmt (in-list stmts)])
-            (query1 fsym stmt collector)))))
+      (let ([stmts
+             (for/list ([stmt (in-list stmts)])
+               (check-statement fsym stmt))])
+        (for/list ([stmt (in-list stmts)])
+          (query1 fsym stmt collector))))
 
     ;; query1 : symbol Statement Collector -> QueryResult
     (define/private (query1 fsym stmt collector)
@@ -372,11 +371,10 @@
 
     ;; query1:collect : statement-binding Collector -> QueryResult stream
     (define/private (query1:collect stmt collector)
-      (let* ([pst (statement-binding-pst stmt)]
-             [result-infos (send pst get-result-infos)])
-        (query1:result result-infos collector)))
+      (let* ([pst (statement-binding-pst stmt)])
+        (query1:result collector)))
 
-    (define/private (query1:result result-infos collector)
+    (define/private (query1:result collector)
       (let ([r (recv 'query* 'result)])
         (match r
           [(struct ok-packet (affected-rows insert-id status warnings message))
@@ -385,36 +383,38 @@
                             (status . ,status)
                             (message . ,message)))]
           [(struct result-set-header-packet (fields extra))
-           (query1:expect-fields result-infos null collector)])))
+           (query1:expect-fields null collector)])))
 
-    (define/private (query1:expect-fields result-infos fieldinfos collector)
+    (define/private (query1:expect-fields r-field-dvecs collector)
       (let ([r (recv 'query* 'field)])
         (match r
           [(? field-packet?)
-           (query1:expect-fields result-infos
-                                 (cons (parse-field-info r) fieldinfos)
+           (query1:expect-fields (cons (parse-field-dvec r) r-field-dvecs)
                                  collector)]
           [(struct eof-packet (warning-count status))
-           (let-values ([(init combine finalize info)
-                         (collector (reverse fieldinfos) result-infos)])
-             (query1:data-loop result-infos init combine finalize info))])))
+           (let ([field-dvecs (reverse r-field-dvecs)])
+             (let-values ([(init combine finalize headers?)
+                           (collector (length r-field-dvecs) #t)])
+               (query1:data-loop field-dvecs init combine finalize
+                                 (and headers?
+                                      (map field-dvec->field-info field-dvecs)))))])))
 
-    (define/private (query1:get-data result-infos)
-      (let ([r (recv 'query* 'binary-data result-infos)])
+    (define/private (query1:data-loop field-dvecs init combine finalize info)
+      (define rows (query1:get-rows field-dvecs))
+      (recordset info
+                 (finalize
+                  (for/fold ([acc init]) ([row (in-list rows)])
+                    (combine acc row)))))
+
+    (define/private (query1:get-rows field-dvecs)
+      (let ([r (recv 'query* 'binary-data field-dvecs)])
         (match r
           [(struct row-data-packet (data))
-           (cons data (query1:get-data result-infos))]
+           (cons data (query1:get-rows field-dvecs))]
           [(struct binary-row-data-packet (data))
-           (cons data (query1:get-data result-infos))]
+           (cons data (query1:get-rows field-dvecs))]
           [(struct eof-packet (warning-count status))
            null])))
-
-    (define/private (query1:data-loop result-infos init combine finalize info)
-      (define data (query1:get-data result-infos))
-      (let loop ([init init] [data data])
-        (if (pair? data)
-            (loop (combine init (list->vector (car data))) (cdr data))
-            (recordset info (finalize init)))))
 
     ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
     (define/public (prepare* fsym stmts)

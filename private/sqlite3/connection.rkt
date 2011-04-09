@@ -100,16 +100,14 @@
              (handle-status fsym (sqlite3_reset stmt) db)
              (handle-status fsym (sqlite3_clear_bindings stmt) db)
              (values info rows)))))
-      (let-values ([(init combine finalize info)
-                    (collector info0 #f)])
-        (cond [(or (pair? info0) (pair? rows))
-               (recordset
-                info
-                (finalize
-                 (for/fold ([accum init]) ([row (in-list rows)])
-                   (combine accum row))))]
-              [else
-               (simple-result '())])))
+      (let-values ([(init combine finalize headers?)
+                    (collector (length info0) #t)])
+        (cond [(pair? info0)
+               (recordset (and headers? info0)
+                          (finalize
+                           (for/fold ([accum init]) ([row (in-list rows)])
+                             (combine accum row))))]
+              [else (simple-result '())])))
 
     (define/private (load-param fsym db stmt i param)
       (handle-status

@@ -10,7 +10,6 @@
          "functions.rkt")
 (provide (struct-out simple-result)
          (struct-out recordset)
-         (struct-out field-info)
          statement-binding?
          statement-generator?
 

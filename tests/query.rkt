@@ -5,6 +5,7 @@
 #lang racket/unit
 (require (for-syntax racket/base
                      "../private/generic/unstable-syntax.rkt")
+         racket/string
          rackunit
          "config.rkt"
          "../private/generic/signatures.rkt"
@@ -174,21 +175,21 @@
           (check-equal? (prepared-statement-parameter-types pst) '())
           (check-equal? (prepared-statement-result-types pst)
                         (case (dbsystem-name dbsystem)
-                          ((postgresql) '(int4 varchar))
-                          ((mysql) '(int var-string))
+                          ((postgresql) '(integer varchar))
+                          ((mysql) '(integer var-string))
                           ((sqlite3) '(any any))
                           ((odbc) '(integer varchar)))))
         (let ([pst (prepare c (sql "select n from the_numbers where n = $1"))])
           (check-equal? (prepared-statement-parameter-types pst)
                         (case (dbsystem-name dbsystem)
-                          ((postgresql) '(int4))
+                          ((postgresql) '(integer))
                           ((mysql) '(var-string))
                           ((sqlite3) '(any))
                           ((odbc) '(unknown))))) ;; FIXME, may vary
         (let ([pst (prepare c (sql "insert into the_numbers values ($1, $2)"))])
           (check-equal? (prepared-statement-parameter-types pst)
                         (case (dbsystem-name dbsystem)
-                          ((postgresql) '(int4 varchar))
+                          ((postgresql) '(integer varchar))
                           ((mysql) '(var-string var-string))
                           ((sqlite3) '(any any))
                           ((odbc) '(unknown unknown))))
@@ -248,17 +249,24 @@
     ;; nulls with returned fields.
     (test-case "nulls arrive in correct order"
       (with-connection c
-        (check-equal? (query-row c "select null, 1, null")
+        ;; raw NULL has PostgreSQL type "unknown", not allowed
+        (define (clean . strs)
+          (regexp-replace* #rx"NULL" (apply string-append strs)
+                           (case (dbsystem-name dbsystem)
+                             ((postgresql) "cast(NULL as integer)")
+                             (else "NULL"))))
+        (check-equal? (query-row c (clean "select NULL, 1, NULL"))
                       (vector sql-null 1 sql-null))
-        (check-equal? (query-row c "select 1, null")
+        (check-equal? (query-row c (clean "select 1, NULL"))
                       (vector 1 sql-null))
-        (check-equal? (query-row c "select null, 1")
+        (check-equal? (query-row c (clean "select NULL, 1"))
                       (vector sql-null 1))
         (check-equal?
-         (query-row c (string-append
-                       "select 1, 2, 3, 4, null, 6, null, 8, 9, 10, 11, 12, null, "
-                       "14, 15, null, null, 18, 19, 20, null, null, null, null, null, "
-                       "null, 27, 28, 29, 30, null, 32, 33, null, 35"))
+         (query-row c (clean "select 1, 2, 3, 4, NULL, 6, NULL, "
+                             "8, 9, 10, 11, 12, NULL, 14, 15, NULL, "
+                             "NULL, 18, 19, 20, NULL, "
+                             "NULL, " "NULL, " "NULL, " "NULL, " "NULL, "
+                             "27, 28, 29, 30, NULL, 32, 33, NULL, 35"))
          (vector 1 2 3 4 sql-null 6 sql-null 8 9 10 11 12 sql-null 14 15 sql-null
                  sql-null 18 19 20 sql-null sql-null sql-null sql-null sql-null
                  sql-null 27 28 29 30 sql-null 32 33 sql-null 35))))))

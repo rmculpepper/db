@@ -16,6 +16,6 @@
         [else #f]))
 
 (define (get-fi-typeid alist)
-  (cond [(assq '*type* alist)
+  (cond [(assq 'typeid alist)
          => cdr]
         [else #f]))

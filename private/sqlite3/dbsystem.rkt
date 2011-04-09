@@ -15,7 +15,8 @@
     (define/public (get-short-name) 'sqlite3)
     (define/public (get-known-types) '())
     (define/public (has-support? x) #f)
-    (define/public (typeids->types typeids) typeids)
+    (define/public (typeids->types typeids)
+      (map (lambda _ 'any) typeids))
 
     (define/public (get-parameter-handlers param-infos)
       (map (lambda (param-info) check-param)

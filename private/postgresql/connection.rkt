@@ -153,7 +153,8 @@
          (set! delayed-handler-calls
                (cons (lambda ()
                        (notice-handler (cdr (assq 'code properties))
-                                       (cdr (assq 'message properties))))))]
+                                       (cdr (assq 'message properties))))
+                     delayed-handler-calls))]
         [(struct NotificationResponse (pid condition info))
          (set! delayed-handler-calls
                (cons (lambda ()

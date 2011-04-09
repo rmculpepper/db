@@ -21,81 +21,6 @@
 (define DEBUG-RESPONSES #f)
 (define DEBUG-SENT-MESSAGES #f)
 
-
-;; base<%>
-;; Manages communication
-(define base<%>
-  (interface ()
-    ;; recv-message : -> message
-    recv-message
-
-    ;; send-message : message -> void
-    send-message
-
-    ;; buffer-message : message -> void
-    buffer-message
-
-    ;; flush-message-buffer : -> void
-    flush-message-buffer
-
-    ;; check-ready-for-query : symbol boolean -> void
-    check-ready-for-query
-
-    ;; lock : symbol -> void
-    lock
-
-    ;; unlock : -> void
-    unlock
-
-    ;; call-with-lock : symbol (-> any) -> any
-    call-with-lock
-
-    ;; disconnect : -> void
-    ;; disconnect : boolean -> void
-    disconnect
-
-    ;; connected? : -> boolean
-    connected?
-    ))
-
-;; postgres-base<%>
-;; Hooks for extending postgres message behavior
-(define postgres-base<%>
-  (interface (base<%>)
-    ;; handle-parameter-status : string string -> void
-    handle-parameter-status
-
-    ;; handle-notice : string string string (listof (cons string string)) => void
-    handle-notice
-
-    ;; handle-notification : string -> void
-    handle-notification))
-
-;; postgres-connector<%>
-;; Hooks for extending postgres connection setup
-(define postgres-connector<%>
-  (interface (connector<%>)
-    ;; compute-cleartext-password : string/#f -> bytes
-    compute-cleartext-password
-
-    ;; compute-crypt-password : string/#f bytes -> bytes
-    compute-crypt-password
-
-    ;; compute-md5-password : string string bytes -> bytes
-    compute-md5-password
-
-    ;; handle-kerberos5-authentication : -> void
-    handle-kerberos5-authentication
-
-    ;; handle-scm-credential-authentication : -> void
-    handle-scm-credential-authentication))
-
-;; ssl-connector<%>
-(define ssl-connector<%>
-  (interface (connector<%>)
-    ;; set-ssl-options : YesNoOptional SSLMode -> void
-    set-ssl-options))
-
 ;; ========================================
 
 (define prepared-statement%
@@ -106,29 +31,52 @@
 
 ;; ========================================
 
-;; base%
-(define base%
-  (class* object% (connection:admin<%> postgres-base<%>)
-    (field [inport #f]
-           [outport #f]
-           [process-id #f]
-           [secret-key #f])
-    (init-field [notice-handler void]
-                [notification-handler void])
-    (define wlock (make-semaphore 1))
+;; base<%>
+;; Manages communication
+(define base<%>
+  (interface ()
+    recv-message           ;; -> message
+    send-message           ;; message -> void
+    buffer-message         ;; mesage -> void
+    flush-message-buffer   ;; -> void
+    check-ready-for-query  ;; symbol boolean -> void
 
-    ;; Delay async handler calls until unlock.
-    (define delayed-handler-calls null)
+    lock                   ;; symbol -> void
+    unlock                 ;; -> void
+    call-with-lock         ;; symbol (-> any) -> any
+
+    disconnect*            ;; [boolean] -> void
+    connected?             ;; -> boolean
+    ))
+
+;; ========================================
+
+(define connection-base%
+  (class* object% (connection<%> connector<%>)
+    (init-private notice-handler
+                  notification-handler
+                  allow-cleartext-password?)
+    (define inport #f)
+    (define outport #f)
+    (define process-id #f)
+    (define secret-key #f)
 
     (super-new)
 
     ;; with-disconnect-on-error
-    ;; Specialized to use direct method call rather than 'send'
-    (define-syntax-rule (with-disconnect-on-error expr)
-      (with-handlers ([exn:fail? (lambda (e) (disconnect #f) (raise e))])
-        expr))
+    (define-syntax-rule (with-disconnect-on-error . body)
+      (with-handlers ([exn:fail? (lambda (e) (disconnect* #f) (raise e))])
+        . body))
+
+    ;; ========================================
 
     ;; == Communication locking
+
+    ;; Lock; all communication occurs within lock.
+    (define wlock (make-semaphore 1))
+
+    ;; Delay async handler calls until unlock.
+    (define delayed-handler-calls null)
 
     (define/public (lock who)
       (semaphore-wait wlock)
@@ -159,16 +107,16 @@
          r)))
 
     ;; recv-message : symbol -> message
-    (define/public (recv-message behalf)
+    (define/public (recv-message fsym)
       (let ([r (raw-recv)])
         (cond [(ErrorResponse? r)
-               (check-ready-for-query behalf #t) ;; FIXME: eat msgs until ReadyForQuery?
-               (raise-backend-error behalf r)]
+               (check-ready-for-query fsym #t) ;; FIXME: eat msgs until ReadyForQuery?
+               (raise-backend-error fsym r)]
               [(or (NoticeResponse? r)
                    (NotificationResponse? r)
                    (ParameterStatus? r))
-               (handle-async-message r)
-               (recv-message behalf)]
+               (handle-async-message fsym r)
+               (recv-message fsym)]
               [else r])))
 
     ;; send-message : message -> void
@@ -194,61 +142,44 @@
         (cond [(ReadyForQuery? r) (void)]
               [(and or-eof? (eof-object? r)) (void)]
               [else
-               (error fsym "internal error: backend sent unexpected message: ~e" r)])))
+               (error fsym "internal error: backend sent unexpected message")])))
 
-    ;; == Asynchronous message hooks
+    ;; == Asynchronous messages
 
     ;; handle-async-message : message -> void
-    (define/private (handle-async-message msg)
+    (define/private (handle-async-message fsym msg)
       (match msg
         [(struct NoticeResponse (properties))
-         (handle-notice properties)]
+         (set! delayed-handler-calls
+               (cons (lambda ()
+                       (notice-handler (cdr (assq 'code properties))
+                                       (cdr (assq 'message properties))))))]
         [(struct NotificationResponse (pid condition info))
-         (handle-notification condition info)]
+         (set! delayed-handler-calls
+               (cons (lambda ()
+                       (notification-handler condition))
+                     delayed-handler-calls))]
         [(struct ParameterStatus (name value))
-         (handle-parameter-status name value)]))
-
-    ;; handle-parameter-status : string string -> void
-    (define/public (handle-parameter-status name value)
-      (when (equal? name "client_encoding")
-        (unless (equal? value "UTF8")
-          (disconnect* #f)
-          (error 'connection
-                 (string-append
-                  "backend attempted to change the client character encoding "
-                  "from UTF8 to ~a, disconnecting")
-                 value)))
-      (void))
-
-    ;; handle-notice : (listof (cons symbol string)) -> void
-    ;; Queues handler call for execution on unlock
-    (define/public (handle-notice properties)
-      (set! delayed-handler-calls
-            (cons (lambda ()
-                    (notice-handler (cdr (assq 'code properties))
-                                    (cdr (assq 'message properties))))
-             delayed-handler-calls)))
-
-    ;; handle-notification :  string string -> void
-    ;; Queues handler call for execution on unlock
-    (define/public (handle-notification condition info)
-      (set! delayed-handler-calls
-            (cons (lambda ()
-                    (notification-handler condition))
-                  delayed-handler-calls)))
+         (cond [(equal? name "client_encoding")
+                (unless (equal? value "UTF8")
+                  (disconnect* #f)
+                  (error fsym
+                         (string-append
+                          "backend attempted to change the client character encoding "
+                          "from UTF8 to ~a, disconnecting")
+                         value))]
+               [else (void)])]))
 
     ;; == Connection management
 
     ;; disconnect : [boolean] -> (void)
-    (define/public disconnect
-      (case-lambda
-        [() (disconnect* #t)]
-        [(politely?) (disconnect* politely?)]))
+    (define/public (disconnect)
+      (disconnect* #t))
 
     ;; disconnect* : boolean -> void
-    ;; If politely? = #t, lock is not already held.
-    ;; If politely? = #f, lock is already held.
-    (define/public (disconnect* politely?)
+    (define/public (disconnect* no-lock-held?)
+      ;; If we don't hold the lock, try to acquire it and disconnect politely.
+      (define politely? no-lock-held?)
       (when (connected?)
         (when politely?
           (lock 'disconnect)
@@ -272,31 +203,10 @@
 
     (define/public (get-dbsystem)
       dbsystem)
-    ))
 
-;; connector-mixin%
-(define connector-mixin
-  (mixin (base<%>) (connector<%>)
-    (init-field [allow-cleartext-password? #f])
+    ;; ========================================
 
-    (inherit-field inport
-                   outport
-                   process-id
-                   secret-key)
-    (inherit recv-message
-             lock
-             unlock
-             call-with-lock
-             buffer-message
-             send-message
-             disconnect)
-    (super-new)
-
-    ;; with-disconnect-on-error
-    ;; Specialized to use direct method call rather than 'send'
-    (define-syntax-rule (with-disconnect-on-error . body)
-      (with-handlers ([exn:fail? (lambda (e) (disconnect #f) (raise e))])
-        . body))
+    ;; == Connect
 
     ;; attach-to-ports : input-port output-port -> void
     (define/public (attach-to-ports in out)
@@ -314,35 +224,44 @@
                   (cons "database" dbname)
                   (cons "client_encoding" "UTF8")
                   (cons "DateStyle" "ISO, MDY"))))
-          (expect-auth username password)))))
+          (connect:expect-auth username password)))))
 
-    ;; expect-auth : string/#f -> ConnectionResult
-    (define/private (expect-auth username password)
+    ;; connect:expect-auth : string/#f -> ConnectionResult
+    (define/private (connect:expect-auth username password)
       (let ([r (recv-message 'postgresql-connect)])
         (match r
           [(struct AuthenticationOk ())
-           (expect-ready-for-query)]
+           (connect:expect-ready-for-query)]
           [(struct AuthenticationCleartextPassword ())
-           (handle-cleartext-password-authentication password)
-           (expect-auth username password)]
+           (unless (string? password)
+             (error 'postgresql-connect "password needed but not supplied"))
+           (unless allow-cleartext-password?
+             (error 'postgresql-connect (nosupport "cleartext password")))
+           (send-message (make-PasswordMessage password))
+           (connect:expect-auth username password)]
           [(struct AuthenticationCryptPassword (salt))
-           (handle-crypt-password-authentication password salt)
-           (expect-auth username password)]
+           (unless #f ;; crypt() support removed
+             (error 'postgresql-connect (nosupport "crypt()-encrypted password")))
+           (unless (string? password)
+             (error 'postgresql-connect "password needed but not supplied"))
+           (send-message (make-PasswordMessage (crypt-password password salt)))
+           (connect:expect-auth username password)]
           [(struct AuthenticationMD5Password (salt))
-           (handle-md5-password-authentication username password salt)
-           (expect-auth username password)]
+           (unless (string? password)
+             (error 'postgresql-connect "password needed but not supplied"))
+           (send-message (make-PasswordMessage (md5-password username password salt)))
+           (connect:expect-auth username password)]
           [(struct AuthenticationKerberosV5 ())
-           (handle-kerberos5-authentication)
-           (expect-auth username password)]
+           (error 'postgresql-connect (nosupport "KerberosV5 authentication"))]
           [(struct AuthenticationSCMCredential ())
-           (handle-scm-credential-authentication)
-           (expect-auth username password)]
+           (error 'postgresql-connect (nosupport "SCM authentication"))]
+          ;; ErrorResponse handled by recv-message
           [_
            (error 'postgresql-connect
-                  "authentication failed (backend sent unexpected message)")])))
+                  "internal error: unknown message during authentication")])))
 
-    ;; expect-ready-for-query : -> void
-    (define/private (expect-ready-for-query)
+    ;; connect:expect-ready-for-query : -> void
+    (define/private (connect:expect-ready-for-query)
       (let ([r (recv-message 'postgresql-connect)])
         (match r
           [(struct ReadyForQuery (status))
@@ -350,167 +269,19 @@
           [(struct BackendKeyData (pid secret))
            (set! process-id pid)
            (set! secret-key secret)
-           (expect-ready-for-query)]
+           (connect:expect-ready-for-query)]
           [_
            (error 'postgresql-connect
-                  (string-append "connection failed after authentication "
-                                 "(backend sent unexpected message: ~e)")
-                  r)])))
+                  "internal error: unknown message after authentication")])))
 
-    ;; Authentication hooks
-    ;; The authentication hooks serve two purposes:
-    ;;   - to handle unsupported mechanisms (eg kerberos)
-    ;;   - to prevent undesirable authentication methods
-    ;;     (such as sending passwords in cleartext)
-    ;; An authentication hook should take any necessary action (eg send one or more
-    ;; messages to the protocol) and then return to continue the authentication 
-    ;; process, or raise an error to abort the connection.
+    ;; ============================================================
 
-    ;; handle-cleartext-password-authentication : string -> void
-    (define/private (handle-cleartext-password-authentication password)
-      (unless (string? password)
-        (raise-user-error 'postgresql-connect "password needed but not supplied"))
-      (send-message (make-PasswordMessage (compute-cleartext-password password))))
-
-    ;; compute-cleartext-password : string -> string
-    (define/public (compute-cleartext-password password)
-      (unless allow-cleartext-password?
-        (raise-user-error 'postgresql-connect (nosupport "cleartext password")))
-      password)
-
-    ;; handle-crypt-password-authentication : string bytes -> void
-    (define/private (handle-crypt-password-authentication password salt)
-      (send-message (make-PasswordMessage (compute-crypt-password password salt))))
-
-    ;; compute-crypt-password : string bytes -> void
-    (define/public (compute-crypt-password password salt)
-      (raise-user-error 'postgresql-connect (nosupport "crypt()-encrypted password")))
-
-    ;; handle-md5-password-authentication : string string bytes -> void
-    (define/private (handle-md5-password-authentication user password salt)
-      (send-message (make-PasswordMessage (compute-md5-password user password salt))))
-
-    ;; compute-md5-password : strin string bytes -> bytes
-    (define/public (compute-md5-password user password salt)
-      (unless (string? password)
-        (raise-user-error 'postgresql-connect "password needed but not supplied"))
-      (md5password user password salt))
-
-    ;; handle-kerberos5-authentication : -> void
-    (define/public (handle-kerberos5-authentication)
-      (raise-user-error 'postgresql-connect (nosupport "KerberosV5 authentication")))
-
-    ;; handle-scm-credential-authentication : -> void
-    (define/public (handle-scm-credential-authentication)
-      (raise-user-error 'postgresql-connect (nosupport "SCM authentication")))
-
-    ))
-
-;; ssl-connector-mixin
-;; Adds SSL connection support.
-(define ssl-connector-mixin
-  (mixin (connector<%> base<%>) (ssl-connector<%>)
-    (field [ssl 'no]
-           [ssl-encrypt 'sslv2-or-v3])
-    (super-new)
-
-    ;; set-ssl-options : YesNoOptional/#f SSLMode/#f -> void
-    (define/public (set-ssl-options -ssl -ssl-encrypt)
-      (unless (memq -ssl '(yes no optional))
-        (raise-user-error 'set-ssl-options
-                          "bad ssl option: expected 'yes, 'no, or 'optional, got: ~e"
-                          -ssl))
-      (when -ssl (set! ssl -ssl))
-      (when -ssl-encrypt (set! ssl-encrypt -ssl-encrypt)))
-
-    ;; attach-to-ports : input-port output-port -> void
-    (define/override (attach-to-ports in out)
-      (with-handlers ([(lambda _ #t)
-                       (lambda (e)
-                         (close-input-port in)
-                         (close-output-port out)
-                         (raise e))])
-        (case ssl
-          ((yes optional)
-           ;; Try negotiating SSL connection
-           (write-message (make-SSLRequest) out)
-           (flush-output out)
-           (let ([response (peek-byte in)])
-             (case (integer->char response)
-               ((#\S)
-                (void (read-byte in))
-                (let-values ([(sin sout)
-                              (ports->ssl-ports in out
-                                                #:mode 'connect
-                                                #:encrypt ssl-encrypt 
-                                                #:close-original? #t)])
-                  (super attach-to-ports sin sout)))
-               ((#\N)
-                ;; Backend gracefully declined
-                (void (read-byte in))
-                (unless (eq? ssl 'optional)
-                  (error 'postgresql-connect "backend does not support SSL"))
-                (super attach-to-ports in out))
-               ((#\E)
-                (let ([r (parse-server-message in)])
-                  (error 'postgresql-connect r)))
-               (else
-                (error 'postgresql-connect
-                       "backend returned invalid response to SSL request")))))
-          ((no)
-           (super attach-to-ports in out)))))))
-
-;; nosupport : string -> string
-(define (nosupport str)
-  (string-append "not supported: " str))
-
-;; md5password : string string bytes -> string
-;; Compute the MD5 hash of a password in the form expected by the PostgreSQL 
-;; backend.
-(define (md5password user password salt)
-  (bytes->string/latin-1
-   (md5password/bytes (string->bytes/latin-1 user)
-                      (string->bytes/latin-1 password)
-                      salt)))
-(define (md5password/bytes user password salt)
-  (let* [(s (md5 (bytes-append password user)))
-         (t (md5 (bytes-append s salt)))]
-    (bytes-append #"md5" t)))
-
-;; ============================================================
-
-;; query-mixin
-;; Handles the mechanics of connection creations, queries, etc.
-;; Provides functionality, not usability. See connection% for friendly 
-;; interface.
-(define query-mixin
-  (mixin (connection:admin<%> base<%>) ()
-    (inherit-field process-id
-                   secret-key)
-    (inherit get-dbsystem
-             recv-message
-             send-message
-             buffer-message
-             flush-message-buffer
-             check-ready-for-query
-             lock
-             unlock
-             call-with-lock)
-    (super-new)
-
-    ;; name-counter : number
-    (define name-counter 0)
-
-    (define/private (call-with-unlock proc)
-      (with-handlers ([values (lambda (e) (unlock) (raise e))])
-        (begin0 (proc)
-          (unlock))))
+    ;; == Query
 
     ;; query* : symbol (list-of Statement) Collector
     ;;       -> (list-of QueryResult)
     (define/public (query* fsym stmts collector)
-      (let ([collector
-             (compose-collector-with-conversions (get-dbsystem) collector)])
+      (let ([collector (compose-collector-with-conversions (get-dbsystem) collector)])
         (for ([stmt (in-list stmts)])
           (check-statement fsym stmt))
         (let ([thunks
@@ -600,9 +371,9 @@
     (define/private (query1:error-recovery fsym r)
       (match r
         [(struct CopyInResponse (format column-formats))
-         (raise-user-error fsym "COPY IN statements not supported")]
+         (error fsym (nosupport "COPY IN statements"))]
         [(struct CopyOutResponse (format column-formats))
-         (raise-user-error fsym "COPY OUT statements not supported")]
+         (error fsym (nosupport "COPY OUT statements"))]
         [_ (error fsym "internal error: unexpected message")]))
 
     ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
@@ -615,7 +386,6 @@
                   [stmt (in-list stmts)])
               (prepare1:enqueue name stmt))
             (send-message (make-Sync))
-
             (let ([results
                    (for/list ([name (in-list names)]
                               [stmt (in-list stmts)])
@@ -666,17 +436,86 @@
         (let ([pst (statement-binding-pst stmt)])
           (send pst check-owner fsym this stmt))))
 
+    ;; name-counter : nat
+    (define name-counter 0)
+
     ;; generate-name : -> string
     (define/private (generate-name)
       (let ([n name-counter])
         (set! name-counter (add1 name-counter))
         (format "λmz_~a_~a" process-id n)))))
 
+
+;; ========================================
+
+;; ssl-connector-mixin
+;; Adds SSL connection support.
+(define ssl-connector-mixin
+  (mixin (connector<%>) ()
+    (super-new)
+
+    ;; attach-to-ports : input-port output-port -> void
+    (define/override (attach-to-ports in out [ssl 'no] [ssl-encrypt #f])
+      (with-handlers ([(lambda _ #t)
+                       (lambda (e)
+                         (close-input-port in)
+                         (close-output-port out)
+                         (raise e))])
+        (case ssl
+          ((yes optional)
+           ;; Try negotiating SSL connection
+           (write-message (make-SSLRequest) out)
+           (flush-output out)
+           (let ([response (peek-byte in)])
+             (case (integer->char response)
+               ((#\S)
+                (void (read-byte in))
+                (let-values ([(sin sout)
+                              (ports->ssl-ports in out
+                                                #:mode 'connect
+                                                #:encrypt ssl-encrypt 
+                                                #:close-original? #t)])
+                  (super attach-to-ports sin sout)))
+               ((#\N)
+                ;; Backend gracefully declined
+                (void (read-byte in))
+                (unless (eq? ssl 'optional)
+                  (error 'postgresql-connect "backend refused SSL connection"))
+                (super attach-to-ports in out))
+               ((#\E)
+                (let ([r (parse-server-message in)])
+                  (raise-backend-error 'postgresql-connect r)))
+               (else
+                (error 'postgresql-connect
+                       "backend returned invalid response to SSL request")))))
+          ((no)
+           (super attach-to-ports in out)))))))
+
+;; ========================================
+
+;; nosupport : string -> string
+(define (nosupport str)
+  (string-append "not supported: " str))
+
+;; md5-password : string string bytes -> string
+;; Compute the MD5 hash of a password in the form expected by the PostgreSQL 
+;; backend.
+(define (md5-password user password salt)
+  (bytes->string/latin-1
+   (md5-password/bytes (string->bytes/latin-1 user)
+                       (string->bytes/latin-1 password)
+                       salt)))
+(define (md5-password/bytes user password salt)
+  (let* ([s (md5 (bytes-append password user))]
+         [t (md5 (bytes-append s salt))])
+    (bytes-append #"md5" t)))
+
+(define (crypt-password password salt)
+  (error 'crypt-password "not implemented"))
+
+;; ========================================
+
 ;; connection%
 (define connection%
-  (class* (ssl-connector-mixin
-           (query-mixin
-            (connector-mixin
-             base%)))
-          (connection<%>)
+  (class (ssl-connector-mixin connection-base%)
     (super-new)))

@@ -73,19 +73,15 @@
                   (notice-handler notice-handler)
                   (notification-handler notification-handler)
                   (allow-cleartext-password? allow-cleartext-password?))])
-      (send c set-ssl-options ssl ssl-encrypt)
-      (cond [socket
-             (let-values ([(in out) (unix-socket-connect socket)])
-               (send c attach-to-ports in out))]
-            [input-port
-             (send c attach-to-port input-port output-port)]
-            [else
-             (let ([server (or server "localhost")]
-                   [port (or port 5432)])
-               (let-values ([(in out) (tcp-connect server port)])
-                 (send c attach-to-ports in out)))])
-      (send c start-connection-protocol database user password)
-      c)))
+      (let-values ([(in out)
+                    (cond [socket (unix-socket-connect socket)]
+                          [input-port (values input-port output-port)]
+                          [else (let ([server (or server "localhost")]
+                                      [port (or port 5432)])
+                                  (tcp-connect server port))])])
+        (send c attach-to-ports in out ssl ssl-encrypt)
+        (send c start-connection-protocol database user password)
+        c))))
 
 (define socket-paths
   '("/var/run/postgresql/.s.PGSQL.5432"))

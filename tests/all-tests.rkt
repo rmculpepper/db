@@ -19,7 +19,8 @@
          "concurrent.rkt")
 
 (define-unit all-tests@
-  (import (tag connect (prefix connect: test^))
+  (import database^
+          (tag connect (prefix connect: test^))
           (tag query (prefix query: test^))
           (tag sql-types (prefix sql-types: test^))
           (tag concurrent (prefix concurrent: test^)))
@@ -27,7 +28,7 @@
 
   (define test
     (make-test-suite
-     "All tests"
+     (format "~a tests" (dbsystem-name dbsystem))
      (list connect:test
            query:test
            sql-types:test
@@ -44,6 +45,7 @@
           (((SQL-TYPES-TEST : test^)) sql-types@ CONFIG DB)
           (((CONCURRENT-TEST : test^)) concurrent@ CONFIG DB)
           (((ALL-TESTS : test^)) all-tests@
+                                 DB
                                  (tag connect CONNECT-TEST)
                                  (tag query QUERY-TEST)
                                  (tag sql-types SQL-TYPES-TEST)

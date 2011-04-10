@@ -81,7 +81,7 @@
 
 ;; -fold : connection symbol Statement ('a fieldv -> 'a) 'a -> 'a
 (define (-fold c fsym sql f base)
-  (recordset-data
+  (recordset-rows
    (query/recordset c
                     fsym
                     sql
@@ -137,7 +137,7 @@
             #f)))
 
 (define (recordset->one-row fsym rs sql)
-  (define rows (recordset-data rs))
+  (define rows (recordset-rows rs))
   (cond [(null? rows)
          (raise-mismatch-error fsym "query returned zero rows: " sql)]
         [(null? (cdr rows))
@@ -146,7 +146,7 @@
          (raise-mismatch-error fsym "query returned multiple rows: " sql)]))
 
 (define (recordset->maybe-row fsym rs sql)
-  (define rows (recordset-data rs))
+  (define rows (recordset-rows rs))
   (cond [(null? rows)
          #f]
         [(and (pair? rows) (null? (cdr rows)))
@@ -186,7 +186,7 @@
 ;; query-rows : connection Statement arg ... -> (listof (vectorof 'a))
 (define (query-rows c sql . args)
   (let ([sql (compose-statement 'query-rows c sql args 'recordset)])
-    (recordset-data
+    (recordset-rows
      (query/recordset c 'query-rows sql
                       vectorlist-collector))))
 
@@ -194,7 +194,7 @@
 ;; Expects to get back a recordset with one field per row.
 (define (query-list c sql . args)
   (let ([sql (compose-statement 'query-list c sql args 'column)])
-    (recordset-data
+    (recordset-rows
      (query/recordset c 'query-list sql
                       (mk-single-column-collector 'query-list sql)))))
 

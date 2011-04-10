@@ -6,7 +6,8 @@
 (require racket/class
          "../generic/interfaces.rkt"
          "../generic/query.rkt"
-         "../generic/sql-convert.rkt")
+         "../generic/sql-convert.rkt"
+         (only-in "msg.rkt" field-dvec->typeid))
 (provide dbsystem
          typeid->type
          type->type-reader)
@@ -24,18 +25,15 @@
         ((numeric-infinities) #t)
         (else #f)))
 
-    (define/public (get-parameter-handlers param-infos)
-      (map (lambda (param-info)
-             (let ([type (typeid->type (get-fi-typeid param-info))])
+    (define/public (get-parameter-handlers param-typeids)
+      (map (lambda (param-typeid)
+             (let ([type (typeid->type param-typeid)])
                (or (type->type-writer type)
                    (make-default-marshal type))))
-           param-infos))
+           param-typeids))
 
-    (define/public (get-result-handlers result-infos)
-      (map (lambda (result-info)
-             (let ([type (typeid->type (get-fi-typeid result-info))])
-               (type->type-reader type)))
-           result-infos))
+    (define/public (field-dvecs->typeids dvecs)
+      (map field-dvec->typeid dvecs))
 
     (super-new)))
 

@@ -18,9 +18,13 @@
     (define/public (typeids->types typeids)
       (map (lambda _ 'any) typeids))
 
-    (define/public (get-parameter-handlers param-infos)
-      (map (lambda (param-info) check-param)
-           param-infos))
+    (define/public (get-parameter-handlers param-typeids)
+      (map (lambda (param-typeid) check-param)
+           param-typeids))
+
+    (define/public (field-dvecs->typeids dvecs)
+      (map (lambda (dvec) (vector-ref dvec 0))
+           dvecs))
 
     (super-new)))
 
@@ -29,7 +33,7 @@
 
 ;; ========================================
 
-(define (check-param fsym index param-info param)
+(define (check-param fsym index param)
   (unless (or (real? param)
               (string? param)
               (bytes? param))

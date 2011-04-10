@@ -1,8 +1,6 @@
 To do
 =====
 
-- avoid creating *-infos, keep as vectors, interp by dbsys
-
 - add sql-bits datatype for BIT, VARBIT types
 
 - strict mode by default: error if backend result type unknown

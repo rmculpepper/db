@@ -147,24 +147,24 @@
           (check-pred list? q)
           (check-equal? 2 (length q))
           (check-true (andmap recordset? q))
-          (check-true (andmap (lambda (r) (list? (recordset-data r))) q))
-          (check-true (andmap (lambda (r) (list? (recordset-info r))) q))
+          (check-true (andmap (lambda (r) (list? (recordset-rows r))) q))
+          (check-true (andmap (lambda (r) (list? (recordset-headers r))) q))
           (check-true (andmap (lambda (v) (= (vector-length v) 1))
-                              (recordset-data (car q))))
-          (check-true (list? (recordset-info (cadr q))))
-          (check-equal? (length (recordset-info (cadr q))) 1)
-          (check-equal? (recordset-data (cadr q))
+                              (recordset-rows (car q))))
+          (check-true (list? (recordset-headers (cadr q))))
+          (check-equal? (length (recordset-headers (cadr q))) 1)
+          (check-equal? (recordset-rows (cadr q))
                         (list (vector 5)))
           (check-true 
            (set-equal? (map car test-data)
                        (map (lambda (v) (vector-ref v 0) )
-                            (recordset-data (car q))))))))
+                            (recordset-rows (car q))))))))
     (test-case "query - select"
       (with-connection c
         (let [(q (query c "select N from the_numbers"))]
           (check-pred recordset? q)
           (check-true (set-equal? (map vector (map car test-data))
-                                  (recordset-data q))))))
+                                  (recordset-rows q))))))
     (test-case "query - update"
       (with-connection c
         (let [(q (query c "update the_numbers set N = -1 where N = 1"))]

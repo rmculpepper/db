@@ -9,9 +9,8 @@
          file/md5
          openssl/mzssl
          "../generic/interfaces.rkt"
-         "../generic/connection.rkt"
          "../generic/sql-data.rkt"
-         "../generic/query.rkt"
+         "../generic/prepared.rkt"
          "msg.rkt"
          "exceptions.rkt"
          "dbsystem.rkt")
@@ -441,27 +440,27 @@
     (define/private (prepare1:describe-params fsym name stmt)
       (let ([r (recv-message fsym)])
         (match r
-          [(struct ParameterDescription (param-types))
-           (prepare1:describe-result fsym name stmt param-types)]
+          [(struct ParameterDescription (param-typeids))
+           (prepare1:describe-result fsym name stmt param-typeids)]
           [else (prepare1:error fsym r stmt)])))
 
-    (define/private (prepare1:describe-result fsym name stmt param-types)
+    (define/private (prepare1:describe-result fsym name stmt param-typeids)
       (let ([r (recv-message fsym)])
         (match r
           [(struct RowDescription (field-dvecs))
-           (prepare1:finish fsym name stmt param-types (map field-dvec->field-info field-dvecs))]
+           (prepare1:finish fsym name stmt param-typeids field-dvecs)]
           [(struct NoData ())
-           (prepare1:finish fsym name stmt param-types #f)]
+           (prepare1:finish fsym name stmt param-typeids null)]
           [else (prepare1:error fsym r stmt)])))
 
     (define/private (prepare1:error fsym r stmt)
       (error fsym "internal error: unexpected message processing ~s" stmt))
 
-    (define/private (prepare1:finish fsym name stmt param-types result-fields)
+    (define/private (prepare1:finish fsym name stmt param-typeids result-dvecs)
       (new prepared-statement%
            (name name)
-           (param-infos (map (lambda (t) `((typeid . ,t))) param-types))
-           (result-infos result-fields)
+           (param-typeids param-typeids)
+           (result-dvecs result-dvecs)
            (owner this)))
 
     ;; check-statement : symbol any -> void

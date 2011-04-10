@@ -19,11 +19,14 @@
     (define/public (get-known-types) known-types+aliases)
     (define/public (has-support? x) #f)
 
-    (define/public (get-parameter-handlers param-infos)
-      (map (lambda (param-info)
+    (define/public (get-parameter-handlers param-typeids)
+      (map (lambda (param-typeid)
              ;; FIXME: do parameter checks! (for drivers that give param types)
              check-param)
-           param-infos))
+           param-typeids))
+
+    (define/public (field-dvecs->typeids dvecs)
+      (map (lambda (dvec) (vector-ref dvec 1)) dvecs))
 
     (super-new)))
 
@@ -32,7 +35,7 @@
 
 ;; ----
 
-(define (check-param fsym index param-info param)
+(define (check-param fsym index param)
   (unless (or (string? param)
               (bytes? param)
               (rational? param)

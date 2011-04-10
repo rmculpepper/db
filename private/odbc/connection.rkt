@@ -6,12 +6,11 @@
 (require racket/class
          ffi/unsafe
          ffi/unsafe/atomic
-         "../generic/io.rkt"
-         "../generic/connection.rkt"
-         "../generic/query.rkt"
          "../generic/interfaces.rkt"
+         "../generic/prepared.rkt"
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
+         "../generic/io.rkt"
          "ffi.rkt"
          "ffi-constants.rkt"
          "dbsystem.rkt")
@@ -92,12 +91,12 @@
                (query1/p fsym pst params collector))]))
 
     (define/private (query1/p fsym pst params collector)
-      (define-values (info0 rows)
+      (define-values (dvecs rows)
         (with-lock
          (let* ([db (get-db fsym)]
                 [stmt (send pst get-stmt)]
                 ;; FIXME: reset/clear
-                [result-infos (send pst get-result-infos)])
+                [result-dvecs (send pst get-result-dvecs)])
            (for ([i (in-naturals 1)]
                  [param (in-list params)])
              (load-param fsym db stmt i param))
@@ -105,11 +104,11 @@
            (let ([rows (fetch* fsym stmt (send pst get-result-typeids))])
              (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
              (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
-             (values result-infos rows)))))
-      (let-values ([(init combine finalize info)
-                    (collector (length info0) #t)])
-        (cond [(or (pair? info0) (pair? rows))
-               (recordset info0
+             (values result-dvecs rows)))))
+      (let-values ([(init combine finalize headers?)
+                    (collector (length dvecs) #t)])
+        (cond [(pair? dvecs)
+               (recordset (and headers? (map field-dvec->field-info dvecs))
                           (finalize
                            (for/fold ([accum init]) ([row (in-list rows)])
                              (combine accum row))))]
@@ -296,12 +295,12 @@
                  (let ([status (SQLPrepare stmt sql)])
                    (handle-status fsym status stmt)
                    stmt))]
-              [param-infos
+              [param-typeids
                (let-values ([(status param-count) (SQLNumParams stmt)])
                  (handle-status fsym status stmt)
                  (for/list ([i (in-range 1 (add1 param-count))])
                    (describe-param fsym stmt i)))]
-              [result-infos
+              [result-dvecs
                (let-values ([(status result-count) (SQLNumResultCols stmt)])
                  (handle-status fsym status stmt)
                  (for/list ([i (in-range 1 (add1 result-count))])
@@ -309,8 +308,8 @@
          (let ([pst (new prepared-statement%
                          (stmt stmt)
                          (owner this)
-                         (param-infos param-infos)
-                         (result-infos result-infos))])
+                         (param-typeids param-typeids)
+                         (result-dvecs result-dvecs))])
            (hash-set! statement-table pst #t)
            (thread-resume finalizer-thread)
            (will-register will-executor pst (lambda (pst) (send pst finalize)))
@@ -321,15 +320,14 @@
              (let-values ([(status type size digits nullable)
                            (SQLDescribeParam stmt i)])
                (handle-status fsym status stmt)
-               `((typeid . ,type) (size . ,size) (digits . ,digits)))]
-            [else
-             `((typeid . ,SQL_UNKNOWN_TYPE))]))
+               type)]
+            [else SQL_UNKNOWN_TYPE]))
 
     (define/private (describe-result-column fsym stmt i)
       (let-values ([(status name type size digits nullable)
                     (SQLDescribeCol stmt i)])
         (handle-status fsym status stmt)
-        `((name . ,name) (typeid . ,type) (size . ,size) (digits . ,digits))))
+        (vector name type size digits)))
 
     (define/public (disconnect)
       (with-lock
@@ -381,3 +379,9 @@
          (error who "~a: ~a" sqlstate message))
         ((print)
          (eprintf "~a: ~a: ~a\n" who sqlstate message))))))
+
+(define (field-dvec->field-info dvec)
+  `((name . ,(vector-ref dvec 0))
+    (typeid . ,(vector-ref dvec 1))
+    (size . ,(vector-ref dvec 2))
+    (digits . ,(vector-ref dvec 3))))

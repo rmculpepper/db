@@ -8,9 +8,8 @@
 (require racket/class
          ffi/unsafe
          ffi/unsafe/atomic
-         "../generic/query.rkt"
-         "../generic/connection.rkt"
          "../generic/interfaces.rkt"
+         "../generic/prepared.rkt"
          "../generic/sql-data.rkt"
          "ffi.rkt"
          "dbsystem.rkt")
@@ -172,16 +171,16 @@
          (when (handle-status fsym prep-status db)
            (or stmt
                (begin (free!) (error fsym "internal error in prepare"))))
-         (let* ([param-infos
+         (let* ([param-typeids
                  (for/list ([i (in-range (sqlite3_bind_parameter_count stmt))])
-                   `((*type* . any)))]
-                [result-infos
+                   'any)]
+                [result-dvecs
                  (for/list ([i (in-range (sqlite3_column_count stmt))])
-                   `((*type* . any)))]
+                   '#(any))]
                 [pst (new prepared-statement%
                           (stmt stmt)
-                          (param-infos param-infos)
-                          (result-infos result-infos)
+                          (param-typeids param-typeids)
+                          (result-dvecs result-dvecs)
                           (owner this))])
            (hash-set! statement-table pst #t)
            (thread-resume finalizer-thread)

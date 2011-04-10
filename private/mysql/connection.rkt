@@ -7,9 +7,8 @@
          racket/match
          openssl/sha1
          "../generic/interfaces.rkt"
-         "../generic/connection.rkt"
+         "../generic/prepared.rkt"
          "../generic/sql-data.rkt"
-         "../generic/query.rkt"
          "message.rkt"
          "exceptions.rkt"
          "dbsystem.rkt")
@@ -354,31 +353,23 @@
       (let ([r (recv fsym 'prep-ok)])
         (match r
           [(struct ok-prepared-statement-packet (id fields params))
-           (let ([paraminfos
-                  (if (zero? params) null (prepare1:get-params fsym))]
-                 [fieldinfos
-                  (if (zero? fields) null (prepare1:get-fields fsym))])
+           (let ([param-dvecs
+                  (if (zero? params) null (prepare1:get-field-descriptions fsym))]
+                 [field-dvecs
+                  (if (zero? fields) null (prepare1:get-field-descriptions fsym))])
              (new prepared-statement%
                   (id id)
-                  (param-infos paraminfos)
-                  (result-infos fieldinfos)
+                  (param-typeids (map field-dvec->typeid param-dvecs))
+                  (result-dvecs field-dvecs)
                   (owner this)))])))
 
-    (define/private (prepare1:get-params fsym)
+    (define/private (prepare1:get-field-descriptions fsym)
       (let ([r (recv fsym 'field)])
         (match r
           [(struct eof-packet (warning-count status))
            null]
           [(? field-packet?)
-           (cons (parse-field-info r) (prepare1:get-params fsym))])))
-
-    (define/private (prepare1:get-fields fsym)
-      (let ([r (recv fsym 'field)])
-        (match r
-          [(struct eof-packet (warning-count status))
-           null]
-          [(? field-packet?)
-           (cons (parse-field-info r) (prepare1:get-fields fsym))])))))
+           (cons (parse-field-dvec r) (prepare1:get-field-descriptions fsym))])))))
 
 
 ;; ========================================

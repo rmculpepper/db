@@ -5,7 +5,8 @@
 #lang racket/base
 (require racket/class
          "../generic/interfaces.rkt"
-         "../generic/sql-data.rkt")
+         "../generic/sql-data.rkt"
+         (only-in "message.rkt" field-dvec->typeid))
 (provide dbsystem)
 
 (define mysql-dbsystem%
@@ -22,13 +23,16 @@
         ((numeric-infinities) #f)
         (else #f)))
 
-    (define/public (get-parameter-handlers param-infos)
+    (define/public (get-parameter-handlers param-typeids)
       ;; All params sent as binary data, so handled in message.rkt
       ;; Just need to check params for legal values here
       ;; FIXME: for now, only possible param type is var-string;
       ;; when that changes, will need to refine check-param.
-      (map (lambda (param-info) check-param)
-           param-infos))
+      (map (lambda (param-typid) check-param)
+           param-typeids))
+
+    (define/public (field-dvecs->typeids dvecs)
+      (map field-dvec->typeid dvecs))
 
     (super-new)))
 
@@ -38,7 +42,7 @@
 
 ;; ========================================
 
-(define (check-param fsym index param-info param)
+(define (check-param fsym index param)
   (unless (or (string? param)
               (rational? param)
               (sql-date? param)

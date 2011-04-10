@@ -16,7 +16,9 @@
 
          init-private
 
-         define-type-table)
+         define-type-table
+
+         connector<%>)
 
 ;; ==== Connection
 
@@ -48,12 +50,12 @@
     get-short-name      ;; -> symbol
     get-known-types     ;; -> (listof symbol)
     typeids->types      ;; (listof typeid) -> (listof type)
-    has-support?        ;; any -> boolean
 
-    ;; get-parameter-handlers : (listof alist) -> (listof ParameterHandler)
-    get-parameter-handlers))
+    get-parameter-handlers ;; (listof typeid) -> (listof ParameterHandler)
+    field-dvecs->typeids   ;; (listof field-dvec) -> (listof typeid)
+    ))
 
-;; ParameterHandler = (fsym index alist datum -> ???)
+;; ParameterHandler = (fsym index datum -> ???)
 ;; Each system gets to choose its checked-param representation.
 ;; Maybe check and convert to string. Maybe just check, do binary conversion later.
 
@@ -62,11 +64,11 @@
 ;; prepared-statement<%>
 (define prepared-statement<%>
   (interface ()
-    get-param-infos    ;; 
     get-param-count    ;; -> nat or #f
+    get-param-typeids  ;; -> (listof typeid)
     get-param-types    ;; -> (listof type)
 
-    get-result-infos   ;; -> (listof alist)
+    get-result-dvecs   ;; -> (listof vector)
     get-result-count   ;; -> nat or #f
     get-result-typeids ;; -> (listof typeid) or #f
     get-result-types   ;; -> (listof type) or #f
@@ -92,13 +94,15 @@
 ;; A YesNoOptional is one of 'yes, 'no, 'optional
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls
 
-;; A query-result is one of:
+;; An query-result is one of:
 ;;  - (simple-result alist)
-;;  - (recordset Header value)
+;;  - (recordset Header/#f data), determined by collector
+;;    for user-visible recordsets: headers present, data is (listof vector)
 (struct simple-result (info) #:transparent)
-(struct recordset (info data) #:transparent)
+(struct recordset (headers rows) #:transparent)
 
-;; A Header is either (listof alist) | #f
+;; A Header is (listof FieldInfo)
+;; A FieldInfo is an alist, contents dbsys-dependent
 
 ;; Collector = (nat order -> headers? init combine finish)
 ;;   where init : A
@@ -152,3 +156,14 @@
       (case x
         ((type) writer) ...
         (else #f)))))
+
+
+;; == Internal staging interfaces
+
+;; connector<%>
+;; Manages making connections
+(define connector<%>
+  (interface ()
+    attach-to-ports            ;; input-port output-port -> void
+    start-connection-protocol  ;; string string string/#f -> void
+    ))

@@ -449,6 +449,7 @@
   (-> (or/c string? (-> dbsystem? string?))
       statement-generator?)]
 
+#| 
  [prepare-query
   (-> connection? preparable/c any)]
  [prepare-query-exec
@@ -466,4 +467,5 @@
  [prepare-query-maybe-value
   (-> connection? preparable/c any)]
  [prepare-query-fold
-  (-> connection? preparable/c procedure? any/c any)])
+  (-> connection? preparable/c procedure? any/c any)]
+|#)

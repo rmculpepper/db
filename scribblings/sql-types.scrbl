@@ -33,7 +33,7 @@ a supported type:
 ]
 
 
-@section[#:tag "db-types"]{Database system type correspondences}
+@section[#:tag "db-types"]{Type correspondences}
 
 This sections describes the correspondences between SQL types and
 Racket types for the supported database systems. 

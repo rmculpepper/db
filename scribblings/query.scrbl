@@ -429,6 +429,7 @@ SQLite:       @&  supports both syntaxes (plus others)
 }
 
 
+@;{
 @section{Prepared queries as functions}
 
 The following functions prepare a parameterized SQL statement for
@@ -479,4 +480,5 @@ strongly.
   @racket[query-list], @racket[query-row], @racket[query-maybe-row],
   @racket[query-value], @racket[query-maybe-value],
   @racket[query-fold], and @racket[query], respectively.
+}
 }

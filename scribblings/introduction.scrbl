@@ -140,7 +140,8 @@ SQL statement in the query function call.
 ]
 
 Alternatively, a parameterized query may be prepared in advance and
-applied later.
+executed later. @tech{Prepared statements} can be executed multiple
+times with different parameter values.
 
 @my-interaction[
 [(define get-less-than-pst
@@ -152,14 +153,13 @@ applied later.
  (list 0 1)]
 ]
 
-A @tech{prepared statement} is tied to the connection used to create
-it; attempting to use it with another connection results in an
-error. Unfortunately, with some database usage patterns, such as those
-exhibited by web servlets, the lifetimes of connections are short or
-difficult to track, making prepared statements difficult to use
-properly. In such cases, a better tool is the @tech{statement
-generator}, which prepares statements on demand and caches them for
-future use with the same connection.
+A prepared statement is tied to the connection used to create it;
+attempting to use it with another connection results in an
+error. Unfortunately, in some scenarios, such as web servlets, the
+lifetimes of connections are short or difficult to track, making
+prepared statements inconvenient. In such cases, a better tool is the
+@tech{statement generator}, which prepares statements on demand and
+caches them for future use with the same connection.
 
 @my-interaction[
 [(define get-less-than-pst

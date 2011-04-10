@@ -1,0 +1,36 @@
+Drivers to test:
+
+  + PostgreSQL (2 versions, ascii and unicode)
+  + MySQL
+  + Sqlite3 (2 versions, why?)
+  - Oracle
+  - DB2
+  - Firebird
+  - others?
+
+------------------------------------------------------------
+Driver: PostgreSQL Unicode
+
+1 test fails: No error on multiple statements in string.
+
+I haven't figured out how to configure the driver to get
+SQLDescribeParam to work, so param types always reported as 'unknown.
+
+------------------------------------------------------------
+Driver: MySQL (/usr/lib/odbc/libmyodbc.so)
+
+All tests pass.
+
+------------------------------------------------------------
+Driver: SQLite3 (/usr/lib/odbc/libsqlite3odbc.so)
+
+A few tests fail because of wrong types, eg "1" returned instead of
+1. When there is a declared type, the driver seems to believe it, and
+use the closest suitable ODBC type. For example, a column declared
+with type "date" actually gets converted to a date. If a value does
+not fit the declared type, it is converted to NULL.
+
+Some functions have surprising result types. For example, "count(*)"
+returns a varchar rather than an integer.
+
+------------------------------------------------------------

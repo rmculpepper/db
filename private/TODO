@@ -1,24 +1,22 @@
 To do
 =====
 
-- add sql-bits datatype for BIT, VARBIT types
-
 - strict mode by default: error if backend result type unknown
 
+- GC postgresql and mysql prepared-statements to close descriptors
+
+----
+
 - doc: enumerate errors
+
+- add sql-bits datatype for BIT, VARBIT types
 
 - test sql-interval type
   - and add to ODBC (easy as result, complicated as param (I think))
 
-- test odbc
-
 - figure out ODBC and unicode (need to use WCHAR?)
 
-----
-
 - printers for sql-* structs
-
-- GC postgresql and mysql prepared-statements to close descriptors
 
 - sqlite: allow configurable behavior on SQLITE_BUSY
   eg retry n times, retry forever, retry w/ timeout, fail

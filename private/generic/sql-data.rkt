@@ -18,6 +18,16 @@
 (define (sql-null? x)
   (eq? x sql-null))
 
+(define (sql-null->false x)
+  (if (eq? x sql-null)
+      #f
+      x))
+
+(define (false->sql-null x)
+  (if (eq? x #f)
+      sql-null
+      x))
+
 ;; ----
 
 (define-struct sql-date (year month day) #:transparent)
@@ -159,7 +169,9 @@
 ;; Note: MySQL allows 0 month, 0 day, etc.
 
 (provide sql-null
-         sql-null?)
+         sql-null?
+         sql-null->false
+         false->sql-null)
 (provide/contract
  [struct sql-date ([year exact-integer?]
                    [month (integer-in 0 12)]

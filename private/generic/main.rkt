@@ -13,24 +13,5 @@
          statement-binding?
          statement-generator?
 
-         sql-null
-         sql-null?
-
-         (struct-out sql-date)
-         (struct-out sql-time)
-         (struct-out sql-timestamp)
-         (struct-out sql-interval)
-
-         sql-datetime->srfi-date
-         srfi-date->sql-date
-         srfi-date->sql-time
-         srfi-date->sql-time-tz
-         srfi-date->sql-timestamp
-         srfi-date->sql-timestamp-tz
-
-         sql-year-month-interval?
-         sql-day-time-interval?
-         sql-day-time-interval->seconds
-         sql-interval->sql-time
-
+         (all-from-out "sql-data.rkt")
          (all-from-out "functions.rkt"))

@@ -236,6 +236,28 @@ query results. The @scheme[sql-null] value may be recognized using
    sql-null])
 }
 
+@defproc[(sql-null->false [x any/c]) any/c]{
+
+If @racket[x] is @racket[sql-null], returns @racket[#f], otherwise returns @racket[x].
+
+@examples[#:eval the-eval
+(sql-null->false "apple")
+(sql-null->false sql-null)
+(sql-null->false #f)
+]
+}
+
+@defproc[(false->sql-null [x any/c]) any/c]{
+
+If @racket[x] is @racket[#f], returns @racket[sql-null], otherwise returns @racket[x].
+
+@examples[#:eval the-eval
+(false->sql-null "apple")
+(false->sql-null #f)
+]
+}
+
+
 New Racket datatypes are also provided for a few SQL types that have
 no existing close analogues.
 

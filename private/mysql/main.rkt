@@ -7,7 +7,6 @@
          racket/class
          racket/tcp
          "../generic/main.rkt"
-         "../generic/query.rkt"
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
          "../generic/killsafe.rkt"

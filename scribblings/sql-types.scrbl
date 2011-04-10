@@ -17,12 +17,23 @@ accepted as Racket values and converted to the appropriate SQL type.
 
 @examples/results[
 [(query-value pgc "select count(*) from the_numbers") 4]
-[(query-value pgc "select false") #f]
+[(query-value pgc "select false") (values #f)]
 [(query-value pgc "select 1 + $1" 2) 3]
 ]
 
+If a query result contains a column with a SQL type not supported by
+this library, an error is raised. As a workaround, cast the column to
+a supported type:
 
-@section{Database system type correspondences}
+@examples/results[
+[(query-value pgc "select point(1,2)")
+ (error 'query-value "unsupported type: point")]
+[(query-value pgc "select cast(point(1,2) as varchar)")
+ "(1,2)"]
+]
+
+
+@section[#:tag "db-types"]{Database system type correspondences}
 
 This sections describes the correspondences between SQL types and
 Racket types for the supported database systems. 
@@ -32,59 +43,55 @@ Racket types for the supported database systems.
 The following table lists the PostgreSQL types known to this library,
 along with their corresponding Racket representations.
 
+@centered{
 @tabbing{
-  @bold{PostgreSQL type} @& @bold{Aliases}      @& @bold{Racket type} @//
-  @tt{boolean}       @& @tt{bool}               @& @scheme[boolean?] @//
-  @tt{char1}         @& @tt{}                   @& @scheme[char?] @//
-  @tt{smallint}      @& @tt{int2}               @& @scheme[exact-integer?] @//
-  @tt{integer}       @& @tt{int int4}           @& @scheme[exact-integer?] @//
-  @tt{bigint}        @& @tt{int8}               @& @scheme[exact-integer?] @//
-  @tt{real}          @& @tt{float4}             @& @scheme[real?] @//
-  @tt{double}        @& @tt{float8}             @& @scheme[real?] @//
-  @tt{decimal}       @& @tt{numeric}            @& @scheme[number?] @//
-  @tt{character}     @& @tt{char bpchar}        @& @scheme[string?] @//
-  @tt{varchar}       @& @tt{}                   @& @scheme[string?] @//
-  @tt{text}          @& @tt{}                   @& @scheme[string?] @//
-  @tt{bytea}         @& @tt{}                   @& @scheme[bytes?] @//
-  @tt{date}          @& @tt{}                   @& @scheme[sql-date?] @//
-  @tt{time}          @& @tt{}                   @& @scheme[sql-time?] @//
-  @tt{timetz}        @& @tt{}                   @& @scheme[sql-time?] @//
-  @tt{timestamp}     @& @tt{}                   @& @scheme[sql-timestamp?] @//
-  @tt{timestamptz}   @& @tt{}                   @& @scheme[sql-timestamp?] @//
-  @tt{interval}      @& @tt{}                   @& @scheme[sql-interval?] @//
-  @tt{oid}           @& @tt{}                   @& @scheme[exact-integer?]
+  @bold{PostgreSQL type}  @& @bold{pg_type.typname}  @& @bold{Racket type} @//
+  @racket['boolean]       @& @tt{bool}               @& @scheme[boolean?] @//
+  @racket['char1]         @& @tt{char}               @& @scheme[char?] @//
+  @racket['smallint]      @& @tt{int2}               @& @scheme[exact-integer?] @//
+  @racket['integer]       @& @tt{int4}               @& @scheme[exact-integer?] @//
+  @racket['bigint]        @& @tt{int8}               @& @scheme[exact-integer?] @//
+  @racket['real]          @& @tt{float4}             @& @scheme[real?] @//
+  @racket['double]        @& @tt{float8}             @& @scheme[real?] @//
+  @racket['decimal]       @& @tt{numeric}            @& @scheme[number?] @//
+  @racket['character]     @& @tt{bpchar}             @& @scheme[string?] @//
+  @racket['varchar]       @& @tt{varchar}            @& @scheme[string?] @//
+  @racket['text]          @& @tt{text}               @& @scheme[string?] @//
+  @racket['bytea]         @& @tt{bytea}              @& @scheme[bytes?] @//
+  @racket['date]          @& @tt{date}               @& @scheme[sql-date?] @//
+  @racket['time]          @& @tt{time}               @& @scheme[sql-time?] @//
+  @racket['timetz]        @& @tt{timetz}             @& @scheme[sql-time?] @//
+  @racket['timestamp]     @& @tt{timestamp}          @& @scheme[sql-timestamp?] @//
+  @racket['timestamptz]   @& @tt{timestamptz}        @& @scheme[sql-timestamp?] @//
+  @racket['interval]      @& @tt{interval}           @& @scheme[sql-interval?] @//
+  @racket['oid]           @& @tt{oid}                @& @scheme[exact-integer?]
+}
 }
 
-The @tt{char1} type, written @tt{"char"} in PostgreSQL's SQL syntax
-(the quotation marks are significant), is always one byte, essentially
+The @racket['char1] type, written @tt{"char"} in PostgreSQL's SQL
+syntax (the quotation marks are significant), is one byte, essentially
 a tiny integer written as a character.
 
-A SQL value of type @tt{numeric} is always converted to either an
-exact rational or @scheme[+nan.0]. When converting Scheme values to
-SQL @tt{numeric}, exact rational values representable by finite
-decimal strings are converted without loss of precision. (Precision
-may be lost, of course, if the value is then stored in a database
-field of lower precision.) Other real values are converted to decimals
-with a loss of precision.
+A SQL value of type @tt{decimal} is converted to either an exact
+rational or @scheme[+nan.0]. When converting Scheme values to SQL
+@tt{decimal}, exact rational values representable by finite decimal
+strings are converted without loss of precision. (Precision may be
+lost, of course, if the value is then stored in a database field of
+lower precision.) Other real values are converted to decimals with a
+loss of precision. In PostgreSQL, @tt{numeric} and @tt{decimal} refer
+to the same type.
 
 @examples/results[
 [(query-value pgc "select real '+Infinity'")
  +inf.0]
-[(query-value pgc "select decimal '12345678901234567890'")
+[(query-value pgc "select numeric '12345678901234567890'")
  12345678901234567890]
 ]
 
-PostgreSQL defines many other types, such as network addresses and
-various geometric shapes. These are currently converted to and from
-Racket strings, but future versions of this library may include new
-type correspondences and conversions.
-
-Array types are not currently supported.
-
-@examples/results[
-[(query-value pgc "select point (1,2)") "(1,2)"]
-[(query-value pgc "select '{1,2,3}'::int[]") "{1,2,3}"]
-]
+PostgreSQL defines many other types, such as network addresses,
+various geometric shapes, and array types. These are currently not
+supported, but future versions of this library may include new type
+correspondences and conversions.
 
 
 @subsection[#:tag "mysql-types"]{MySQL}
@@ -92,22 +99,24 @@ Array types are not currently supported.
 The following table lists the MySQL types known to this package, along
 with their corresponding Racket representations.
 
-@tabbing{
-  @bold{MySQL type}  @& @bold{Aliases}      @& @bold{Racket type} @//
-  @tt{integer}       @& @tt{int}            @& @scheme[exact-integer?] @//
-  @tt{tinyint}       @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{smallint}      @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{mediumint}     @& @tt{}               @& @scheme[exact-integer?] @//
-  @tt{bigint}        @& @tt{biginteger}     @& @scheme[exact-integer?] @//
-  @tt{real}          @& @tt{float}          @& @scheme[real?] @//
-  @tt{double}        @& @tt{}               @& @scheme[real?] @//
-  @tt{decimal}       @& @tt{numeric}        @& @scheme[number?] @//
-  @tt{varchar}       @& @tt{}               @& @scheme[string?] @//
-  @tt{var-string}    @& @tt{}               @& @scheme[string?], but see below @//
-  @tt{date}          @& @tt{}               @& @scheme[sql-date?] @//
-  @tt{time}          @& @tt{}          @& @scheme[sql-time?] or @racket[sql-day-time-interval?] @//
-  @tt{datetime}      @& @tt{}               @& @scheme[sql-timestamp?]
+@centered{
+@tabbing[#:spacing 8]{
+  @bold{MySQL type}            @& @bold{Racket type} @//
+  @racket['integer]            @& @scheme[exact-integer?] @//
+  @racket['tinyint]            @& @scheme[exact-integer?] @//
+  @racket['smallint]           @& @scheme[exact-integer?] @//
+  @racket['mediumint]          @& @scheme[exact-integer?] @//
+  @racket['bigint]             @& @scheme[exact-integer?] @//
+  @racket['real]               @& @scheme[real?] @//
+  @racket['double]             @& @scheme[real?] @//
+  @racket['decimal]            @& @scheme[number?] @//
+  @racket['varchar]            @& @scheme[string?] @//
+  @racket['var-string]         @& @scheme[string?] or @scheme[bytes?], but see below @//
+  @racket['date]               @& @scheme[sql-date?] @//
+  @racket['time]               @& @scheme[sql-time?] or @racket[sql-day-time-interval?] @//
+  @racket['datetime]           @& @scheme[sql-timestamp?]
 @;{FIXME: blob types?}
+}
 }
 
 MySQL does not report specific parameter types for prepared queries,
@@ -118,8 +127,8 @@ NaN) and SQL date/time structures (@racket[sql-date?],
 @racket[sql-time?], @racket[sql-timestamp?], and
 @racket[sql-day-time-interval?]).
 
-A SQL value of type @tt{decimal} is always converted to an exact
-rational (MySQL seems not to support infinite @tt{decimal} values).
+A SQL value of type @tt{decimal} is converted to an exact rational
+(MySQL seems not to support infinite @tt{decimal} values).
 
 Note that in MySQL, the @tt{time} type represents time intervals,
 which may not correspond to times of day (for example, the interval
@@ -135,9 +144,11 @@ The following table lists the SQLite types known to this package,
 along with their corresponding Racket representations.
 
 Unlike PostgreSQL and MySQL, SQLite does not enforce declared type
-constraints (with the exception of integer primary keys). Rather,
-every SQLite value has an associated ``storage class''.
+constraints (with the exception of integer primary keys) on
+@emph{columns}. Rather, every SQLite @emph{value} has an associated
+``storage class''.
 
+@centered{
 @tabbing{
   @bold{SQLite storage class}  @& @bold{Racket type} @//
   @tt{integer}                 @& @scheme[exact-integer?] @//
@@ -145,16 +156,19 @@ every SQLite value has an associated ``storage class''.
   @tt{text}                    @& @scheme[string?] @//
   @tt{blob}                    @& @scheme[bytes?]
 }
+}
 
 SQLite does not report specific parameter and result types for
 prepared queries. Instead, they are assigned the pseudotype
-@tt{any}. Conversion of Racket values to @tt{any} parameters accepts
-strings, bytes, and real numbers. 
+@racket['any]. Conversion of Racket values to parameters accepts
+strings, bytes, and real numbers.
 
 An exact integer that cannot be represented as a 64-bit signed integer
 is converted as @tt{real}, not @tt{integer}.
 
 @examples/results[
+[(expt 2 80)
+ (expt 2 80)]
 [(query-value slc "select ?" (expt 2 80))
  1.2089258196146292e+24]
 ]
@@ -165,46 +179,49 @@ is converted as @tt{real}, not @tt{integer}.
 The following table lists the ODBC types known to this package,
 along with their corresponding Racket representations.
 
-@tabbing{
-  @bold{ODBC type}  @& @bold{Racket type} @//
-  @tt{character}    @& @scheme[string?] @//
-  @tt{varchar}      @& @scheme[string?] @//
-  @tt{longvarchar}  @& @scheme[string?] @//
-  @tt{numeric}      @& @scheme[rational?] @//
-  @tt{decimal}      @& @scheme[rational?] @//
-  @tt{integer}      @& @scheme[exact-integer?] @//
-  @tt{tinyint}      @& @scheme[exact-integer?] @//
-  @tt{smallint}     @& @scheme[exact-integer?] @//
-  @tt{bigint}       @& @scheme[exact-integer?] @//
-  @tt{float}        @& @scheme[real?] @//
-  @tt{real}         @& @scheme[real?] @//
-  @tt{double}       @& @scheme[real?] @//
-  @tt{date}         @& @scheme[sql-date?] @//
-  @tt{time}         @& @scheme[sql-time?] @//
-  @tt{datetime}     @& @scheme[sql-timestamp?] @//
-  @tt{timestamp}    @& @scheme[sql-timestamp?] @//
-  @tt{binary}       @& @scheme[bytes?] @//
-  @tt{varbinary}    @& @scheme[bytes?] @//
-  @tt{longvarbinary}@& @scheme[bytes?] @//
-  @tt{bit1}         @& @scheme[boolean?]
+@centered{
+@tabbing[#:spacing 8]{
+  @bold{ODBC type}       @& @bold{Racket type} @//
+  @racket['character]     @& @scheme[string?] @//
+  @racket['varchar]       @& @scheme[string?] @//
+  @racket['longvarchar]   @& @scheme[string?] @//
+  @racket['numeric]       @& @scheme[rational?] @//
+  @racket['decimal]       @& @scheme[rational?] @//
+  @racket['integer]       @& @scheme[exact-integer?] @//
+  @racket['tinyint]       @& @scheme[exact-integer?] @//
+  @racket['smallint]      @& @scheme[exact-integer?] @//
+  @racket['bigint]        @& @scheme[exact-integer?] @//
+  @racket['float]         @& @scheme[real?] @//
+  @racket['real]          @& @scheme[real?] @//
+  @racket['double]        @& @scheme[real?] @//
+  @racket['date]          @& @scheme[sql-date?] @//
+  @racket['time]          @& @scheme[sql-time?] @//
+  @racket['datetime]      @& @scheme[sql-timestamp?] @//
+  @racket['timestamp]     @& @scheme[sql-timestamp?] @//
+  @racket['binary]        @& @scheme[bytes?] @//
+  @racket['varbinary]     @& @scheme[bytes?] @//
+  @racket['longvarbinary] @& @scheme[bytes?] @//
+  @racket['bit1]          @& @scheme[boolean?]
+}
 }
 
 Not all ODBC drivers provide parameter type information for prepared
 queries. In such situations the connection assigns the parameter the
-pseudotype @tt{unknown}. Conversion of Racket values to @tt{unknown}
-parameters accepts strings, bytes, numbers (@racket[rational?]---no
-infinities or NaN) and SQL date/time structures (@racket[sql-date?],
-@racket[sql-time?], and @racket[sql-timestamp?]).
+pseudotype @racket['unknown]. Conversion of Racket values to
+@racket['unknown] parameters accepts strings, bytes, numbers
+(@racket[rational?]---no infinities or NaN) and SQL date/time
+structures (@racket[sql-date?], @racket[sql-time?], and
+@racket[sql-timestamp?]).
 
-The ODBC type @tt{bit1} always represents a single bit, unlike the
+The ODBC type @racket['bit1] represents a single bit, unlike the
 standard SQL @tt{bit(N)} type.
+
 
 @;{----------------------------------------}
 
 @section[#:tag "sql-data"]{SQL data}
 
-SQL @tt{NULL} is always translated into the unique @scheme[sql-null]
-value.
+SQL @tt{NULL} is translated into the unique @scheme[sql-null] value.
 
 @defthing[sql-null sql-null?]
 @defproc[(sql-null? [val any/c])

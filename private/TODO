@@ -12,6 +12,8 @@ To do
 
 - test odbc
 
+- figure out ODBC and unicode (need to use WCHAR?)
+
 ----
 
 - printers for sql-* structs

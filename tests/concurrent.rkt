@@ -6,7 +6,6 @@
 (require racket/class
          rackunit
          "../private/generic/functions.rkt"
-         "../private/generic/query.rkt"
          "../private/generic/signatures.rkt"
          "../private/generic/killsafe.rkt"
          "config.rkt")

@@ -6,8 +6,7 @@
 (require racket/contract
          racket/class
          (rename-in "interfaces.rkt"
-                    [statement-generator make-statement-generator])
-         "query.rkt")
+                    [statement-generator make-statement-generator]))
 
 ;; == Administrative procedures
 

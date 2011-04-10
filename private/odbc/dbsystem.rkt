@@ -6,7 +6,6 @@
 (require racket/class
          ffi/unsafe
          ffi/unsafe/atomic
-         "../generic/query.rkt"
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
          "ffi.rkt")

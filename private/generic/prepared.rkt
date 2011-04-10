@@ -29,8 +29,7 @@
     (define/public (get-result-count) (length result-dvecs))
     (define/public (get-result-typeids) result-typeids)
     (define/public (get-result-types)
-      (and (pair? result-typeids)
-           (send dbsystem typeids->types result-typeids)))
+      (send dbsystem typeids->types result-typeids))
 
     (define/public (check-owner fsym c obj)
       (or (eq? c (weak-box-value owner))

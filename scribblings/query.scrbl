@@ -3,7 +3,8 @@
           scribble/eval
           scribble/struct
           racket/sandbox
-          "config.rkt")
+          "config.rkt"
+          "tabbing.rkt")
 
 @title[#:tag "query-api"]{Queries}
 
@@ -215,33 +216,28 @@ A general query result is either a @racket[simple-result] or a
 @racket[recordset].
 
 @defstruct*[simple-result
-            ([info (listof pair?)])]{
+            ([info any/c])]{
 
 Represents the result of a SQL statement that does not return a
-relation, such as an @tt{INSERT} or @tt{DELETE} statement.
-The @racket[info] field is an association list containing arbitrary
-information about the SQL statement's execution. Do not rely on the
-contents of the @racket[info] field; it varies based on database
-system and may change in future versions of this library.
+relation, such as an @tt{INSERT} or @tt{DELETE} statement.  
+
+The @racket[info] field is usually an association list, but do not
+rely on its contents; it varies based on database system and may
+change in future versions of this library (even new minor versions).
 }
 
 @defstruct*[recordset
-            ([info (listof field-info?)]
-             [data (listof (vectorof any/c))])]{
+            ([headers (listof any/c)]
+             [rows (listof vector?)])]{
 
 Represents the result of SQL statement that results in a relation,
 such as a @tt{SELECT} query.
-}
 
-@defstruct*[field-info
-            ([name string?]
-             [info (listof pair?)])]{
-
-Represents a column in a recordset. The @racket[name] field is the
-name of the column, and the @racket[info] field is an association list
-containing arbitrary additional information about the column. Do not
-rely on the contents of the @racket[info] field; it varies based on
-database system and may change in future versions of this library.
+The @racket[headers] field is a list whose length is the number of
+columns in the result rows. Each header is usually an association list
+containing information about the column, but do not rely on its
+contents; it varies based on the database system and may change in
+future version of this library (even new minor versions).
 }
 
 @defproc[(query [connection connection?]
@@ -272,7 +268,7 @@ database system and may change in future versions of this library.
   Executes SQL statements for effect and discards the result(s).
   Calling @racket[query-exec*] on multiple statements at once may be
   more efficient than calling @racket[query-exec] multiple times on
-  the statements individually. Inline parameter arguments ae not
+  the statements individually. Inline parameter arguments are not
   supported; parameter binding must be done explicitly.
 
   Example:
@@ -313,11 +309,13 @@ A @deftech{prepared statement} is the result of a call to
 The syntax of parameterized queries varies depending on the database
 system. For example:
 
-PostgreSQL: @verbatim{select * from the_numbers where num > $1;}
-
-MySQL: @verbatim{select * from the_numbers where num > ?;}
-
-SQLite supports both syntaxes.
+@centered{
+@tabbing{
+PostgreSQL:   @&  @tt{select * from the_numbers where num > $1;} @//
+MySQL, ODBC:  @&  @tt{select * from the_numbers where num > ?;} @//
+SQLite:       @&  supports both syntaxes (plus others)
+}
+}
 
 @deftogether[[
 @defproc[(prepare [connection connection?]
@@ -344,16 +342,18 @@ SQLite supports both syntaxes.
          (listof symbol?)]{
 
   Returns a list of symbols, one for each of the prepared statement's
-  parameters, identifying the types of the parameters.
+  parameters, identifying the SQL types (or pseudotypes) of the
+  parameters. See @secref["db-types"] for a discussion of how each
+  database system reports parameter types.
 }
 
 @defproc[(prepared-statement-result-types [pst prepared-statement?])
-         (or/c (listof symbol?) #f)]{
+         (listof symbol?)]{
 
   If @racket[pst] is a recordset-producing statement (eg,
   @tt{SELECT}), returns a list of symbols, identifying the SQL types
-  of the result columns. If @racket[pst] does not produce a recordset,
-  the function returns @racket[#f].
+  (or pseudotypes) of the result columns. If @racket[pst] does not
+  produce a recordset, the function returns the empty list.
 }
 
 
@@ -412,7 +412,8 @@ SQLite supports both syntaxes.
     (lambda (dbsys)
       (case (dbsystem-name dbsys)
         ((postgresql) "select n from the_numbers where n < $1")
-        ((sqlite3) "select n from the_numbers where n < ?")))))
+        ((sqlite3) "select n from the_numbers where n < ?")
+        (else (error "unknown system"))))))
  (void)]
 [(query-list pgc pst 3)
  (list 1 2)]

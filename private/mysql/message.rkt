@@ -9,7 +9,6 @@ Based on protocol documentation here:
 
 #lang racket/base
 (require racket/match
-         "../generic/query.rkt"
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
          "../generic/io.rkt")

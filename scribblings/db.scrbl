@@ -20,13 +20,13 @@ systems. The following database systems are currently supported:
 @itemlist[
 @item{@bold{PostgreSQL versions 7.4 and later}}
 @item{@bold{MySQL versions 5 and later}}
-@item{@bold{SQLite version 3} --- requires @tt{libsqlite3} native library}
-@item{@bold{ODBC} --- experimental, requires @tt{libodbc} native library}
+@item{@bold{SQLite version 3} --- requires @tt{libsqlite3} library}
+@item{@bold{ODBC} --- experimental, requires @tt{libodbc} library}
 ]
 Support for PostgreSQL and MySQL does not rely on any
-native client libraries; this package is everything you
+foreign client libraries; this package is everything you
 need to connect to a PostgreSQL or MySQL server. SQLite and ODBC
-support require the appropriate native libraries to be installed.
+support require the appropriate foreign libraries to be installed.
 
 The query operations are functional in spirit. Queries return results;
 they do not stow them away in the connection for later manipulation

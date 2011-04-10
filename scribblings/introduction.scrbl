@@ -63,10 +63,8 @@ system to system and is subject to change.)
   "select n, description from the_numbers where n % 2 = 0")
  (recordset
   (list
-   (field-info "n" '((name . "n") (type-oid . 23) (*type* . 23)))
-   (field-info
-    "description"
-    '((name . "description") (type-oid . 1043) (*type* . 1043))))
+   '((name . "n") (typeid . 23))
+   '((name . "description") (typeid . 1043)))
   '(#(0 "nothing") #(2 "company")))]
 ]
 

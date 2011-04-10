@@ -4,7 +4,6 @@
 
 #lang racket/base
 (require racket/class
-         "../generic/query.rkt"
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
          "ffi-constants.rkt")

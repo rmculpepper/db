@@ -5,7 +5,6 @@
 #lang racket/base
 (require racket/class
          "../generic/interfaces.rkt"
-         "../generic/query.rkt"
          "../generic/sql-convert.rkt"
          (only-in "msg.rkt" field-dvec->typeid))
 (provide dbsystem
@@ -58,12 +57,12 @@
   (19   name       ()              parse-string       marshal-string)
   (20   bigint     (int8)          parse-integer      marshal-int8)
   (21   smallint   (int2)          parse-integer      marshal-int2)
-  (23   integer    (int int4)      parse-integer      marshal-int4)
+  (23   integer    (int4)          parse-integer      marshal-int4)
   (25   text       ()              parse-string       marshal-string)
   (26   oid        ()              parse-integer      marshal-int4)
-  (700  real       (float float4)  parse-real         marshal-real)
+  (700  real       (float4)        parse-real         marshal-real)
   (701  double     (float8)        parse-real         marshal-real)
-  (1042 character  (char bpchar)   parse-string       marshal-string)
+  (1042 character  (bpchar)        parse-string       marshal-string)
   (1043 varchar    ()              parse-string       marshal-string)
   (1082 date       ()              parse-date         marshal-date)
   (1083 time       ()              parse-time         marshal-time)

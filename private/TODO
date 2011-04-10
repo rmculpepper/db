@@ -38,10 +38,3 @@ To do
 
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)
-
-----
-
-- mysql doesn't support prepare of "BEGIN WORK" or equivalents :(
-  or many other things, as it turns out:
-    http://dev.mysql.com/doc/refman/5.0/en/c-api-prepared-statements.html
-    http://dev.mysql.com/doc/refman/5.0/en/stored-program-restrictions.html

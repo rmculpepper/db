@@ -274,7 +274,7 @@
     (define/private (query1 fsym stmt)
       (fresh-exchange)
       (query1:enqueue stmt)
-      (query1:collect fsym))
+      (query1:collect fsym (not (string? stmt))))
 
     ;; check-statement : symbol any -> statement-binding
     (define/private (check-statement fsym stmt)
@@ -282,22 +282,26 @@
              (let ([pst (statement-binding-pst stmt)])
                (send pst check-owner fsym this stmt)
                stmt)]
-            [(string? stmt)
+            [(and (string? stmt) (force-prepare-sql? fsym stmt))
              (let ([pst (prepare1 fsym stmt)])
-               (send pst bind fsym null))]))
+               (send pst bind fsym null))]
+            [else stmt]))
 
-    ;; query1:enqueue : statement-binding -> void
+    ;; query1:enqueue : statement -> void
     (define/private (query1:enqueue stmt)
-      (let* ([pst (statement-binding-pst stmt)]
-             [id (send pst get-id)]
-             [params (statement-binding-params stmt)]
-             [null-map (map not params)]
-             [param-types (send pst get-param-types)])
-        (send-message
-         (make-execute-packet id null 1 null-map 1 param-types params))))
+      (cond [(statement-binding? stmt)
+             (let* ([pst (statement-binding-pst stmt)]
+                    [id (send pst get-id)]
+                    [params (statement-binding-params stmt)]
+                    [null-map (map not params)]
+                    [param-types (send pst get-param-types)])
+               (send-message
+                (make-execute-packet id null 1 null-map 1 param-types params)))]
+            [else ;; string
+             (send-message (make-command-packet 'query stmt))]))
 
-    ;; query1:collect : symbol -> QueryResult stream
-    (define/private (query1:collect fsym)
+    ;; query1:collect : symbol bool -> QueryResult stream
+    (define/private (query1:collect fsym binary?)
       (let ([r (recv fsym 'result)])
         (match r
           [(struct ok-packet (affected-rows insert-id status warnings message))
@@ -306,24 +310,25 @@
                               (status . ,status)
                               (message . ,message)))]
           [(struct result-set-header-packet (fields extra))
-           (query1:expect-fields fsym null)])))
+           (query1:expect-fields fsym null binary?)])))
 
-    (define/private (query1:expect-fields fsym r-field-dvecs)
+    (define/private (query1:expect-fields fsym r-field-dvecs binary?)
       (let ([r (recv fsym 'field)])
         (match r
           [(? field-packet?)
-           (query1:expect-fields fsym (cons (parse-field-dvec r) r-field-dvecs))]
+           (query1:expect-fields fsym (cons (parse-field-dvec r) r-field-dvecs) binary?)]
           [(struct eof-packet (warning-count status))
            (let ([field-dvecs (reverse r-field-dvecs)])
-             (vector 'recordset field-dvecs (query1:get-rows fsym field-dvecs)))])))
+             (vector 'recordset field-dvecs (query1:get-rows fsym field-dvecs binary?)))])))
 
-    (define/private (query1:get-rows fsym field-dvecs)
-      (let ([r (recv fsym 'binary-data field-dvecs)])
+    (define/private (query1:get-rows fsym field-dvecs binary?)
+      ;; Note: binary? should always be #f, unless force-prepare-sql? misses something.
+      (let ([r (recv fsym (if binary? 'binary-data 'data) field-dvecs)])
         (match r
           [(struct row-data-packet (data))
-           (cons data (query1:get-rows fsym field-dvecs))]
+           (cons data (query1:get-rows fsym field-dvecs binary?))]
           [(struct binary-row-data-packet (data))
-           (cons data (query1:get-rows fsym field-dvecs))]
+           (cons data (query1:get-rows fsym field-dvecs binary?))]
           [(struct eof-packet (warning-count status))
            null])))
 
@@ -408,3 +413,50 @@
     protocol-41
     secure-connection
     connect-with-db))
+
+;; ========================================
+
+#|
+MySQL allows only certain kinds of statements to be prepared; the rest
+must go through the old execution path. See here:
+  http://dev.mysql.com/doc/refman/5.0/en/c-api-prepared-statements.html
+According to that page, the following statements may be prepared:
+
+  CALL, CREATE TABLE, DELETE, DO, INSERT, REPLACE, SELECT, SET, UPDATE,
+  and most SHOW statements
+
+On the other hand, we want to force all recordset-returning statements
+through the prepared-statement path to use the binary data
+protocol. That would seem to be the following:
+
+  CALL (?) and SELECT
+
+The following bit of heinously offensive code determines the kind of
+SQL statement is contained in a string.
+
+----
+
+3 kinds of comments in mysql SQL:
+  - "#" to end of line
+  - "-- " to end of line
+  - "/*" to next "*/" (not nested), except some weird conditional-inclusion stuff
+
+I'll ignore the third kind.
+|#
+
+(define (force-prepare-sql? fsym stmt)
+  (let ([kw (get-sql-keyword stmt)])
+    (cond [(not kw)
+           ;; better to have unpreparable stmt rejected than
+           ;; to have SELECT return unconvered types
+           #t]
+          [(string-ci=? kw "select") #t]
+          [(string-ci=? kw "call") #t]
+          [else #f])))
+
+(define sql-statement-rx
+  #rx"^(?:(?:#[^\n\r]*[\n\r])|(?:-- [^\n\r]*[\n\r])|[ \t\n\r])*([A-Za-z]+)")
+
+(define (get-sql-keyword stmt)
+  (let ([m (regexp-match sql-statement-rx stmt)])
+    (and m (cadr m))))

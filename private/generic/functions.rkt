@@ -155,31 +155,32 @@
         [else
          (raise-mismatch-error fsym "query returned multiple rows: " sql)]))
 
-(define (compose-statement fsym c sql args checktype)
+(define (compose-statement fsym c stmt args checktype)
   (cond [(or (pair? args)
-             (prepared-statement? sql)
-             (statement-generator? sql))
+             (prepared-statement? stmt)
+             (statement-generator? stmt))
          (let ([pst
-                (cond [(string? sql) (prepare c sql)]
-                      [(statement-generator? sql)
-                       (prepare1 fsym sql)]
-                      [(prepared-statement? sql)
+                (cond [(string? stmt) (prepare c stmt)]
+                      [(statement-generator? stmt)
+                       (prepare1 fsym stmt)]
+                      [(prepared-statement? stmt)
                        ;; Ownership check done later, by query* method.
-                       sql]
-                      [(statement-binding? sql)
+                       stmt]
+                      [(statement-binding? stmt)
                        (error fsym
-                              (string-append "expected string or prepared statement "
-                                             "for SQL statement with arguments, got ~e")
-                              sql)])])
+                              (string-append
+                               "cannot execute statement-binding with "
+                               "additional inline arguments: ~e")
+                              stmt)])])
            (case checktype
              ((recordset)
-              (check-results fsym pst sql))
+              (check-results fsym pst stmt))
              ((column)
-              (check-results/one-column fsym pst sql))
+              (check-results/one-column fsym pst stmt))
              (else (void)))
            (send pst bind fsym args))]
         [else ;; no args, and sql is either string or statement-binding
-         sql]))
+         stmt]))
 
 
 ;; Query API procedures
@@ -292,35 +293,29 @@
          #f)
   (void))
 
+;; ========================================
 
-;; == Prepared query procedures
+;; FIXME: Currently, to support (prepare c stmt-gen), handle stmts one by one.
+;; Should do something smarter.
 
-;; Prepare auxiliaries
-;; Relies on prepare* method
+(define (prepare c stmt)
+  (prepare1 'prepare c stmt))
 
-(define-syntax defprepare
-  (syntax-rules ()
-    [(defprepare name method)
-     (defprepare name method [#:check] [#:arg])]
-    [(defprepare name method [#:check check ...])
-     (defprepare name method [#:check check ...] [#:arg])]
-    [(defprepare name method [#:check check ...] [#:arg arg ...])
-     (define (name c sql arg ...)
-       (let ([pst (prepare1 'name c sql)])
-         (check 'name pst sql) ...
-         (lambda args (method c (send pst bind 'name args) arg ...))))]))
+(define (prepare-multiple c stmts)
+  (for/list ([stmt (in-list stmts)])
+    (prepare1 'prepare-multiple c stmt)))
 
-(define (check-results name pst stmt)
+;; ----
+
+(define (check-results name pst sql)
   (unless (send pst get-result-count)
-    (raise-user-error name "query does not return records")))
+    (error name "expected statement producing recordset, got ~e" sql)))
 
-(define (check-results/one-column name pst stmt)
-  (check-results name pst stmt)
+(define (check-results/one-column name pst sql)
+  (check-results name pst sql)
   (let ([results (send pst get-result-count)])
     (unless (equal? results 1)
-      (raise-user-error name
-                        "query does not return a single column (returns ~a columns)"
-                        (or results "no")))))
+      (error name "expected statement producing recordset with single column, got ~e" sql))))
 
 (define (prepare1 fsym c stmt)
   (cond [(string? stmt)
@@ -335,17 +330,19 @@
                    (hash-set! table c pst)
                    pst))))]))
 
-;; Prepared query API procedures
+;; ========================================
 
-;; FIXME: Currently, to support (prepare c stmt-gen), handle stmts one by one.
-;; Should do something smarter.
-
-(define (prepare c stmt)
-  (prepare1 'prepare c stmt))
-
-(define (prepare-multiple c stmts)
-  (for/list ([stmt (in-list stmts)])
-    (prepare1 'prepare-multiple c stmt)))
+(define-syntax defprepare
+  (syntax-rules ()
+    [(defprepare name method)
+     (defprepare name method [#:check] [#:arg])]
+    [(defprepare name method [#:check check ...])
+     (defprepare name method [#:check check ...] [#:arg])]
+    [(defprepare name method [#:check check ...] [#:arg arg ...])
+     (define (name c sql arg ...)
+       (let ([pst (prepare1 'name c sql)])
+         (check 'name pst sql) ...
+         (lambda args (method c (send pst bind 'name args) arg ...))))]))
 
 (defprepare prepare-query-rows query-rows)
 
@@ -385,7 +382,7 @@
   [#:arg combine base])
 
 
-;; == Contracts
+;; ========================================
 
 (define preparable/c (or/c string? statement-generator?))
 

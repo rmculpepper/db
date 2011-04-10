@@ -24,9 +24,9 @@ systems. The following database systems are currently supported:
 @item{@bold{ODBC} --- experimental, requires @tt{libodbc} library}
 ]
 Support for PostgreSQL and MySQL does not rely on any
-foreign client libraries; this package is everything you
+native client libraries; this package is everything you
 need to connect to a PostgreSQL or MySQL server. SQLite and ODBC
-support require the appropriate foreign libraries to be installed.
+support require the appropriate native libraries to be installed.
 
 The query operations are functional in spirit. Queries return results;
 they do not stow them away in the connection for later manipulation

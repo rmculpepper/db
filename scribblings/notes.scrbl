@@ -80,17 +80,38 @@ and @tt{password} authentication methods in the parlance of
 seems to work for unix domain sockets. The @tt{gss}, @tt{sspi},
 @tt{krb5}, @tt{pam}, and @tt{ldap} methods are not supported.
 
-@section{SQLite native library}
+@section{SQLite and ODBC native libraries}
 
-Requires the @tt{libsqlite3} native library, specifically
-@tt{libsqlite3.so.0}.
-
-
-@section{ODBC}
+SQLite support requires the @tt{libsqlite3} native library,
+specifically @tt{libsqlite3.so.0}.
 
 Requires the @tt{libodbc} native library, specifically
 @tt{libodbc.so.1}. This library is provided by packages such as
 @tt{unixODBC} or @tt{iODBC}. In addition, the appropriate ODBC Drivers
 must be installed and any Data Sources configured.
 
-ODBC support is experimental.
+@section{ODBC}
+
+ODBC support is experimental. This library is compatible only with
+ODBC 3.x drivers. The behavior of ODBC connections can vary widely
+depending on the driver in use and even the configuration of a
+particular data source.
+
+This library has been tested with @tt{unixODBC} on Linux/x86 (32-bit)
+running Ubuntu 10.10 with the following drivers: PostgreSQL Unicode
+(from the @tt{odbc-postgresql} package), MySQL (from the
+@tt{libmyodbc} package), and SQLite3 (from the @tt{libsqliteodbc}
+package).
+
+@bold{PostgreSQL Unicode} I have not been able to configure the driver
+to support @tt{SQLDescribeParam}, so all parameter types are set to
+@racket['unknown]. One test fails: no error is reported for multiple
+SQL statements in a string.
+
+@bold{MySQL} All tests pass.
+
+@bold{SQLite3} This driver interprets the declared types of columns
+strictly, replacing nonconforming values in query results with
+@tt{NULL}. All computed columns, even those with explicit @tt{CAST}s,
+seem to be returned as text. Several tests fail because of this
+behavior.

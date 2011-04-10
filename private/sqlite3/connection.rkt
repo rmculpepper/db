@@ -163,14 +163,14 @@
        (let-values ([(db) (get-db fsym)]
                     [(stmt prep-status tail)
                      (sqlite3_prepare_v2 (get-db fsym) sql)])
-         (define (free!) (sqlite3_finalize stmt))
+         (define (free!) (when stmt (sqlite3_finalize stmt)))
          (when (string=? sql tail)
            (free!) (error fsym "SQL syntax error in ~e" tail))
          (when (not (zero? (string-length tail)))
            (free!) (error fsym "multiple SQL statements given: ~e" tail))
-         (when (handle-status fsym prep-status db)
-           (or stmt
-               (begin (free!) (error fsym "internal error in prepare"))))
+         (handle-status fsym prep-status db)
+         (or stmt
+             (begin (free!) (error fsym "internal error in prepare")))
          (let* ([param-typeids
                  (for/list ([i (in-range (sqlite3_bind_parameter_count stmt))])
                    'any)]

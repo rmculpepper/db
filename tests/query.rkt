@@ -176,20 +176,20 @@
                           ((mysql) '(integer var-string))
                           ((sqlite3) '(any any))
                           ((odbc) '(integer varchar)))))
-        (let ([pst (prepare c (sql "select n from the_numbers where n = $1"))])
-          (check-equal? (prepared-statement-parameter-types pst)
-                        (case (dbsystem-name dbsystem)
-                          ((postgresql) '(integer))
-                          ((mysql) '(var-string))
-                          ((sqlite3) '(any))
-                          ((odbc) '(unknown))))) ;; FIXME, may vary
-        (let ([pst (prepare c (sql "insert into the_numbers values ($1, $2)"))])
-          (check-equal? (prepared-statement-parameter-types pst)
-                        (case (dbsystem-name dbsystem)
-                          ((postgresql) '(integer varchar))
-                          ((mysql) '(var-string var-string))
-                          ((sqlite3) '(any any))
-                          ((odbc) '(unknown unknown))))
+        (let* ([pst (prepare c (sql "select n from the_numbers where n = $1"))]
+               [param-types (prepared-statement-parameter-types pst)])
+          (case (dbsystem-name dbsystem)
+            ((postgresql) (check-equal? param-types '(integer)))
+            ((mysql) (check-equal? param-types '(var-string)))
+            ((sqlite3) (check-equal? param-types '(any)))
+            ((odbc) (check-equal? (length param-types) 1)))) ;; actual types may vary
+        (let* ([pst (prepare c (sql "insert into the_numbers values ($1, $2)"))]
+               [param-types (prepared-statement-parameter-types pst)])
+          (case (dbsystem-name dbsystem)
+            ((postgresql) (check-equal? param-types '(integer varchar)))
+            ((mysql) (check-equal? param-types '(var-string var-string)))
+            ((sqlite3) (check-equal? param-types '(any any)))
+            ((odbc) (check-equal? (length param-types) 2))) ;; actual types may vary
           (check-equal? (prepared-statement-result-types pst) '()))))))
 
 (define misc-tests

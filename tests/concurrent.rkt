@@ -23,9 +23,8 @@
     (call-with-connection
      (lambda (c)
        (query-exec c "create temporary table play_numbers (n integer)")
-       (when (eq? (dbsystem-name dbsystem) 'postgresql)
-         ;; transaction speeds up test by a factor of 6
-         (query-exec c "begin work"))
+       ;; transaction speeds up test by a factor of 6 on postgresql
+       (query-exec c "begin")
        (for-each thread-wait
                  (map thread
                       (map (mk-worker c 100) (build-list workers add1))))))))

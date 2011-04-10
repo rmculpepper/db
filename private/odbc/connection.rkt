@@ -101,7 +101,9 @@
                  [param (in-list params)])
              (load-param fsym db stmt i param))
            (handle-status fsym (SQLExecute stmt) stmt)
-           (let ([rows (fetch* fsym stmt (send pst get-result-typeids))])
+           (let ([rows
+                  (and (pair? result-dvecs)
+                       (fetch* fsym stmt (map field-dvec->typeid result-dvecs)))])
              (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
              (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
              (values result-dvecs rows)))))
@@ -385,3 +387,6 @@
     (typeid . ,(vector-ref dvec 1))
     (size . ,(vector-ref dvec 2))
     (digits . ,(vector-ref dvec 3))))
+
+(define (field-dvec->typeid dvec)
+  (vector-ref dvec 1))

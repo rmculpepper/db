@@ -28,6 +28,8 @@
 (define (dbsystem-name x)
   (send x get-short-name))
 
+(define (dbsystem-supported-types x)
+  (send x get-known-types))
 
 ;; == Misc procedures
 
@@ -400,6 +402,8 @@
   (-> any/c any)]
  [dbsystem-name
   (-> dbsystem? symbol?)]
+ [dbsystem-supported-types
+  (-> dbsystem? (listof symbol?))]
 
  [statement?
   (-> any/c any)]

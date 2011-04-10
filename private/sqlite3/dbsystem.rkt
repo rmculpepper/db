@@ -12,7 +12,7 @@
 (define sqlite3-dbsystem%
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'sqlite3)
-    (define/public (get-known-types) '())
+    (define/public (get-known-types) '(any))
     (define/public (has-support? x) #f)
     (define/public (typeids->types typeids)
       (map (lambda _ 'any) typeids))

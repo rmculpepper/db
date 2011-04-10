@@ -271,6 +271,14 @@ following:
 ]
 }
 
+@defproc[(dbsystem-supported-types [sys dbsystem?])
+         (listof symbol?)]{
+
+Returns a list of symbols identifying types supported by the database
+system.
+}
+
+
 @section{System-specific modules}
 
 The @(my-racketmodname) module exports all of the functions listed in

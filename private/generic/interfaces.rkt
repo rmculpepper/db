@@ -125,17 +125,20 @@
 
 ;; === Util for defining type tables
 
-(define-syntax-rule (define-type-table (known-type-aliases
-                                        known-types
+(define-syntax-rule (define-type-table (supported-types
                                         type-alias->type
                                         typeid->type
                                         type->typeid
                                         type->type-reader
                                         type->type-writer)
-                      (typeid type (alias ...) reader writer) ...)
+                      (typeid type (alias ...) supported? reader writer) ...)
   (begin
-    (define known-type-aliases '(alias ... ...))
-    (define known-types '(type ...))
+    (define all-types '((type supported?) ...))
+    (define supported-types
+      (sort (map car (filter cadr all-types))
+            string<?
+            #:key symbol->string
+            #:cache-keys? #t))
     (define (type-alias->type x)
       (case x
         ((alias ...) 'type) ...

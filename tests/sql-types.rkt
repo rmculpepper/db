@@ -101,7 +101,7 @@
       ((sqlite3)
        "select length(?)")))
   (when (string? psql)
-    (check-equal? ((prepare-query-value c psql) value)
+    (check-equal? (query-value c psql value)
                   (string-length value))))
 
 (define (check-timestamptz-equal? a b)
@@ -123,7 +123,7 @@
            ((postgresql)
             ;; only valid Postgreql syntax!
             (check (let ([q (format "select $1::~a" (current-type))])
-                     ((prepare-query-value c q) value))
+                     (query-value c q value))
                    value))
            ((mysql)
             ;; FIXME: can do better once prepare supports types
@@ -139,7 +139,8 @@
                      ((datetime) "select cast (? as datetime)")
                      (else #f))])
               (when stmt
-                (check ((prepare-query-value c stmt) value) value)))))))]))
+                (check (query-value c stmt value)
+                       value)))))))]))
 
 (define string-tests
   (test-suite "String escaping"

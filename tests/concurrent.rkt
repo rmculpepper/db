@@ -28,8 +28,9 @@
                       (map (mk-worker c 100) (build-list workers add1))))))))
 
 (define (((mk-worker c iterations) tid))
-  (define insert
-    (prepare-query-exec c (sql "insert into play_numbers (n) values ($1)")))
+  (define insert-pst
+    (prepare c (sql "insert into play_numbers (n) values ($1)")))
+  (define (insert x) (query-exec c insert-pst x))
   (define (add-to-max n)
     (insert (+ n (query-value c "select max(n) from play_numbers"))))
   (for-each insert (build-list iterations add1))

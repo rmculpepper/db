@@ -29,18 +29,15 @@
 ;;   'string = query w/ string
 ;;   'prepare = query w/ prepared
 ;;   'bind = query w/ prepared+bound
-;;   'function = prepared-query functions
 (define-syntax (Q* stx)
   (syntax-case stx ()
     [(Q prep-mode function obj stmt arg ...)
-     (with-syntax ([prepared (format-id #'function "prepare-~a" #'function)])
-       #'(Q** prep-mode function prepared obj (sql stmt) (list arg ...)))]))
-(define (Q** prep-mode function prepared obj stmt args)
+     #'(Q** prep-mode function obj (sql stmt) (list arg ...))]))
+(define (Q** prep-mode function obj stmt args)
   (case prep-mode
     ((string) (apply function obj stmt args))
     ((prepare) (apply function obj (prepare obj stmt) args))
     ((bind) (function obj (bind-prepared-statement (prepare obj stmt) args)))
-    ((function) (apply (prepared obj stmt) args))
     (else 'Q* "bad prep-mode: ~e" prep-mode)))
 
 (define (simple-tests prep-mode)
@@ -193,7 +190,7 @@
                           ((mysql) '(var-string var-string))
                           ((sqlite3) '(any any))
                           ((odbc) '(unknown unknown))))
-          (check-equal? (prepared-statement-result-types pst) #f))))))
+          (check-equal? (prepared-statement-result-types pst) '()))))))
 
 (define misc-tests
   (test-suite "misc correctness"
@@ -296,18 +293,11 @@
           (check-exn exn:fail? (lambda () (query-value c "select nonsuch")))
           (check-equal? (query-value c "select 17") 17))))))
 
-(define prep-tests
-  (test-suite "prepared-statement inspection"
-))
-                          
-          
-
 (define test
   (test-suite "query API"
     (simple-tests 'string)
     (simple-tests 'prepare)
     (simple-tests 'bind)
-    (simple-tests 'function)
     (fold-tests)
     low-level-tests
     misc-tests

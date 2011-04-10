@@ -76,19 +76,22 @@ library currently supports only cleartext and md5-hashed passwords,
 and it does not send cleartext passwords unless explicitly ordered to
 (see @racket[postgresql-connect]). These correspond to the @tt{md5}
 and @tt{password} authentication methods in the parlance of
-@tt{pg_hba.conf}, respectively. On Linux, @tt{ident} authentication
-seems to work for unix domain sockets. The @tt{gss}, @tt{sspi},
-@tt{krb5}, @tt{pam}, and @tt{ldap} methods are not supported.
+@tt{pg_hba.conf}, respectively. On Linux, @tt{ident} authentication is
+automatically supported for unix domain sockets (but not TCP). The
+@tt{gss}, @tt{sspi}, @tt{krb5}, @tt{pam}, and @tt{ldap} methods are
+not supported.
+
 
 @section{SQLite and ODBC native libraries}
 
 SQLite support requires the @tt{libsqlite3} native library,
 specifically @tt{libsqlite3.so.0}.
 
-Requires the @tt{libodbc} native library, specifically
+ODBC support requires the @tt{libodbc} native library, specifically
 @tt{libodbc.so.1}. This library is provided by packages such as
 @tt{unixODBC} or @tt{iODBC}. In addition, the appropriate ODBC Drivers
 must be installed and any Data Sources configured.
+
 
 @section{ODBC}
 

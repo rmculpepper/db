@@ -153,9 +153,9 @@
              (statement-generator? stmt))
          (let ([pst
                 (cond [(string? stmt)
-                       (prepare1 fsym c stmt)]
+                       (prepare1 fsym c stmt #t)]
                       [(statement-generator? stmt)
-                       (prepare1 fsym stmt)]
+                       (prepare1 fsym c stmt #f)]
                       [(prepared-statement? stmt)
                        ;; Ownership check done later, by query method.
                        stmt]
@@ -229,7 +229,7 @@
 ;; query-exec : connection Statement arg ... -> void
 (define (query-exec c sql . args)
   (let ([sql (compose-statement 'query-exec c sql args #f)])
-    (send c query 'query-exec sql void-collector)
+    (query1 c 'query-exec sql void-collector)
     (void)))
 
 ;; query : connection Statement arg ... -> QueryResult
@@ -275,20 +275,20 @@
 ;; ========================================
 
 (define (prepare c stmt)
-  (prepare1 'prepare c stmt))
+  (prepare1 'prepare c stmt #f))
 
 ;; ----
 
-(define (prepare1 fsym c stmt)
+(define (prepare1 fsym c stmt close-on-exec?)
   (cond [(string? stmt)
-         (send c prepare fsym stmt)]
+         (send c prepare fsym stmt close-on-exec?)]
         [(statement-generator? stmt)
          (let ([table (statement-generator-table stmt)]
                [gen (statement-generator-gen stmt)])
            (let ([table-pst (hash-ref table c #f)])
              (or table-pst
                  (let* ([sql-string (gen (send c get-dbsystem))]
-                        [pst (prepare1 fsym c sql-string)])
+                        [pst (prepare1 fsym c sql-string #f)])
                    (hash-set! table c pst)
                    pst))))]))
 
@@ -302,7 +302,7 @@
      (defprepare name method [#:check check ...] [#:arg])]
     [(defprepare name method [#:check check ...] [#:arg arg ...])
      (define (name c sql arg ...)
-       (let ([pst (prepare1 'name c sql)])
+       (let ([pst (prepare1 'name c sql #f)])
          (check 'name pst sql) ...
          (lambda args (method c (send pst bind 'name args) arg ...))))]))
 

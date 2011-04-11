@@ -59,8 +59,8 @@
     (define/public (query fsym stmt collector)
       (call (lambda (obj) (send obj query fsym stmt collector))))
 
-    (define/public (prepare fsym stmt)
-      (call (lambda (obj) (send obj prepare fsym stmt))))
+    (define/public (prepare fsym stmt close-on-exec?)
+      (call (lambda (obj) (send obj prepare fsym stmt close-on-exec?))))
 
     (define/public (free-statement stmt)
       (call (lambda (obj) (send obj free-statement stmt))))

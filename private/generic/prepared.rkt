@@ -6,12 +6,14 @@
 (require racket/class
          "interfaces.rkt"
          "sql-data.rkt")
-(provide prepared-statement%)
+(provide prepared-statement%
+         statement:after-exec)
 
 ;; prepared-statement%
 (define prepared-statement%
   (class* object% (prepared-statement<%>)
-    (init-private handle            ;; handle, determined by database system
+    (init-private handle            ;; handle, determined by database system, #f means closed
+                  close-on-exec?    ;; boolean
                   param-typeids     ;; (listof typeid)
                   result-dvecs)     ;; (listof vector), layout depends on dbsys
     (init ([-owner owner]))
@@ -24,6 +26,10 @@
 
     (define/public (get-handle) handle)
     (define/public (set-handle h) (set! handle h))
+
+    (define/public (after-exec)
+      (when close-on-exec? ;; indicates ad-hoc prepared statement
+        (finalize)))
 
     (define/public (get-param-count) (length param-typeids))
     (define/public (get-param-typeids) param-typeids)
@@ -39,9 +45,11 @@
       (case checktype
         ((recordset)
          (unless (positive? (get-result-count))
+           (when close-on-exec? (finalize))
            (error fsym "expected statement producing recordset, got ~e" obj)))
         ((column)
          (unless (= (get-result-count) 1)
+           (when close-on-exec? (finalize))
            (error fsym "expected statement producing recordset with single column, got ~e" obj)))
         (else (void))))
 
@@ -76,6 +84,10 @@
 
     (super-new)
     (register-finalizer)))
+
+(define (statement:after-exec stmt)
+  (when (statement-binding? stmt)
+    (send (statement-binding-pst stmt) after-exec)))
 
 ;; ----
 

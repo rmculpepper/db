@@ -263,6 +263,7 @@
                  (send-message (make-Sync))
                  (begin0 (query1:collect fsym stmt)
                    (check-ready-for-query fsym #f))))])
+        (statement:after-exec stmt)
         (query1:process-result fsym collector result)))
 
     ;; query1:enqueue : Statement -> void
@@ -280,59 +281,43 @@
 
     ;; query1:collect : symbol Statement bool bool -> QueryResult stream
     (define/private (query1:collect fsym stmt)
-      (if (string? stmt)
-          (query1:expect-parse-complete fsym)
-          (query1:expect-bind-complete fsym)))
+      (when (string? stmt)
+        (match (recv-message fsym)
+          [(struct ParseComplete ()) (void)]
+          [other-r (query1:error fsym other-r)]))
+      (match (recv-message fsym)
+        [(struct BindComplete ()) (void)]
+        [other-r (query1:error fsym other-r)])
+      (match (recv-message fsym)
+        [(struct RowDescription (field-dvecs))
+         (let* ([rows (query1:data-loop fsym)])
+           (query1:expect-close-complete fsym)
+           (vector 'recordset field-dvecs rows))]
+        [(struct NoData ())
+         (let* ([command (query1:expect-completion fsym)])
+           (query1:expect-close-complete fsym)
+           (vector 'command command))]
+        [other-r (query1:error fsym other-r)]))
 
-    (define/private (query1:expect-parse-complete fsym)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct ParseComplete ())
-           (query1:expect-bind-complete fsym)]
-          [_ (query1:error-recovery fsym r)])))
-
-    (define/private (query1:expect-bind-complete fsym)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct BindComplete ())
-           (query1:expect-portal-description fsym)]
-          [_ (query1:error-recovery fsym r)])))
-
-    (define/private (query1:expect-portal-description fsym)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct RowDescription (field-dvecs))
-           (query1:data-loop fsym field-dvecs null)]
-          [(struct NoData ())
-           (query1:expect-completion fsym)]
-          [_ (query1:error-recovery fsym r)])))
-
-    (define/private (query1:data-loop fsym field-dvecs rows)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct DataRow (value))
-           (query1:data-loop fsym field-dvecs (cons (list->vector value) rows))]
-          [(struct CommandComplete (command))
-           (query1:finalize fsym (vector 'recordset field-dvecs rows))]
-          [_ (query1:error-recovery fsym r)])))
+    (define/private (query1:data-loop fsym)
+      (match (recv-message fsym)
+        [(struct DataRow (row))
+         (cons (list->vector row) (query1:data-loop fsym))]
+        [(struct CommandComplete (command)) null]
+        [other-r (query1:error fsym other-r)]))
 
     (define/private (query1:expect-completion fsym)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct CommandComplete (command))
-           (query1:finalize fsym (vector 'command command))]
-          [(struct EmptyQueryResponse ())
-           (query1:finalize fsym (lambda () (simple-result '())))]
-          [_ (query1:error-recovery fsym r)])))
+      (match (recv-message fsym)
+        [(struct CommandComplete (command)) `((command . ,command))]
+        [(struct EmptyQueryResponse ()) '()]
+        [other-r (query1:error fsym other-r)]))
 
-    (define/private (query1:finalize fsym result)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct CloseComplete ())
-           result]
-          [_ (query1:error-recovery fsym r)])))
+    (define/private (query1:expect-close-complete fsym)
+      (match (recv-message fsym)
+        [(struct CloseComplete ()) (void)]
+        [other-r (query1:error fsym other-r)]))
 
-    (define/private (query1:error-recovery fsym r)
+    (define/private (query1:error fsym r)
       (match r
         [(struct CopyInResponse (format column-formats))
          (error fsym (nosupport "COPY IN statements"))]
@@ -344,7 +329,7 @@
       (match result
         [(vector 'recordset field-dvecs rows)
          (let-values ([(init combine finalize headers?)
-                       (collector (length field-dvecs) #f)])
+                       (collector (length field-dvecs) #t)])
            (let* ([type-reader-v
                    (list->vector (query1:get-type-readers fsym field-dvecs))]
                   [row-length (length field-dvecs)]
@@ -361,8 +346,8 @@
                         (finalize
                          (for/fold ([accum init]) ([row (in-list rows)])
                            (combine accum (convert-row row)))))))]
-        [(vector 'command command-string)
-         (simple-result `((command . ,command-string)))]))
+        [(vector 'command command)
+         (simple-result command)]))
 
     (define/private (query1:get-type-readers fsym field-dvecs)
       (map (lambda (dvec)
@@ -377,54 +362,48 @@
     ;; == Prepare
 
     ;; prepare : symbol string -> PreparedStatement
-    (define/public (prepare fsym stmt)
+    (define/public (prepare fsym stmt close-on-exec?)
       (call-with-lock fsym
         (lambda ()
           ;; name generation within exchange: synchronized
           (let ([name (generate-name)])
             (prepare1:enqueue name stmt)
             (send-message (make-Sync))
-            (begin0 (prepare1:collect fsym name stmt)
+            (begin0 (prepare1:collect fsym name close-on-exec?)
               (check-ready-for-query fsym #f))))))
 
-    ;; prepare1:enqueue : string string -> void
+    ;; prepare1:enqueue : string string boolean -> void
     (define/private (prepare1:enqueue name stmt)
       (buffer-message (make-Parse name stmt null))
       (buffer-message (make-Describe 'statement name)))
 
-    ;; prepare1:collect : stream string string -> PreparedStatement stream
-    (define/private (prepare1:collect fsym name stmt)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct ParseComplete ())
-           (prepare1:describe-params fsym name stmt)]
-          [else (prepare1:error fsym r stmt)])))
+    ;; prepare1:collect : stream string string boolean -> PreparedStatement stream
+    (define/private (prepare1:collect fsym name close-on-exec?)
+      (match (recv-message fsym)
+        [(struct ParseComplete ()) (void)]
+        [other-r (prepare1:error fsym other-r)])
+      (let* ([param-typeids (prepare1:describe-params fsym)]
+             [field-dvecs (prepare1:describe-result fsym)])
+        (new prepared-statement%
+             (handle name)
+             (close-on-exec? close-on-exec?)
+             (param-typeids param-typeids)
+             (result-dvecs field-dvecs)
+             (owner this))))
 
-    (define/private (prepare1:describe-params fsym name stmt)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct ParameterDescription (param-typeids))
-           (prepare1:describe-result fsym name stmt param-typeids)]
-          [else (prepare1:error fsym r stmt)])))
+    (define/private (prepare1:describe-params fsym)
+      (match (recv-message fsym)
+        [(struct ParameterDescription (param-typeids)) param-typeids]
+        [other-r (prepare1:error fsym other-r)]))
 
-    (define/private (prepare1:describe-result fsym name stmt param-typeids)
-      (let ([r (recv-message fsym)])
-        (match r
-          [(struct RowDescription (field-dvecs))
-           (prepare1:finish fsym name stmt param-typeids field-dvecs)]
-          [(struct NoData ())
-           (prepare1:finish fsym name stmt param-typeids null)]
-          [else (prepare1:error fsym r stmt)])))
+    (define/private (prepare1:describe-result fsym)
+      (match (recv-message fsym)
+        [(struct RowDescription (field-dvecs)) field-dvecs]
+        [(struct NoData ()) null]
+        [other-r (prepare1:error fsym other-r)]))
 
-    (define/private (prepare1:error fsym r stmt)
-      (error fsym "internal error: unexpected message processing ~s" stmt))
-
-    (define/private (prepare1:finish fsym name stmt param-typeids result-dvecs)
-      (new prepared-statement%
-           (handle name)
-           (param-typeids param-typeids)
-           (result-dvecs result-dvecs)
-           (owner this)))
+    (define/private (prepare1:error fsym r)
+      (error fsym "internal error: unexpected message in prepare"))
 
     ;; check-statement : symbol any -> void
     (define/private (check-statement fsym stmt)

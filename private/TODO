@@ -7,6 +7,8 @@ To do
 
 ----
 
+- test statement-generators
+
 - doc: enumerate errors
 
 - add sql-bits datatype for BIT, VARBIT types

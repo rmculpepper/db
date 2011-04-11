@@ -236,11 +236,13 @@
 
     ;; query : symbol Statement Collector -> QueryResult
     (define/public (query fsym stmt collector)
-      (let ([result
-             (call-with-lock fsym
-               (lambda ()
-                 (let ([stmt (check-statement fsym stmt)])
-                   (query1 fsym stmt))))])
+      (let-values ([(stmt result)
+                    (call-with-lock fsym
+                      (lambda ()
+                        (let ([stmt (check-statement fsym stmt)])
+                          (values stmt (query1 fsym stmt)))))])
+        ;; For some reason this is *really* slow:
+        ;; (statement:after-exec stmt)
         (query1:process-result fsym collector result)))
 
     ;; query1 : symbol Statement Collector -> QueryResult
@@ -256,7 +258,7 @@
                (send pst check-owner fsym this stmt)
                stmt)]
             [(and (string? stmt) (force-prepare-sql? fsym stmt))
-             (let ([pst (prepare1 fsym stmt)])
+             (let ([pst (prepare1 fsym stmt #t)])
                (send pst bind fsym null))]
             [else stmt]))
 
@@ -319,13 +321,13 @@
 
     ;; == Prepare
 
-    ;; prepare : symbol string -> PreparedStatement
-    (define/public (prepare fsym stmt)
+    ;; prepare : symbol string boolean -> PreparedStatement
+    (define/public (prepare fsym stmt close-on-exec?)
       (call-with-lock fsym
         (lambda ()
-          (prepare1 fsym stmt))))
+          (prepare1 fsym stmt close-on-exec?))))
 
-    (define/private (prepare1 fsym stmt)
+    (define/private (prepare1 fsym stmt close-on-exec?)
       (fresh-exchange)
       (send-message (make-command-packet 'statement-prepare stmt))
       (let ([r (recv fsym 'prep-ok)])
@@ -337,6 +339,7 @@
                   (if (zero? fields) null (prepare1:get-field-descriptions fsym))])
              (new prepared-statement%
                   (handle id)
+                  (close-on-exec? close-on-exec?)
                   (param-typeids (map field-dvec->typeid param-dvecs))
                   (result-dvecs field-dvecs)
                   (owner this)))])))

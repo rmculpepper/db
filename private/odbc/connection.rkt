@@ -54,7 +54,7 @@
 
     (define/private (query1 fsym stmt collector)
       (cond [(string? stmt)
-             (let* ([pst (prepare1 fsym stmt)]
+             (let* ([pst (prepare1 fsym stmt #t)]
                     [sb (send pst bind fsym null)])
                (query1 fsym sb collector))]
             [(statement-binding? stmt)
@@ -80,6 +80,7 @@
              (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
              (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
              (values result-dvecs rows)))))
+      (send pst after-exec)
       (let-values ([(init combine finalize headers?)
                     (collector (length dvecs) #t)])
         (cond [(pair? dvecs)
@@ -255,10 +256,10 @@
                      [(sql-null? fields) sql-null]))]
             [else (get-string)]))
 
-    (define/public (prepare fsym stmt)
-      (prepare1 fsym stmt))
+    (define/public (prepare fsym stmt close-on-exec?)
+      (prepare1 fsym stmt close-on-exec?))
 
-    (define/private (prepare1 fsym sql)
+    (define/private (prepare1 fsym sql close-on-exec?)
       (with-lock
        ;; no time between prepare and table entry
        (let* ([stmt
@@ -281,6 +282,7 @@
                    (describe-result-column fsym stmt i)))])
          (let ([pst (new prepared-statement%
                          (handle stmt)
+                         (close-on-exec? close-on-exec?)
                          (owner this)
                          (param-typeids param-typeids)
                          (result-dvecs result-dvecs))])

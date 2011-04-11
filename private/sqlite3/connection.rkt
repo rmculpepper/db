@@ -45,7 +45,7 @@
 
     (define/private (query1 fsym stmt collector)
       (cond [(string? stmt)
-             (let* ([pst (prepare1 fsym stmt)]
+             (let* ([pst (prepare1 fsym stmt #t)]
                     [sb (send pst bind fsym null)])
                (query1 fsym sb collector))]
             [(statement-binding? stmt)
@@ -72,6 +72,7 @@
              (handle-status fsym (sqlite3_reset stmt) db)
              (handle-status fsym (sqlite3_clear_bindings stmt) db)
              (values info rows)))))
+      (send pst after-exec)
       (let-values ([(init combine finalize headers?)
                     (collector (length info0) #t)])
         (cond [(pair? info0)
@@ -128,10 +129,10 @@
                  vec)]
               [else (handle-status fsym s db)])))
 
-    (define/public (prepare fsym stmt)
-      (prepare1 fsym stmt))
+    (define/public (prepare fsym stmt close-on-exec?)
+      (prepare1 fsym stmt close-on-exec?))
 
-    (define/private (prepare1 fsym sql)
+    (define/private (prepare1 fsym sql close-on-exec?)
       (with-lock
        ;; no time between sqlite3_prepare and table entry
        (let-values ([(db) (get-db fsym)]
@@ -153,6 +154,7 @@
                    '#(any))]
                 [pst (new prepared-statement%
                           (handle stmt)
+                          (close-on-exec? close-on-exec?)
                           (param-typeids param-typeids)
                           (result-dvecs result-dvecs)
                           (owner this))])

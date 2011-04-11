@@ -29,7 +29,7 @@
     disconnect    ;; -> void
     get-dbsystem  ;; -> dbsystem<%>
     query         ;; symbol statement collector -> QueryResult
-    prepare       ;; symbol preparable -> prepared-statement<%>
+    prepare       ;; symbol preparable boolean -> prepared-statement<%>
 
     free-statement)) ;; prepared-statement<%> -> void
 
@@ -59,6 +59,8 @@
   (interface ()
     get-handle         ;; -> Handle (depends on database system)
     set-handle         ;; Handle -> void
+
+    after-exec         ;; -> void (for close-after-exec)
 
     get-param-count    ;; -> nat or #f
     get-param-typeids  ;; -> (listof typeid)

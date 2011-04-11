@@ -367,7 +367,8 @@ No conversion may be passed sql-null.
 (define (marshal-day-time-interval f i t)
   (unless (sql-day-time-interval? t)
     (marshal-error f i "simple time interval" t))
-  (let ([h (sql-interval-hours t)]
+  (let ([h (+ (sql-interval-hours t)
+              (* 24 (sql-interval-days t)))]
         [m (abs (sql-interval-minutes t))]
         [s (abs (sql-interval-seconds t))]
         [ns (abs (sql-interval-nanoseconds t))])

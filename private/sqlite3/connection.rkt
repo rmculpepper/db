@@ -16,31 +16,10 @@
 (provide connection%
          handle-status)
 
-(define will-executor (make-will-executor))
-
-(define finalizer-thread
-  (thread/suspend-to-kill
-   (lambda ()
-     (let loop ()
-       (will-execute will-executor)
-       (loop)))))
-
 (define prepared-statement%
   (class prepared-statement-base%
-    (init stmt) ;; a sqlite_stmt
-    (define -stmt stmt)
-    (define/public (get-stmt) -stmt)
-
-    (define/public (finalize)
-      (call-as-atomic
-       (lambda ()
-         (let ([stmt -stmt])
-           (when stmt
-             (set! -stmt #f)
-             (sqlite3_finalize stmt)
-             (void))))))
-
     (super-new)))
+
 
 ;; == Connection
 
@@ -66,9 +45,8 @@
     (define/public (get-dbsystem) dbsystem)
     (define/public (connected?) (and -db #t))
 
-    (define/public (query* fsym stmts collector)
-      (for/list ([stmt (in-list stmts)])
-        (query1 fsym stmt collector)))
+    (define/public (query fsym stmt collector)
+      (query1 fsym stmt collector))
 
     (define/private (query1 fsym stmt collector)
       (cond [(string? stmt)
@@ -85,7 +63,7 @@
       (define-values (info0 rows)
         (with-lock
          (let ([db (get-db fsym)]
-               [stmt (send pst get-stmt)])
+               [stmt (send pst get-handle)])
            (handle-status fsym (sqlite3_reset stmt) db)
            (handle-status fsym (sqlite3_clear_bindings stmt) db)
            (for ([i (in-naturals 1)]
@@ -149,13 +127,14 @@
                                         [(= type SQLITE_BLOB)
                                          (sqlite3_column_blob stmt i)]
                                         [else
-                                         (error 'query* "unknown column type: ~e" type)]))))
+                                         (error fsym
+                                                "internal error: unknown column type: ~e"
+                                                type)]))))
                  vec)]
               [else (handle-status fsym s db)])))
 
-    (define/public (prepare* fsym stmts)
-      (for/list ([stmt stmts])
-        (prepare1 fsym stmt)))
+    (define/public (prepare fsym stmt)
+      (prepare1 fsym stmt))
 
     (define/private (prepare1 fsym sql)
       (with-lock
@@ -178,13 +157,11 @@
                  (for/list ([i (in-range (sqlite3_column_count stmt))])
                    '#(any))]
                 [pst (new prepared-statement%
-                          (stmt stmt)
+                          (handle stmt)
                           (param-typeids param-typeids)
                           (result-dvecs result-dvecs)
                           (owner this))])
            (hash-set! statement-table pst #t)
-           (thread-resume finalizer-thread)
-           (will-register will-executor pst (lambda (pst) (send pst finalize)))
            pst))))
 
     (define/public (disconnect)
@@ -195,12 +172,22 @@
            (set! -db #f)
            (set! statement-table #f)
            (for ([pst (in-list statements)])
-             (send pst finalize))
+             (let ([stmt (send pst get-handle)])
+               (when stmt
+                 (send pst set-handle #f)
+                 (handle-status 'disconnect (sqlite3_finalize stmt)))))
            (handle-status 'disconnect (sqlite3_close db))
            (void)))))
 
-    (super-new)
+    (define/public (free-statement pst)
+      (with-lock
+       (let ([stmt (send pst get-handle)])
+         (when stmt
+           (send pst set-handle #f)
+           (handle-status 'free-statement (sqlite3_finalize stmt))
+           (void)))))
 
+    (super-new)
     (register-finalizer this (lambda (obj) (send obj disconnect)))
 
     #|

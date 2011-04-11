@@ -39,13 +39,10 @@ Use @racket[query-exec] method to execute a SQL statement for effect.
 [(query-exec pgc
   "insert into the_numbers values (0, 'nothing')")
  (void)]
-]
-
-Use @racket[query-exec*] to perform several updates at once.
-
-@my-interaction[
-[(query-exec* pgc
-  "insert into the_numbers values (1, 'the loneliest number')"
+[(query-exec pgc
+  "insert into the_numbers values (1, 'the loneliest number')")
+ (void)]
+[(query-exec pgc
   "insert into the_numbers values (2, 'company')")
  (void)]
 ]

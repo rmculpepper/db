@@ -62,8 +62,7 @@ is one of the following:
 @itemlist[
 @item{a string containing a single SQL statement, possibly with
 parameters}
-@item{a @tech{prepared statement} produced by @racket[prepare] or
-@racket[prepare-multiple]}
+@item{a @tech{prepared statement} produced by @racket[prepare]}
 @item{a @tech{statement generator} produced by
 @racket[statement-generator]}
 @item{a statement-binding value produced by
@@ -250,41 +249,6 @@ future version of this library (even new minor versions).
   supports both recordset-returning and effect-only queries.
 }
 
-@defproc[(query-multiple [connection connection?]
-                         [stmts (listof (or/c string? statement-binding?))])
-         (listof (or/c simple-result? recordset?))]{
-
-  Executes queries, returning structures that describe the
-  results. Unlike the more specialized query functions,
-  @racket[query-multiple] supports a mixture of recordset-returning
-  and effect-only queries. Inline parameter arguments are not
-  supported; parameter binding must be done explicitly.
-}
-
-@defproc[(query-exec* [connection connection?]
-                      [stmt (or/c string? statement-binding?)] ...)
-         void?]{
-
-  Executes SQL statements for effect and discards the result(s).
-  Calling @racket[query-exec*] on multiple statements at once may be
-  more efficient than calling @racket[query-exec] multiple times on
-  the statements individually. Inline parameter arguments are not
-  supported; parameter binding must be done explicitly.
-
-  Example:
-  @racketinput[
-    (query-exec* c
-      "create table the_numbers (n integer, description varchar)"
-      "insert into the_numbers values (0, 'nothing')"
-      "insert into the_numbers values (1, 'the loneliest number')")
-  ]
-
-  @bold{PostgreSQL note}: The list of statements passed to
-  @racket[query-exec*] are executed within their own
-  ``mini-transaction''; if any statement fails, the effects of all
-  previous statements in the list are rolled back.
-}
-
 @defproc[(query-fold [connection connection?]
                      [stmt (or/c string? statement-binding?)]
                      [fold-proc (_alpha _field _... -> _alpha)]
@@ -304,7 +268,7 @@ queries. A parameterized query may be executed any number of times
 with different values for its parameters.
 
 A @deftech{prepared statement} is the result of a call to
-@racket[prepare] or @racket[prepare-multiple].
+@racket[prepare].
 
 The syntax of parameterized queries varies depending on the database
 system. For example:
@@ -317,25 +281,22 @@ SQLite:       @&  supports both syntaxes (plus others)
 }
 }
 
-@deftogether[[
 @defproc[(prepare [connection connection?]
                   [stmt (or/c string? statement-generator?)])
-         prepared-statement?]
-@defproc[(prepare-multiple [connection connection?]
-                           [stmts (listof (or/c string? statement-generator?))])
-         (listof prepared-statement?)]]]{
+         prepared-statement?]{
 
-  Prepares parameterized queries. The resulting @tech{prepared
-  statement}s are tied to the connection that prepared them; it is an
-  error to use them with any other connection. (The prepared statement
-  holds its connection link weakly; a reference to a prepared
-  statement will not keep a connection from being garbage collected.)
+  Prepares a (possibly parameterized) statement. The resulting
+  @tech{prepared statement}s are tied to the connection that prepared
+  them; it is an error to use them with any other connection. (The
+  prepared statement holds its connection link weakly; a reference to
+  a prepared statement will not keep a connection from being garbage
+  collected.)
 }
 
 @defproc[(prepared-statement? [x any/c]) boolean?]{
 
-  Returns @racket[#t] if @racket[x] is a prepared statement created by
-  @racket[prepare] or @racket[prepare-multiple], @racket[#f] otherwise.
+  Returns @racket[#t] if @racket[x] is a @tech{prepared statement}
+  created by @racket[prepare], @racket[#f] otherwise.
 }
 
 @defproc[(prepared-statement-parameter-types [pst prepared-statement?])
@@ -363,9 +324,9 @@ SQLite:       @&  supports both syntaxes (plus others)
          statement-binding?]{
 
   Fills in the parameters of a parameterized prepared query. The
-  resulting statement can be executed with @racket[query],
-  @racket[query-multiple], or any of the other query functions, but it
-  must be used with the same connection that created it.
+  resulting statement can be executed with @racket[query] or any of
+  the other query functions, but it must be used with the same
+  connection that created it.
 
   @(examples/results
     [(let* ([get-name-pst
@@ -426,59 +387,4 @@ SQLite:       @&  supports both syntaxes (plus others)
 
   Returns @racket[#t] if @racket[x] is a statement generator created
   by @racket[statement-generator], @racket[#f] otherwise.
-}
-
-
-@;{
-@section{Prepared queries as functions}
-
-The following functions prepare a parameterized SQL statement for
-later execution and and encapsulate it as a function. The
-prepared-statement function accepts the parameter values and executes
-the prepared statement, processing the results like the corresponding
-query functions.
-
-A prepared-statement function may be executed any number of times.  It
-is possible to prepare a statement that contains no parameters; the
-resulting function should be called with zero arguments.
-
-Prepared-statement functions hold their associated connections
-strongly.
-
-@deftogether[[
-@defproc[(prepare-query-exec [connection connection?]
-                             [stmt (or/c string? statement-generator?)])
-         (_param _... -> void?)]
-@defproc[(prepare-query-rows [connection connection?]
-                             [stmt (or/c string? statement-generator?)])
-         (_param _... -> (listof (vectorof _field)))]
-@defproc[(prepare-query-list [connection connection?]
-                             [stmt (or/c string? statement-generator?)])
-         (_param _... -> (listof _field))]
-@defproc[(prepare-query-row [connection connection?]
-                             [stmt (or/c string? statement-generator?)])
-         (_param _... -> (vectorof _field))]
-@defproc[(prepare-query-maybe-row [connection connection?]
-                                  [stmt (or/c string? statement-generator?)])
-         (_param _... -> (or/c (vectorof _field) false?))]
-@defproc[(prepare-query-value [connection connection?]
-                              [stmt (or/c string? statement-generator?)])
-         (_param _... -> _field)]
-@defproc[(prepare-query-maybe-value [connection connection?]
-                                    [stmt (or/c string? statement-generator?)])
-         (_param _... -> (or/c _field false?))]
-@defproc[(prepare-query-fold [connection connection?]
-                              [stmt (or/c string? statement-generator?)]
-                             [proc (_alpha _field _... -> _alpha)]
-                             [init _alpha])
-         (_param _... -> _alpha)]
-@defproc[(prepare-query [connection connection?]
-                        [stmt (or/c string? statement-generator?)])
-         (_param _... -> (or/c simple-result? recordset?))]]]{
-
-  Prepared versions of @racket[query-exec], @racket[query-rows],
-  @racket[query-list], @racket[query-row], @racket[query-maybe-row],
-  @racket[query-value], @racket[query-maybe-value],
-  @racket[query-fold], and @racket[query], respectively.
-}
 }

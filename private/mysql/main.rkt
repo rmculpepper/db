@@ -9,7 +9,6 @@
          "../generic/main.rkt"
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
-         "../generic/killsafe.rkt"
          "connection.rkt"
          "dbsystem.rkt")
 

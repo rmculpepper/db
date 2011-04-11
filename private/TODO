@@ -1,9 +1,9 @@
 To do
 =====
 
-- strict mode by default: error if backend result type unknown
+- free ad-hoc prepared statements immediately after execution
 
-- GC postgresql and mysql prepared-statements to close descriptors
+- strict mode by default: error if backend result type unknown
 
 ----
 

@@ -22,23 +22,9 @@
 
 (define prepared-statement%
   (class prepared-statement-base%
-    (init-private id) ;; int
-    (define/public (get-id) id)
     (super-new)))
 
 ;; ========================================
-
-(define mysql-base<%>
-  (interface ()
-    recv
-    send-message
-    buffer-message
-    flush-message-buffer
-    fresh-exchange
-    disconnect
-    disconnect*
-    connected?
-    after-connect))
 
 (define connection%
   (class* object% (connection<%>)
@@ -62,23 +48,18 @@
     ;; Lock; all communication occurs within lock.
     (define wlock (make-semaphore 1))
 
-    ;; Delay async handler calls until unlock.
-    (define delayed-handler-calls null)
-
-    (define/private (lock who)
+    (define/private (lock who require-connected?)
       (semaphore-wait wlock)
-      (unless outport
+      (when (and require-connected? (not outport))
         (semaphore-post wlock)
         (error who "not connected")))
 
     (define/private (unlock)
-      (let ([handler-calls delayed-handler-calls])
-        (set! delayed-handler-calls null)
-        (semaphore-post wlock)
-        (for-each (lambda (p) (p)) handler-calls)))
+      (semaphore-post wlock))
 
-    (define/private (call-with-lock who proc)
-      (lock who)
+    (define/private (call-with-lock who proc
+                                    #:require-connected? [require-connected? #t])
+      (lock who require-connected?)
       (with-handlers ([values (lambda (e) (unlock) (raise e))])
         (begin0 (proc) (unlock))))
 
@@ -166,21 +147,21 @@
     (define/private (disconnect* lock-not-held?)
       ;; If we don't hold the lock, try to acquire it and disconnect politely.
       (define politely? lock-not-held?)
-      (when (connected?)
-        (when politely?
-          (lock 'disconnect)
-          (fresh-exchange)
-          (send-message (make-command-packet 'quit "")))
+      (define (go)
         (when DEBUG-SENT-MESSAGES
           (eprintf "  ** Disconnecting\n"))
-        (when inport
-          (close-input-port inport)
-          (set! inport #f))
         (when outport
+          (when politely?
+            (fresh-exchange)
+            (send-message (make-command-packet 'quit "")))
           (close-output-port outport)
           (set! outport #f))
-        (when politely?
-          (unlock))))
+        (when inport
+          (close-input-port inport)
+          (set! inport #f)))
+      (cond [politely?
+             (call-with-lock 'disconnect go #:require-connected? #f)]
+            [else (go)]))
 
     ;; connected? : -> boolean
     (define/public (connected?)
@@ -244,9 +225,9 @@
                   "internal error: unknown message after authentication")])))
 
     ;; Set connection to use utf8 encoding
-    (define/public (after-connect)
-      (query* 'mysql-connect (list "set names 'utf8'")
-              (lambda (fields ordered?) (values #f void void #f)))
+    (define/private (after-connect)
+      (query 'mysql-connect "set names 'utf8'"
+             (lambda (fields ordered?) (values #f void void #f)))
       (void))
 
 
@@ -257,18 +238,14 @@
     ;; name-counter : number
     (define name-counter 0)
 
-    ;; query* : symbol (list-of Statement) Collector -> (list-of QueryResult)
-    (define/public (query* fsym stmts collector)
-      (let ([results
+    ;; query : symbol Statement Collector -> QueryResult
+    (define/public (query fsym stmt collector)
+      (let ([result
              (call-with-lock fsym
                (lambda ()
-                 (let ([stmts
-                        (for/list ([stmt (in-list stmts)])
-                          (check-statement fsym stmt))])
-                   (for/list ([stmt (in-list stmts)])
-                     (query1 fsym stmt)))))])
-        (map (lambda (result) (query1:process-result fsym collector result))
-             results)))
+                 (let ([stmt (check-statement fsym stmt)])
+                   (query1 fsym stmt))))])
+        (query1:process-result fsym collector result)))
 
     ;; query1 : symbol Statement Collector -> QueryResult
     (define/private (query1 fsym stmt)
@@ -291,7 +268,7 @@
     (define/private (query1:enqueue stmt)
       (cond [(statement-binding? stmt)
              (let* ([pst (statement-binding-pst stmt)]
-                    [id (send pst get-id)]
+                    [id (send pst get-handle)]
                     [params (statement-binding-params stmt)]
                     [null-map (map not params)]
                     [param-types (send pst get-param-types)])
@@ -346,11 +323,11 @@
 
     ;; == Prepare
 
-    ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
-    (define/public (prepare* fsym stmts)
+    ;; prepare : symbol string -> PreparedStatement
+    (define/public (prepare fsym stmt)
       (call-with-lock fsym
         (lambda ()
-          (map (lambda (stmt) (prepare1 fsym stmt)) stmts))))
+          (prepare1 fsym stmt))))
 
     (define/private (prepare1 fsym stmt)
       (fresh-exchange)
@@ -363,7 +340,7 @@
                  [field-dvecs
                   (if (zero? fields) null (prepare1:get-field-descriptions fsym))])
              (new prepared-statement%
-                  (id id)
+                  (handle id)
                   (param-typeids (map field-dvec->typeid param-dvecs))
                   (result-dvecs field-dvecs)
                   (owner this)))])))
@@ -374,7 +351,17 @@
           [(struct eof-packet (warning-count status))
            null]
           [(? field-packet?)
-           (cons (parse-field-dvec r) (prepare1:get-field-descriptions fsym))])))))
+           (cons (parse-field-dvec r) (prepare1:get-field-descriptions fsym))])))
+
+    (define/public (free-statement pst)
+      (call-with-lock 'free-statement
+        #:require-connected? #f
+        (lambda ()
+          (let ([id (send pst get-handle)])
+            (when (and id outport) ;; outport = connected?
+              (send pst set-handle #f)
+              (fresh-exchange)
+              (send-message (make-command:statement-packet 'statement-close id)))))))))
 
 
 ;; ========================================

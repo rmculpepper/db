@@ -39,11 +39,6 @@
       (statement-generator? x)
       (statement-binding? x)))
 
-#|
-(define (complete-statement? x)
-  (or (string? x)
-      (statement-binding? x)))
-|#
 (define complete-statement?
   (or/c string? statement-binding?))
 
@@ -64,12 +59,9 @@
 
 ;; == Query procedures
 
-;; Query auxiliaries
-;; Relies on query* method from primitive-query<%>
-
 ;; query1 : connection symbol Statement Collector -> QueryResult
 (define (query1 c fsym stmt collector)
-  (car (send c query* fsym (list stmt) collector)))
+  (send c query fsym stmt collector))
 
 ;; query/recordset : connection symbol Statement collector -> void
 (define (query/recordset c fsym sql collector)
@@ -160,11 +152,12 @@
              (prepared-statement? stmt)
              (statement-generator? stmt))
          (let ([pst
-                (cond [(string? stmt) (prepare c stmt)]
+                (cond [(string? stmt)
+                       (prepare1 fsym c stmt)]
                       [(statement-generator? stmt)
                        (prepare1 fsym stmt)]
                       [(prepared-statement? stmt)
-                       ;; Ownership check done later, by query* method.
+                       ;; Ownership check done later, by query method.
                        stmt]
                       [(statement-binding? stmt)
                        (error fsym
@@ -172,12 +165,7 @@
                                "cannot execute statement-binding with "
                                "additional inline arguments: ~e")
                               stmt)])])
-           (case checktype
-             ((recordset)
-              (check-results fsym pst stmt))
-             ((column)
-              (check-results/one-column fsym pst stmt))
-             (else (void)))
+           (send pst check-results fsym checktype stmt)
            (send pst bind fsym args))]
         [else ;; no args, and sql is either string or statement-binding
          stmt]))
@@ -241,7 +229,7 @@
 ;; query-exec : connection Statement arg ... -> void
 (define (query-exec c sql . args)
   (let ([sql (compose-statement 'query-exec c sql args #f)])
-    (send c query* 'query-exec (list sql) void-collector)
+    (send c query 'query-exec sql void-collector)
     (void)))
 
 ;; query : connection Statement arg ... -> QueryResult
@@ -251,15 +239,6 @@
     (query1 c 'query sql vectorlist-collector/fieldinfo)))
 
 ;; -- Functions that don't accept stmt params --
-
-;; query-multiple : connection (list-of Statement) -> (list-of QueryResult)
-(define (query-multiple c stmts)
-  (send c query* 'query-multiple stmts vectorlist-collector/fieldinfo))
-
-;; query-exec* : connection Statement ... -> void
-(define (query-exec* c . stmts)
-  (send c query* 'query-exec* stmts void-collector)
-  (void))
 
 ;; query-fold : connection Statement ('a field ... -> 'a) 'a -> 'a
 (define (query-fold c stmt f base)
@@ -295,32 +274,15 @@
 
 ;; ========================================
 
-;; FIXME: Currently, to support (prepare c stmt-gen), handle stmts one by one.
-;; Should do something smarter.
-
 (define (prepare c stmt)
   (prepare1 'prepare c stmt))
 
-(define (prepare-multiple c stmts)
-  (for/list ([stmt (in-list stmts)])
-    (prepare1 'prepare-multiple c stmt)))
-
 ;; ----
-
-(define (check-results name pst sql)
-  (unless (send pst get-result-count)
-    (error name "expected statement producing recordset, got ~e" sql)))
-
-(define (check-results/one-column name pst sql)
-  (check-results name pst sql)
-  (let ([results (send pst get-result-count)])
-    (unless (equal? results 1)
-      (error name "expected statement producing recordset with single column, got ~e" sql))))
 
 (define (prepare1 fsym c stmt)
   (cond [(string? stmt)
-         (car (send c prepare* fsym (list stmt)))]
-        [(statement-binding? stmt)
+         (send c prepare fsym stmt)]
+        [(statement-generator? stmt)
          (let ([table (statement-generator-table stmt)]
                [gen (statement-generator-gen stmt)])
            (let ([table-pst (hash-ref table c #f)])
@@ -331,7 +293,7 @@
                    pst))))]))
 
 ;; ========================================
-
+#|
 (define-syntax defprepare
   (syntax-rules ()
     [(defprepare name method)
@@ -380,7 +342,7 @@
 (defprepare prepare-query-fold query-fold
   [#:check check-results]
   [#:arg combine base])
-
+|#
 
 ;; ========================================
 
@@ -432,17 +394,11 @@
  [query
   (->* (connection? statement?) () #:rest list? any)]
 
- [query-multiple
-  (-> connection? (listof complete-statement?) any)]
- [query-exec*
-  (->* (connection?) () #:rest (listof complete-statement?) any)]
  [query-fold
   (-> connection? complete-statement? procedure? any/c any)]
 
  [prepare
   (-> connection? preparable/c any)]
- [prepare-multiple
-  (-> connection? (listof preparable/c) any)]
  [bind-prepared-statement
   (-> prepared-statement? list? any)]
 

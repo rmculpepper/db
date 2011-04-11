@@ -40,6 +40,11 @@ Based on protocol documentation here:
    argument)
   #:transparent)
 
+(define-struct (command:statement-packet packet)
+  (command
+   argument)
+  #:transparent)
+
 (define-struct (command:change-user-packet packet)
   (user
    password
@@ -149,6 +154,9 @@ Based on protocol documentation here:
     [(struct command-packet (command arg))
      (io:write-byte out (encode-command command))
      (io:write-null-terminated-bytes out (string->bytes/utf-8 arg))]
+    [(struct command:statement-packet (command arg))
+     (io:write-byte out (encode-command command))
+     (io:write-le-int32 out arg)]
     [(struct long-data-packet (statement-handler-id parameter-number type data))
      (io:write-le-int32 out statement-handler-id)
      (io:write-le-int16 out parameter-number)
@@ -173,9 +181,6 @@ Based on protocol documentation here:
 (define (parse-packet in expect field-dvecs)
   (let* ([len (io:read-le-int24 in)]
          [num (io:read-byte in)]
-         #|
-         [_ (fprintf (current-error-port) "** Received packet #~s, length ~s\n" num len)]
-         |#
          [inp (subport in len)]
          [msg (parse-packet/1 inp expect len field-dvecs)])
     (when (port-has-bytes? inp)
@@ -199,6 +204,10 @@ Based on protocol documentation here:
     ((auth)
      (unless (eq? (peek-byte in) #x00)
        (error 'parse-packet "expect auth ok packet"))
+     (parse-ok-packet in len))
+    ((ok)
+     (unless (eq? (peek-byte in) #x00)
+       (error 'parse-packet "expect ok packet"))
      (parse-ok-packet in len))
     ((result)
      (if (eq? (peek-byte in) #x00)

@@ -25,20 +25,13 @@
 ;; connection<%>
 (define connection<%>
   (interface ()
-    ;; connected? : -> boolean
-    connected?
+    connected?    ;; -> boolean
+    disconnect    ;; -> void
+    get-dbsystem  ;; -> dbsystem<%>
+    query         ;; symbol statement collector -> QueryResult
+    prepare       ;; symbol preparable -> prepared-statement<%>
 
-    ;; disconnect : -> void
-    disconnect
-
-    ;; get-dbsystem : -> (is-a/c dbsystem<%>)
-    get-dbsystem
-
-    ;; query* : symbol (listof Statement) Collector -> (listof QueryResult)
-    query*
-
-    ;; prepare* : symbol (listof Preparable) -> (listof PreparedStatement)
-    prepare*))
+    free-statement)) ;; prepared-statement<%> -> void
 
 
 ;; ==== DBSystem
@@ -52,18 +45,21 @@
     typeids->types      ;; (listof typeid) -> (listof type)
 
     get-parameter-handlers ;; (listof typeid) -> (listof ParameterHandler)
-    field-dvecs->typeids   ;; (listof field-dvec) -> (listof typeid)
-    ))
+    field-dvecs->typeids)) ;; (listof field-dvec) -> (listof typeid)
 
 ;; ParameterHandler = (fsym index datum -> ???)
 ;; Each system gets to choose its checked-param representation.
 ;; Maybe check and convert to string. Maybe just check, do binary conversion later.
+
 
 ;; ==== Prepared
 
 ;; prepared-statement<%>
 (define prepared-statement<%>
   (interface ()
+    get-handle         ;; -> Handle (depends on database system)
+    set-handle         ;; Handle -> void
+
     get-param-count    ;; -> nat or #f
     get-param-typeids  ;; -> (listof typeid)
     get-param-types    ;; -> (listof type)
@@ -75,6 +71,10 @@
 
     check-owner        ;; symbol connection any -> #t (or error)
     bind               ;; symbol (listof param) -> statement-binding
+
+    ;; extension hooks: usually shouldn't need to override
+    finalize           ;; -> void
+    register-finalizer ;; -> void
     ))
 
 

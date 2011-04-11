@@ -18,30 +18,8 @@
          handle-status
          dbsystem)
 
-(define will-executor (make-will-executor))
-
-(define finalizer-thread
-  (thread/suspend-to-kill
-   (lambda ()
-     (let loop ()
-       (will-execute will-executor)
-       (loop)))))
-
 (define prepared-statement%
   (class prepared-statement-base%
-    (init-private stmt) ;; a hstmt
-    (define/public (get-stmt) stmt)
-
-    (define/public (finalize)
-      (call-as-atomic
-       (lambda ()
-         (let ([stmt* stmt])
-           (when stmt*
-             (set! stmt #f)
-             (handle-status 'finalize-statement (SQLFreeStmt stmt* SQL_CLOSE) stmt*)
-             (handle-status 'finalize-statement (SQLFreeHandle SQL_HANDLE_STMT stmt*) stmt*)
-             (void))))))
-
     (super-new)))
 
 ;; == Connection
@@ -75,9 +53,8 @@
     (define/public (get-dbsystem) dbsystem)
     (define/public (connected?) (and -db #t))
 
-    (define/public (query* fsym stmts collector)
-      (for/list ([stmt (in-list stmts)])
-        (query1 fsym stmt collector)))
+    (define/public (query fsym stmt collector)
+      (query1 fsym stmt collector))
 
     (define/private (query1 fsym stmt collector)
       (cond [(string? stmt)
@@ -94,7 +71,7 @@
       (define-values (dvecs rows)
         (with-lock
          (let* ([db (get-db fsym)]
-                [stmt (send pst get-stmt)]
+                [stmt (send pst get-handle)]
                 ;; FIXME: reset/clear
                 [result-dvecs (send pst get-result-dvecs)])
            (for ([i (in-naturals 1)]
@@ -282,9 +259,8 @@
                      [(sql-null? fields) sql-null]))]
             [else (get-string)]))
 
-    (define/public (prepare* fsym stmts)
-      (for/list ([stmt stmts])
-        (prepare1 fsym stmt)))
+    (define/public (prepare fsym stmt)
+      (prepare1 fsym stmt))
 
     (define/private (prepare1 fsym sql)
       (with-lock
@@ -308,13 +284,11 @@
                  (for/list ([i (in-range 1 (add1 result-count))])
                    (describe-result-column fsym stmt i)))])
          (let ([pst (new prepared-statement%
-                         (stmt stmt)
+                         (handle stmt)
                          (owner this)
                          (param-typeids param-typeids)
                          (result-dvecs result-dvecs))])
            (hash-set! statement-table pst #t)
-           (thread-resume finalizer-thread)
-           (will-register will-executor pst (lambda (pst) (send pst finalize)))
            pst))))
 
     (define/private (describe-param fsym stmt i)
@@ -341,14 +315,25 @@
            (set! -env #f)
            (set! statement-table #f)
            (for ([pst (in-list statements)])
-             (send pst finalize))
+             (free-statement* 'disconnect pst))
            (handle-status 'disconnect (SQLDisconnect db) db)
            (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_DBC db))
            (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_ENV env))
            (void)))))
 
-    (super-new)
+    (define/public (free-statement pst)
+      (with-lock
+       (free-statement* 'free-statement pst)))
 
+    (define/private (free-statement* fsym pst)
+      (let ([stmt (send pst get-handle)])
+        (when stmt
+          (send pst set-handle #f)
+          (handle-status 'free-statement (SQLFreeStmt stmt SQL_CLOSE) stmt)
+          (handle-status 'free-statement (SQLFreeHandle SQL_HANDLE_STMT stmt) stmt)
+          (void))))
+
+    (super-new)
     (register-finalizer this (lambda (obj) (send obj disconnect)))))
 
 ;; ----------------------------------------

@@ -138,6 +138,7 @@
 
 (define low-level-tests
   (test-suite "low-level"
+    #|
     (test-case "query-multiple"
       (with-connection c
         (let [(q (query-multiple c (list "select N from the_numbers" "select 5 as N")))]
@@ -156,6 +157,7 @@
            (set-equal? (map car test-data)
                        (map (lambda (v) (vector-ref v 0) )
                             (recordset-rows (car q))))))))
+    |#
     (test-case "query - select"
       (with-connection c
         (let [(q (query c "select N from the_numbers"))]
@@ -271,11 +273,6 @@
 (define error-tests
   (test-suite "errors"
     (test-suite "low-level"
-      (test-case "query-multiple - not a statement list"
-        (with-connection c
-          (check-exn exn:fail? (lambda () (query-multiple c 5)))
-          (check-exn exn:fail? (lambda () (query-multiple c "select 5")))
-          (check-exn exn:fail? (lambda () (query-multiple c (list 5))))))
       (test-case "query - not a statement"
         (with-connection c
           (check-exn exn:fail? (lambda () (query c 5)))))

@@ -24,29 +24,7 @@
 
 (define prepared-statement%
   (class prepared-statement-base%
-    (init-private name)
-    (define/public (get-name) name)
     (super-new)))
-
-;; ========================================
-
-;; base<%>
-;; Manages communication
-(define base<%>
-  (interface ()
-    recv-message           ;; -> message
-    send-message           ;; message -> void
-    buffer-message         ;; mesage -> void
-    flush-message-buffer   ;; -> void
-    check-ready-for-query  ;; symbol boolean -> void
-
-    lock                   ;; symbol -> void
-    unlock                 ;; -> void
-    call-with-lock         ;; symbol (-> any) -> any
-
-    disconnect*            ;; [boolean] -> void
-    connected?             ;; -> boolean
-    ))
 
 ;; ========================================
 
@@ -77,20 +55,21 @@
     ;; Delay async handler calls until unlock.
     (define delayed-handler-calls null)
 
-    (define/public (lock who)
+    (define/private (lock who require-connected?)
       (semaphore-wait wlock)
-      (unless outport
+      (when (and require-connected? (not outport))
         (semaphore-post wlock)
         (error who "not connected")))
 
-    (define/public (unlock)
+    (define/private (unlock)
       (let ([handler-calls delayed-handler-calls])
         (set! delayed-handler-calls null)
         (semaphore-post wlock)
         (for-each (lambda (p) (p)) handler-calls)))
 
-    (define/public (call-with-lock who proc)
-      (lock who)
+    (define/private (call-with-lock who proc
+                                   #:require-connected? [require-connected? #t])
+      (lock who require-connected?)
       (with-handlers ([values (lambda (e) (unlock) (raise e))])
         (begin0 (proc) (unlock))))
 
@@ -106,7 +85,7 @@
          r)))
 
     ;; recv-message : symbol -> message
-    (define/public (recv-message fsym)
+    (define/private (recv-message fsym)
       (let ([r (raw-recv)])
         (cond [(ErrorResponse? r)
                (check-ready-for-query fsym #t) ;; FIXME: eat msgs until ReadyForQuery?
@@ -119,24 +98,24 @@
               [else r])))
 
     ;; send-message : message -> void
-    (define/public (send-message msg)
+    (define/private (send-message msg)
       (buffer-message msg)
       (flush-message-buffer))
 
     ;; buffer-message : message -> void
-    (define/public (buffer-message msg)
+    (define/private (buffer-message msg)
       (when DEBUG-SENT-MESSAGES
         (fprintf (current-error-port) "  >> ~s\n" msg))
       (with-disconnect-on-error
        (write-message msg outport)))
 
     ;; flush-message-buffer : -> void
-    (define/public (flush-message-buffer)
+    (define/private (flush-message-buffer)
       (with-disconnect-on-error
        (flush-output outport)))
 
     ;; check-ready-for-query : symbol -> void
-    (define/public (check-ready-for-query fsym or-eof?)
+    (define/private (check-ready-for-query fsym or-eof?)
       (let ([r (recv-message fsym)])
         (cond [(ReadyForQuery? r) (void)]
               [(and or-eof? (eof-object? r)) (void)]
@@ -177,23 +156,24 @@
       (disconnect* #t))
 
     ;; disconnect* : boolean -> void
-    (define/public (disconnect* no-lock-held?)
+    (define/private (disconnect* no-lock-held?)
       ;; If we don't hold the lock, try to acquire it and disconnect politely.
       (define politely? no-lock-held?)
-      (when (connected?)
-        (when politely?
-          (lock 'disconnect)
-          (send-message (make-Terminate)))
+      (define (go)
         (when DEBUG-SENT-MESSAGES
           (fprintf (current-error-port) "  ** Disconnecting\n"))
-        (when inport
-          (close-input-port inport)
-          (set! inport #f))
         (when outport
+          (when politely?
+            (send-message (make-Terminate)))
           (close-output-port outport)
           (set! outport #f))
-        (when politely?
-          (unlock))))
+        (when inport
+          (close-input-port inport)
+          (set! inport #f)))
+      (cond [politely?
+             (call-with-lock 'disconnect go
+                             #:require-connected? #f)]
+            [else (go)]))
 
     ;; connected? : -> boolean
     (define/public (connected?)
@@ -279,22 +259,17 @@
 
     ;; == Query
 
-    ;; query* : symbol (list-of Statement) Collector
-    ;;       -> (list-of QueryResult)
-    (define/public (query* fsym stmts collector)
-      (for ([stmt (in-list stmts)])
-        (check-statement fsym stmt))
-      (let ([results
+    ;; query : symbol Statement Collector -> QueryResult
+    (define/public (query fsym stmt collector)
+      (check-statement fsym stmt)
+      (let ([result
              (call-with-lock fsym
                (lambda ()
-                 (for ([stmt (in-list stmts)])
-                   (query1:enqueue stmt))
+                 (query1:enqueue stmt)
                  (send-message (make-Sync))
-                 (begin0 (for/list ([stmt (in-list stmts)])
-                           (query1:collect fsym stmt))
+                 (begin0 (query1:collect fsym stmt)
                    (check-ready-for-query fsym #f))))])
-        (map (lambda (result) (query1:process-result fsym collector result))
-             results)))
+        (query1:process-result fsym collector result)))
 
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
@@ -302,7 +277,7 @@
           (begin (buffer-message (make-Parse "" stmt null))
                  (buffer-message (make-Bind "" "" null null null)))
           (let* ([pst (statement-binding-pst stmt)]
-                 [pst-name (send pst get-name)]
+                 [pst-name (send pst get-handle)]
                  [params (statement-binding-params stmt)])
             (buffer-message (make-Bind "" pst-name null params null))))
       (buffer-message (make-Describe 'portal ""))
@@ -407,22 +382,16 @@
 
     ;; == Prepare
 
-    ;; prepare* : symbol (list-of string) -> (list-of PreparedStatement)
-    (define/public (prepare* fsym stmts)
+    ;; prepare : symbol string -> PreparedStatement
+    (define/public (prepare fsym stmt)
       (call-with-lock fsym
         (lambda ()
           ;; name generation within exchange: synchronized
-          (let ([names (map (lambda (_) (generate-name)) stmts)])
-            (for ([name (in-list names)]
-                  [stmt (in-list stmts)])
-              (prepare1:enqueue name stmt))
+          (let ([name (generate-name)])
+            (prepare1:enqueue name stmt)
             (send-message (make-Sync))
-            (let ([results
-                   (for/list ([name (in-list names)]
-                              [stmt (in-list stmts)])
-                     (prepare1:collect fsym name stmt))])
-              (check-ready-for-query fsym #f)
-              results)))))
+            (begin0 (prepare1:collect fsym name stmt)
+              (check-ready-for-query fsym #f))))))
 
     ;; prepare1:enqueue : string string -> void
     (define/private (prepare1:enqueue name stmt)
@@ -458,7 +427,7 @@
 
     (define/private (prepare1:finish fsym name stmt param-typeids result-dvecs)
       (new prepared-statement%
-           (name name)
+           (handle name)
            (param-typeids param-typeids)
            (result-dvecs result-dvecs)
            (owner this)))
@@ -478,7 +447,23 @@
     (define/private (generate-name)
       (let ([n name-counter])
         (set! name-counter (add1 name-counter))
-        (format "λmz_~a_~a" process-id n)))))
+        (format "λmz_~a_~a" process-id n)))
+
+    ;; free-statement : prepared-statement -> void
+    (define/public (free-statement pst)
+      (call-with-lock 'free-statement
+        #:require-connected? #f
+        (lambda ()
+          (let ([name (send pst get-handle)])
+            (when (and name outport) ;; outport = connected?
+              (send pst set-handle #f)
+              (buffer-message (make-Close 'statement name))
+              (buffer-message (make-Sync))
+              (let ([r (recv-message 'free-statement)])
+                (cond [(CloseComplete? r) (void)]
+                      [else (error 'free-statement "internal error: unexpected message")])
+                (check-ready-for-query 'free-statement #t)))))))
+    ))
 
 
 ;; ========================================

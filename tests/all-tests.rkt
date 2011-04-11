@@ -74,6 +74,13 @@
 (putenv "DBPASSWORD" ???)
 (test/gui postgresql:test)
 (test/gui mysql:test)
+
+;; sqlite3 test just uses 'memory
+(test/gui sqlite3:test)
+
+;; ODBC testing:
+(putenv "DBDB" <data-source-name>")
+(test/gui odbc:test)
 |#
 
 (define-syntax-rule (setup-debug db@ c)

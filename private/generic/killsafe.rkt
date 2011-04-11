@@ -56,10 +56,13 @@
     (define/public (get-dbsystem)
       (call (lambda (obj) (send obj get-dbsystem))))
 
-    (define/public (query* fsym stmts collector)
-      (call (lambda (obj) (send obj query* fsym stmts collector))))
+    (define/public (query fsym stmt collector)
+      (call (lambda (obj) (send obj query fsym stmt collector))))
 
-    (define/public (prepare* fsym stmts)
-      (call (lambda (obj) (send obj prepare* fsym stmts))))
+    (define/public (prepare fsym stmt)
+      (call (lambda (obj) (send obj prepare fsym stmt))))
+
+    (define/public (free-statement stmt)
+      (call (lambda (obj) (send obj free-statement stmt))))
 
     (super-new)))

@@ -22,12 +22,6 @@
 
 ;; ========================================
 
-(define prepared-statement%
-  (class prepared-statement-base%
-    (super-new)))
-
-;; ========================================
-
 (define connection-base%
   (class* object% (connection<%> connector<%>)
     (init-private notice-handler

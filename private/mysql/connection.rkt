@@ -20,10 +20,6 @@
 
 (define MAX-PACKET-LENGTH #x1000000)
 
-(define prepared-statement%
-  (class prepared-statement-base%
-    (super-new)))
-
 ;; ========================================
 
 (define connection%

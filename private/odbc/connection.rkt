@@ -18,10 +18,6 @@
          handle-status
          dbsystem)
 
-(define prepared-statement%
-  (class prepared-statement-base%
-    (super-new)))
-
 ;; == Connection
 
 (define connection%

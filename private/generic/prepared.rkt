@@ -6,10 +6,10 @@
 (require racket/class
          "interfaces.rkt"
          "sql-data.rkt")
-(provide prepared-statement-base%)
+(provide prepared-statement%)
 
-;; prepared-statement-base%
-(define prepared-statement-base%
+;; prepared-statement%
+(define prepared-statement%
   (class* object% (prepared-statement<%>)
     (init-private handle            ;; handle, determined by database system
                   param-typeids     ;; (listof typeid)

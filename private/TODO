@@ -1,8 +1,6 @@
 To do
 =====
 
-- free ad-hoc prepared statements immediately after execution
-
 - strict mode by default: error if backend result type unknown
 
 ----

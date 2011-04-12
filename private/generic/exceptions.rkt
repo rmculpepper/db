@@ -3,21 +3,26 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(provide (struct-out exn:fail:backend)
-         internal-raise-backend-error)
+(provide (struct-out exn:fail:sql)
+         raise-sql-error)
 
-;; exn:fail:backend
-;; Represents an error sent by the backend.
-(define-struct (exn:fail:backend exn:fail:user) (properties))
+#|
+Exceptions
 
-;; internal-raise-backend-error : symbol/#f string/#f string alist -> raises exn
-(define (internal-raise-backend-error function code message props)
+Only errors with an associated SQLSTATE are represented by
+exn:fail:sql, specifically only errors originating from a database
+backend or library. Other errors are typically raised using 'error',
+producing plain old exn:fail.
+|#
+
+;; exn:fail:sql
+;; Represents an error with an associated SQLSTATE
+(define-struct (exn:fail:sql exn:fail) (sqlstate info))
+
+;; raise-sql-error : symbol string string alist -> raises exn
+(define (raise-sql-error who sqlstate message info)
   (raise 
-   (make-exn:fail:backend
-    (string-append (if function
-                       (format "~a: " function)
-                       "")
-                   message
-                   " (SQL code " code ")")
-    (current-continuation-marks)
-    props)))
+   (make-exn:fail:sql (format "~a: ~a (SQLSTATE ~a)" who message sqlstate)
+                      (current-continuation-marks)
+                      sqlstate
+                      info)))

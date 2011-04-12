@@ -11,6 +11,7 @@
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
          "../generic/io.rkt"
+         "../generic/exceptions.rkt"
          "ffi.rkt"
          "ffi-constants.rkt"
          "dbsystem.rkt")
@@ -361,9 +362,12 @@
                   (SQLGetDiagRec handle-type handle 1)])
       (case mode
         ((error)
-         (error who "~a: ~a" sqlstate message))
+         (raise-sql-error who sqlstate message
+                          `((code . ,sqlstate)
+                            (message . ,message)
+                            (native-errcode . ,native-errcode))))
         ((print)
-         (eprintf "~a: ~a: ~a\n" who sqlstate message))))))
+         (eprintf "~a: ~a (SQLSTATE ~a)\n" who message sqlstate))))))
 
 (define (field-dvec->field-info dvec)
   `((name . ,(vector-ref dvec 0))

@@ -14,6 +14,7 @@ To do
   - and add to ODBC (easy as result, complicated as param (I think))
 
 - doc: enumerate errors
+- document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 
 - add sql-bits datatype for BIT, VARBIT types
 

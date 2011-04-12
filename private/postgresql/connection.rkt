@@ -11,8 +11,8 @@
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
          "../generic/prepared.rkt"
+         "../generic/exceptions.rkt"
          "msg.rkt"
-         "exceptions.rkt"
          "dbsystem.rkt")
 (provide connection%)
 
@@ -505,6 +505,13 @@
 
 (define (crypt-password password salt)
   (error 'crypt-password "not implemented"))
+
+;; raise-backend-error : symbol ErrorResponse -> raises exn
+(define (raise-backend-error who r)
+  (define props (ErrorResponse-properties r))
+  (define code (cdr (assq 'code props)))
+  (define message (cdr (assq 'message props)))
+  (raise-sql-error who code message props))
 
 ;; ========================================
 

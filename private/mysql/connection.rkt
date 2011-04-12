@@ -9,8 +9,8 @@
          "../generic/interfaces.rkt"
          "../generic/prepared.rkt"
          "../generic/sql-data.rkt"
+         "../generic/exceptions.rkt"
          "message.rkt"
-         "exceptions.rkt"
          "dbsystem.rkt")
 (provide connection%)
 
@@ -399,6 +399,15 @@
     protocol-41
     secure-connection
     connect-with-db))
+
+;; raise-backend-error : symbol ErrorPacket -> raises exn
+(define (raise-backend-error who r)
+  (define code (error-packet-sqlstate r))
+  (define message (error-packet-message r))
+  (define props (list (cons 'errno (error-packet-errno r))
+                      (cons 'code code)
+                      (cons 'message message)))
+  (raise-sql-error who code message props))
 
 ;; ========================================
 

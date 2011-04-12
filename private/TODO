@@ -5,14 +5,17 @@ To do
 
 ----
 
+- connection-generators, analogous to statement-generators
+  cache by thread, but when to disconnect?
+
 - test statement-generators
+
+- test sql-interval type
+  - and add to ODBC (easy as result, complicated as param (I think))
 
 - doc: enumerate errors
 
 - add sql-bits datatype for BIT, VARBIT types
-
-- test sql-interval type
-  - and add to ODBC (easy as result, complicated as param (I think))
 
 - figure out ODBC and unicode (need to use WCHAR?)
 

@@ -1,26 +1,34 @@
 To do
 =====
 
-- strict mode by default: error if backend result type unknown
+- document util/connect
 
 ----
 
-- connection-generators, analogous to statement-generators
-  cache by thread, but when to disconnect?
+Types
 
-- test statement-generators
+- better handling of unsupported param types and result types
+  (may need to handle differently)
 
 - test sql-interval type
   - and add to ODBC (easy as result, complicated as param (I think))
 
+- add sql-bits datatype for BIT, VARBIT types
+
+- permit type annotations for
+  - query params (would help mysql, odbc)
+  - extra conversions on result fields (eg sqlite, specify date field)
+
+- sqlite: opportunistic conversions based on decltype (eg date, time)
+
+----
+
+- test statement-generators
+
 - doc: enumerate errors
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 
-- add sql-bits datatype for BIT, VARBIT types
-
 - figure out ODBC and unicode (need to use WCHAR?)
-
-- printers for sql-* structs
 
 - sqlite: allow configurable behavior on SQLITE_BUSY
   eg retry n times, retry forever, retry w/ timeout, fail
@@ -29,14 +37,6 @@ To do
 - some parts of docs are Linux-centric, especially ODBC part; broaden
 
 - clean up le/be/host in generic/io, odbc
-
-- export and doc kill-safe wrapper
-
-- permit type annotations for
-  - query params (would help mysql, odbc)
-  - extra conversions on result fields (eg sqlite, specify date field)
-
-- sqlite: opportunistic conversions based on decltype (eg date, time)
 
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)

@@ -30,10 +30,44 @@ causes the current actual connection associated with the thread (if
 there is one) to be disconnected, but the connection will be recreated
 if a query function is executed.
 
+@examples/results[
+[(define c
+   (connection-generator
+    (lambda ()
+      (printf "connecting!\n")
+      (postgresql-connect ....))))
+ (void)]
+[(connected? c)
+ (values #f)]
+[(query-value c "select 1")
+ (begin (printf "connecting!\n") 1)]
+[(connected? c)
+ (values #t)]
+[(void (thread (lambda () (displayln (query-value c "select 2")))))
+ (begin (printf "connecting!\n") (displayln 2))]
+[(disconnect c)
+ (void)]
+[(connected? c)
+ (values #f)]
+[(query-value c "select 3")
+ (begin (printf "connecting!\n") 3)]
+]
+
 Connections produced by @racket[connection-generator] may not be used
 with the @racket[prepare] function. However, they may still be used to
 execute parameterized queries expressed as strings or encapsulated via
 @racket[statement-generator].
+
+@examples/results[
+[(prepare c "select 2 + $1")
+ (error 'prepare "cannot prepare statement with connection-generator")]
+[(query-value c "select 2 + $1" 2)
+ 4]
+[(define pst (statement-generator "select 2 + $1"))
+ (void)]
+[(query-value c pst 3)
+ 5]
+]
 }
 
 

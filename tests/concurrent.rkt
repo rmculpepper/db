@@ -7,7 +7,7 @@
          rackunit
          "../private/generic/functions.rkt"
          "../private/generic/signatures.rkt"
-         "../private/generic/killsafe.rkt"
+         "../util/connect.rkt"
          "config.rkt")
 (import database^ config^)
 (export test^)
@@ -46,7 +46,7 @@
     (call-with-connection
      (lambda (c0)
        (let ([c (if proxy?
-                    (new kill-safe-connection% (connection c0))
+                    (kill-safe-connection c0)
                     c0)])
          (query-exec c "delete from the_numbers")
          (for ([i (in-range 1000)])

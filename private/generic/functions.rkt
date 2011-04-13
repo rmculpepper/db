@@ -284,12 +284,13 @@
          (send c prepare fsym stmt close-on-exec?)]
         [(statement-generator? stmt)
          (let ([table (statement-generator-table stmt)]
-               [gen (statement-generator-gen stmt)])
+               [gen (statement-generator-gen stmt)]
+               [cache? (not (is-a? c no-cache-prepare<%>))])
            (let ([table-pst (hash-ref table c #f)])
              (or table-pst
                  (let* ([sql-string (gen (send c get-dbsystem))]
-                        [pst (prepare1 fsym c sql-string #f)])
-                   (hash-set! table c pst)
+                        [pst (prepare1 fsym c sql-string (not cache?))])
+                   (when cache? (hash-set! table c pst))
                    pst))))]))
 
 ;; ========================================

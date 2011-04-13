@@ -63,3 +63,4 @@ details.
 @include-section["query.scrbl"]
 @include-section["sql-types.scrbl"]
 @include-section["notes.scrbl"]
+@include-section["util.scrbl"]

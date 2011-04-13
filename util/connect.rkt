@@ -10,7 +10,7 @@
          "../private/generic/killsafe.rkt")
 
 (define connection-generator%
-  (class* object% (connection<%>)
+  (class* object% (connection<%> no-cache-prepare<%>)
     (init-private generate
                   get-key)
     (super-new)
@@ -88,6 +88,8 @@
       (send (get-connection #t) query fsym stmt collector))
 
     (define/public (prepare fsym stmt close-on-exec?)
+      (unless close-on-exec?
+        (error fsym "cannot prepare statement with connection-generator"))
       (send (get-connection #t) prepare fsym stmt close-on-exec?))
 
     (define/public (free-statement stmt)

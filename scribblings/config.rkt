@@ -9,11 +9,13 @@
          racket/sandbox
          (for-label racket/base
                     racket/contract
-                    (planet ryanc/db:1:0)))
+                    (planet ryanc/db:1:0)
+                    (planet ryanc/db:1:0/util/connect)))
 (provide (all-defined-out)
          (for-label (all-from-out racket/base)
                     (all-from-out racket/contract)
-                    (all-from-out (planet ryanc/db:1:0))))
+                    (all-from-out (planet ryanc/db:1:0))
+                    (all-from-out (planet ryanc/db:1:0/util/connect))))
 
 (define (my-package-version) "1.0")
 (define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:0)))))

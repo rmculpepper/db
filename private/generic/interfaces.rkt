@@ -18,6 +18,7 @@
 
          define-type-table
 
+         no-cache-prepare<%>
          connector<%>)
 
 ;; ==== Connection
@@ -33,6 +34,12 @@
 
     free-statement)) ;; prepared-statement<%> -> void
 
+;; no-cache-prepare<%>
+;; Interface to identify connections such as connection-generators:
+;; prepare method must be called with close-on-exec? = #t and result must
+;; not be cached.
+(define no-cache-prepare<%>
+  (interface ()))
 
 ;; ==== DBSystem
 

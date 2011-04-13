@@ -38,3 +38,8 @@ Types
 
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)
+
+- test kill-safe-connection by creating dummy connection object:
+  - query method acquires lock, sleeps, releases lock, returns
+    maybe bumps external semaphre before sleeping
+    kill calling thread while sleeping to test kill-safe proxy

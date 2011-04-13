@@ -69,7 +69,10 @@
   (1184 timestamptz()        #t     parse-timestamp-tz marshal-timestamp-tz)
   (1186 interval   ()        #t     parse-interval     marshal-interval)
   (1266 timetz     ()        #t     parse-time-tz      marshal-time-tz)
-  (1700 decimal    (numeric) #t     parse-decimal     marshal-decimal)
+  (1700 decimal    (numeric) #t     parse-decimal      marshal-decimal)
+
+  ;; "string" literals have type unknown; just treat as string
+  (705 unknown     ()        #t     parse-string       marshal-string)
 
   ;; The following types are not supported.
   ;; (But putting their names here yields better not-supported errors.)
@@ -87,7 +90,6 @@
   (702 abstime   () #f #f #f)
   (703 reltime   () #f #f #f)
   (704 tinterval () #f #f #f)
-  (705 unknown   () #f #f #f)
   (718 circle    () #f #f #f)
   (790 money     () #f #f #f)
   (829 macaddr   () #f #f #f)

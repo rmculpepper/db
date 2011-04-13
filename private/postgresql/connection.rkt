@@ -279,7 +279,6 @@
       (buffer-message (make-Execute "" 0))
       (buffer-message (make-Close 'portal "")))
 
-    ;; query1:collect : symbol Statement bool bool -> QueryResult stream
     (define/private (query1:collect fsym stmt)
       (when (string? stmt)
         (match (recv-message fsym)
@@ -377,7 +376,6 @@
       (buffer-message (make-Parse name stmt null))
       (buffer-message (make-Describe 'statement name)))
 
-    ;; prepare1:collect : stream string string boolean -> PreparedStatement stream
     (define/private (prepare1:collect fsym name close-on-exec?)
       (match (recv-message fsym)
         [(struct ParseComplete ()) (void)]

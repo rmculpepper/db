@@ -144,7 +144,7 @@ The following table lists the SQLite types known to this package,
 along with their corresponding Racket representations.
 
 Unlike PostgreSQL and MySQL, SQLite does not enforce declared type
-constraints (with the exception of integer primary keys) on
+constraints (with the exception of @tt{integer primary key}) on
 @emph{columns}. Rather, every SQLite @emph{value} has an associated
 ``storage class''.
 

@@ -20,6 +20,7 @@
          io:write-le-int16
          io:write-le-int24
          io:write-le-int32
+         io:write-le-int64
          io:write-le-intN
          io:write-length-code
          io:write-length-coded-bytes
@@ -40,6 +41,7 @@
          io:read-le-int16
          io:read-le-int24
          io:read-le-int32
+         io:read-le-int64
          io:read-le-intN
          io:read-length-code
          io:read-length-coded-bytes
@@ -175,15 +177,18 @@
   (write-byte/timeout 0 port))
 
 ;; write-le-int16
-(define (io:write-le-int16 port n)
-  (write-bytes/timeout (integer->integer-bytes n 2 #f #f) port))
+(define (io:write-le-int16 port n [signed? #f])
+  (write-bytes/timeout (integer->integer-bytes n 2 signed? #f) port))
 
 (define (io:write-le-int24 port n)
   (write-bytes/timeout (subbytes (integer->integer-bytes n 4 #f #f) 0 3)
                        port))
 
-(define (io:write-le-int32 port n)
-  (write-bytes/timeout (integer->integer-bytes n 4 #f #f) port))
+(define (io:write-le-int32 port n [signed? #f])
+  (write-bytes/timeout (integer->integer-bytes n 4 signed? #f) port))
+
+(define (io:write-le-int64 port n [signed? #f])
+  (write-bytes/timeout (integer->integer-bytes n 8 signed? #f) port))
 
 (define (io:write-le-intN port count n)
   (let loop ([count count] [n n])
@@ -279,14 +284,17 @@
         #f
         (io:read-bytes-as-string port len))))
 
-(define (io:read-le-int16 port)
-  (integer-bytes->integer (read-bytes/timeout 2 port) #f #f))
+(define (io:read-le-int16 port [signed? #f])
+  (integer-bytes->integer (read-bytes/timeout 2 port) signed? #f))
 
 (define (io:read-le-int24 port)
   (io:read-le-intN port 3))
 
-(define (io:read-le-int32 port)
-  (integer-bytes->integer (read-bytes/timeout 4 port) #f #f))
+(define (io:read-le-int32 port [signed? #f])
+  (integer-bytes->integer (read-bytes/timeout 4 port) signed? #f))
+
+(define (io:read-le-int64 port [signed? #f])
+  (integer-bytes->integer (read-bytes/timeout 8 port) signed? #f))
 
 (define (io:read-le-intN port count)
   (case count

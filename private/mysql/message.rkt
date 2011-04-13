@@ -420,19 +420,19 @@ Based on protocol documentation here:
   ;; We'll try using #2.
 
   (define type (field-dvec->typeid field-dvec))
+  (define flags (field-dvec->flags field-dvec))
 
   (case type
 
-    ((tiny) (io:read-byte in))
-    ((short) (io:read-le-int16 in))
-    ((int24) (io:read-le-int24 in)) ;; or maybe send as long???
-    ((long) (io:read-le-int32 in))
-    ((longlong) (io:read-le-intN in 8))
+    ((tiny) (io:read-byte in)) ;; FIXME signed/unsigned
+    ((short) (io:read-le-int16 in (not (memq 'unsigned flags))))
+    ((int24) (io:read-le-int24 in (not (memq 'unsigned flags))))
+    ((long) (io:read-le-int32 in (not (memq 'unsigned flags))))
+    ((longlong) (io:read-le-int64 in (not (memq 'unsigned flags))))
     ((varchar var-string)
-     (let ([binary? (memq 'binary (field-dvec->flags field-dvec))])
-       (if binary?
-           (io:read-length-coded-bytes in)
-           (io:read-length-coded-string in))))
+     (if (memq 'binary flags)
+         (io:read-length-coded-bytes in)
+         (io:read-length-coded-string in)))
     ((blob) (io:read-length-coded-bytes in))
 
     ((float)
@@ -499,9 +499,9 @@ Based on protocol documentation here:
 (define (write-binary-datum out type param)
   (case type
     ((tiny) (io:write-byte out param))
-    ((short) (io:write-le-int16 out param))
-    ((long) (io:write-le-int32 out param))
-    ((longlong) (io:write-le-intN out param 8))
+    ((short) (io:write-le-int16 out param #t))
+    ((long) (io:write-le-int32 out param #t))
+    ((longlong) (io:write-le-intN out param 8 #t))
 
     ;; Special case: mysql gives all parameters type var-string,
     ;; even when obviously not (eg, "select 1 + ?")

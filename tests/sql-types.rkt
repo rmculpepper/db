@@ -136,7 +136,7 @@
                      ((numeric) "select cast(? as decimal)")
                      ((date) "select cast(? as date)")
                      ((time) "select cast(? as time)")
-                     ((datetime) "select cast (? as datetime)")
+                     ((datetime) "select cast(? as datetime)")
                      (else #f))])
               (when stmt
                 (check (query-value c stmt value)
@@ -192,7 +192,7 @@
            (check-roundtrip c +inf.0)
            (check-roundtrip c -inf.0)
            (check-roundtrip c +nan.0)))))
-    (type-test-case '(numeric)
+    (type-test-case '(numeric decimal)
       (call-with-connection
        (lambda (c)
          (check-roundtrip c 12345678901234567890)

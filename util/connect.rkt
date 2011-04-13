@@ -12,7 +12,8 @@
 (define connection-generator%
   (class* object% (connection<%> no-cache-prepare<%>)
     (init-private generate
-                  get-key)
+                  get-key
+                  fresh-alarm)
     (super-new)
 
     (define req-channel (make-channel))
@@ -38,26 +39,40 @@
       (channel-put add-channel (cons (get-key) #f)))
 
     (define/private (manage)
-      (define connection-table (make-hasheq))
+      (define connection-table (make-hasheq)) ;; key => (cons alarm-evt connection)
+      (define (fresh-alarm-for key)
+        (wrap-evt (fresh-alarm) (lambda (a) key)))
+      (define (put! key value)
+        (let* ([alarm (fresh-alarm-for key)])
+          (hash-set! connection-table key (cons alarm value))))
+      (define (get key) ;; also refreshes alarm
+        (let* ([value (hash-ref connection-table key #f)])
+          (and value
+               (let ([c (cdr value)]
+                     [alarm (fresh-alarm-for key)])
+                 (hash-set! connection-table key (cons alarm c))
+                 c))))
       (let loop ()
-        (let* ([keys (hash-map connection-table (lambda (k v) k))])
+        (let* ([keys (hash-map connection-table (lambda (k v) k))]
+               [alarms (hash-map connection-table (lambda (k v) (car v)))])
           (sync (handle-evt req-channel
                             (lambda (box+sema)
                               (let* ([b (car box+sema)]
                                      [sema (cdr box+sema)]
                                      [key (unbox b)])
-                                (set-box! b (hash-ref connection-table key #f))
+                                (set-box! b (get key))
                                 (semaphore-post sema))))
                 (handle-evt add-channel
                             (lambda (key+val)
                               (if (cdr key+val)
-                                  (hash-set! connection-table (car key+val) (cdr key+val))
+                                  (put! (car key+val) (cdr key+val))
                                   (hash-remove! connection-table (car key+val)))))
-                (handle-evt (apply choice-evt keys)
+                (handle-evt (choice-evt (apply choice-evt keys)
+                                        (apply choice-evt alarms))
                             (lambda (key)
                               (let ([c (hash-ref connection-table key #f)])
                                 (hash-remove! connection-table key)
-                                (when c (cleanup c))))))
+                                (when c (cleanup (cdr c)))))))
           (loop))))
 
     (define/private (cleanup c)
@@ -102,13 +117,18 @@
   (new kill-safe-connection%
        (connection connection)))
 
-(define (connection-generator generate)
+(define (connection-generator generate #:timeout [timeout #f])
   (new connection-generator%
        (generate generate)
-       (get-key (lambda () (thread-dead-evt (current-thread))))))
+       (get-key (lambda () (thread-dead-evt (current-thread))))
+       (fresh-alarm (if timeout
+                        (lambda () (alarm-evt (+ (current-inexact-milliseconds)
+                                                 (* 1000 timeout))))
+                        (lambda () never-evt)))))
 
 (provide/contract
  [kill-safe-connection
   (-> connection? connection?)]
  [connection-generator
-  (-> (-> connection?) connection?)])
+  (->* ((-> connection?)) (#:timeout (and/c rational? positive?))
+       connection?)])

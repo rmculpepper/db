@@ -11,7 +11,9 @@
 
 @(my-declare-exporting util/connect)
 
-@defproc[(connection-generator [generator (-> connection?)])
+@defproc[(connection-generator
+             [generator (-> connection?)]
+             [#:timeout timeout (or/c #f (and/c rational? positive?)) #f])
          connection?]{
 
 Creates a virtual connection that creates actual connections on demand
@@ -20,8 +22,9 @@ encapsulates a mapping of threads to actual connections. When a query
 function is called with a connection generator, the current thread's
 associated actual connection is used to execute the query. If there is
 no actual connection associated with the current thread, one is
-obtained by calling @racket[generator]. When a thread dies, its
-associated actual connection is disconnected.
+obtained by calling @racket[generator]. An actual connection is
+disconnected when its associated thread dies or if @racket[timeout]
+seconds elapse since the actual connection was last used.
 
 When given a connection produced by @racket[connection-generator],
 @racket[connected?] indicates whether there is an actual connection

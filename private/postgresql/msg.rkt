@@ -317,7 +317,7 @@
             CancelRequest))
 
 (define (parse-server-message p)
-  (let ([c (io:read p #:byte/char)])
+  (let ([c (read-char p)])
     (case c
       ((#\R) (parse:Authentication p))
       ((#\E) (parse:ErrorResponse p))
@@ -338,8 +338,11 @@
       ((#\p) (parse:PortalSuspended p))
       ((#\Z) (parse:ReadyForQuery p))
       ((#\T) (parse:RowDescription p))
-      (else (error 'parse-server-message
-                   "internal error: unknown message header byte: ~e" c)))))
+      (else
+       (if (eof-object? c)
+           c
+           (error 'parse-server-message
+                  "internal error: unknown message header byte: ~e" c))))))
 
 ;; ========================================
 

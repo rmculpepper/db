@@ -153,7 +153,6 @@ No conversion may be passed sql-null.
   (define (to-num m)
     (if m (string->number m) 0))
   (define match-result (regexp-match interval-rx s))
-  (eprintf "match-result = ~s\n" match-result)
   (match match-result
     [(list _whole years months days tsign hours mins secs fsec)
      (let* ([years (to-num years)]

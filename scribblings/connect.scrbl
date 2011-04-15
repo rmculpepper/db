@@ -294,8 +294,9 @@ system.
 @section{System-specific modules}
 
 The @(my-racketmodname) module exports all of the functions listed in
-this manual. Database system-specific connection modules are loaded
-lazily to avoid unnecessary dependencies on foreign libraries.
+this manual except those described in @secref["util"]. The database
+system-specific connection modules are loaded lazily to avoid
+unnecessary dependencies on foreign libraries.
 
 The following modules provide subsets of the bindings described in
 this manual.

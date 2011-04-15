@@ -27,10 +27,16 @@ a supported type:
 
 @examples/results[
 [(query-value pgc "select point(1,2)")
- (error 'query-value "unsupported type: point")]
+ (error 'query-value "unsupported type: point (typeid 600)")]
 [(query-value pgc "select cast(point(1,2) as varchar)")
  "(1,2)"]
 ]
+
+The error for unsupported types in result columns is raised when the
+query is executed; for parameters it is raised when the parameter
+values are supplied. Thus even unexecutable prepared statements can be
+inspected using @racket[prepared-statement-parameter-types] and
+@racket[prepared-statement-result-types].
 
 
 @section[#:tag "db-types"]{Type correspondences}
@@ -63,8 +69,7 @@ along with their corresponding Racket representations.
   @racket['timetz]        @& @tt{timetz}             @& @scheme[sql-time?] @//
   @racket['timestamp]     @& @tt{timestamp}          @& @scheme[sql-timestamp?] @//
   @racket['timestamptz]   @& @tt{timestamptz}        @& @scheme[sql-timestamp?] @//
-  @racket['interval]      @& @tt{interval}           @& @scheme[sql-interval?] @//
-  @racket['oid]           @& @tt{oid}                @& @scheme[exact-integer?]
+  @racket['interval]      @& @tt{interval}           @& @scheme[sql-interval?]
 }
 }
 
@@ -130,11 +135,11 @@ NaN) and SQL date/time structures (@racket[sql-date?],
 A SQL value of type @tt{decimal} is converted to an exact rational
 (MySQL seems not to support infinite @tt{decimal} values).
 
-Note that in MySQL, the @tt{time} type represents time intervals,
-which may not correspond to times of day (for example, the interval
-may be negative). In conversion from MySQL results to Racket values,
-those @tt{time} values that represent times of day are converted to
-@racket[sql-time] values; the rest are represented by
+In MySQL, the @tt{time} type represents time intervals, which may not
+correspond to times of day (for example, the interval may be negative
+or larger than 24 hours). In conversion from MySQL results to Racket
+values, those @tt{time} values that represent times of day are
+converted to @racket[sql-time] values; the rest are represented by
 @racket[sql-interval] values.
 
 

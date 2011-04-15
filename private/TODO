@@ -1,9 +1,6 @@
 To do
 =====
 
-- better handling of unsupported param types and result types
-  (may need to handle differently)
-
 ----
 
 Testing
@@ -24,6 +21,8 @@ Types
 - add sql-interval to ODBC (easy as result, complicated as param, I think)
 
 - add sql-bits datatype for BIT, VARBIT types
+
+- stricter range checking, etc, of params before entering critical section
 
 - permit type annotations for
   - query params (would help mysql, odbc)

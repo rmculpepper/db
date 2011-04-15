@@ -300,21 +300,29 @@ SQLite:       @&  supports both syntaxes (plus others)
 }
 
 @defproc[(prepared-statement-parameter-types [pst prepared-statement?])
-         (listof symbol?)]{
+         (listof (list/c boolean? (or/c symbol? #f) any/c))]{
 
-  Returns a list of symbols, one for each of the prepared statement's
-  parameters, identifying the SQL types (or pseudotypes) of the
-  parameters. See @secref["db-types"] for a discussion of how each
-  database system reports parameter types.
+  Returns a list with one element for each of the prepared statement's
+  parameters. Each element is itself a list of the following form:
+
+  @racketblock[(list _supported? _type _typeid)]
+
+  The @racket[_supported?] field is @racket[#t] if the type is
+  supported by this library; the @racket[_type] field is a symbol
+  corresponding to one of the tables in @secref["db-types"], and the
+  @racket[_typeid] field is a system-specific type identifier. The
+  type description list format may be extended with additional
+  information in future versions of this library.
 }
 
 @defproc[(prepared-statement-result-types [pst prepared-statement?])
-         (listof symbol?)]{
+         (listof (list/c boolean? (or/c symbol? #f) any/c))]{
 
   If @racket[pst] is a recordset-producing statement (eg,
-  @tt{SELECT}), returns a list of symbols, identifying the SQL types
-  (or pseudotypes) of the result columns. If @racket[pst] does not
-  produce a recordset, the function returns the empty list.
+  @tt{SELECT}), returns a list of type descriptions as described
+  above, identifying the SQL types (or pseudotypes) of the result
+  columns. If @racket[pst] does not produce a recordset, the function
+  returns the empty list.
 }
 
 

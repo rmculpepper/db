@@ -22,6 +22,8 @@ Types
 
 - add sql-bits datatype for BIT, VARBIT types
 
+- mysql, odbc: avoid marshaling params to strings
+
 - stricter range checking, etc, of params before entering critical section
 
 - permit type annotations for

@@ -3,8 +3,21 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require (prefix-in odbc- "private/odbc/main.rkt"))
-(provide odbc-connect
-         odbc-driver-connect
-         odbc-data-sources
-         odbc-drivers)
+(require racket/contract
+         "base.rkt"
+         "private/odbc/main.rkt")
+
+;; FIXME: Contracts duplicated at main.rkt
+(provide/contract
+ [odbc-connect
+  (->* (#:database string?)
+       (#:user (or/c string? #f)
+        #:password (or/c string? #f))
+       connection?)]
+ [odbc-driver-connect
+  (-> string?
+      connection?)]
+ [odbc-data-sources
+  (-> (listof (list/c string? string?)))]
+ [odbc-drivers
+  (-> (listof (cons/c string? any/c)))])

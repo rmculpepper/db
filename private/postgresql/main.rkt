@@ -11,41 +11,23 @@
          "../generic/find-socket.rkt"
          "connection.rkt"
          "dbsystem.rkt")
+(provide postgresql-connect
+         postgresql-guess-socket-path
+         (rename-out [dbsystem postgresql-dbsystem]))
 
-;; FIXME: Contracts duplicated at db/main.rkt
-(provide/contract
- [connect
-  (->* (#:user string?
-        #:database string?)
-       (#:password (or/c string? false/c)
-        #:server (or/c string? false/c)
-        #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c string? path? false/c)
-        #:input-port (or/c input-port? false/c)
-        #:output-port (or/c output-port? false/c)
-        #:allow-cleartext-password? boolean?
-        #:ssl (symbols 'yes 'no 'optional)
-        #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
-        #:notice-handler (or/c 'output 'error output-port? procedure?)
-        #:notification-handler (or/c 'output 'error output-port? procedure?))
-       any/c)]
- [guess-socket-path
-  (-> (or/c string? path?))])
-(provide dbsystem)
-
-(define (connect #:user user
-                 #:database database
-                 #:password [password #f]
-                 #:server [server #f]
-                 #:port [port #f]
-                 #:socket [socket #f]
-                 #:input-port [input-port #f]
-                 #:output-port [output-port #f]
-                 #:allow-cleartext-password? [allow-cleartext-password? #f]
-                 #:ssl [ssl 'no]
-                 #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
-                 #:notice-handler [notice-handler 'error]
-                 #:notification-handler [notification-handler 'error])
+(define (postgresql-connect #:user user
+                            #:database database
+                            #:password [password #f]
+                            #:server [server #f]
+                            #:port [port #f]
+                            #:socket [socket #f]
+                            #:input-port [input-port #f]
+                            #:output-port [output-port #f]
+                            #:allow-cleartext-password? [allow-cleartext-password? #f]
+                            #:ssl [ssl 'no]
+                            #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
+                            #:notice-handler [notice-handler 'error]
+                            #:notification-handler [notification-handler 'error])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0)
@@ -84,7 +66,7 @@
 (define socket-paths
   '("/var/run/postgresql/.s.PGSQL.5432"))
 
-(define (guess-socket-path)
+(define (postgresql-guess-socket-path)
   (guess-socket-path/paths 'postgresql-guess-socket-path socket-paths))
 
 ;; make-print-notice : output-port -> string string -> void

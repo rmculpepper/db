@@ -10,16 +10,11 @@
          "connection.rkt"
          "dbsystem.rkt"
          "ffi.rkt")
+(provide sqlite3-connect
+         (rename-out [dbsystem sqlite3-dbsystem]))
 
-;; FIXME: Contracts duplicated at db/main.rkt
-(provide/contract
- [connect
-  (-> #:database (or/c string? path? bytes? 'memory 'temporary)
-      any/c)])
-(provide dbsystem)
-
-(define (connect #:database path-or-sym
-                 #:mode [mode 'read/write])
+(define (sqlite3-connect #:database path-or-sym
+                         #:mode [mode 'read/write])
   (let ([path
          (cond [(symbol? path-or-sym)
                 (case path-or-sym

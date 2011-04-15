@@ -3,5 +3,12 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require (prefix-in sqlite3- "private/sqlite3/main.rkt"))
-(provide sqlite3-connect)
+(require racket/contract
+         "base.rkt"
+         "private/sqlite3/main.rkt")
+
+;; FIXME: Contracts duplicated at main.rkt
+(provide/contract
+ [sqlite3-connect
+  (-> #:database (or/c string? path? bytes? 'memory 'temporary)
+      any/c)])

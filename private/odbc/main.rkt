@@ -10,24 +10,15 @@
          "connection.rkt"
          "dbsystem.rkt"
          "ffi.rkt")
-(provide dbsystem)
-(provide/contract
- [connect
-  (->* (#:database string?)
-       (#:user (or/c string? #f)
-        #:password (or/c string? #f))
-       connection?)]
- [driver-connect
-  (-> string?
-      connection?)]
- [data-sources
-  (-> (listof (list/c string? string?)))]
- [drivers
-  (-> (listof (cons/c string? any/c)))])
+(provide odbc-connect
+         odbc-driver-connect
+         odbc-data-sources
+         odbc-drivers
+         (rename-out [dbsystem odbc-dbsystem]))
 
-(define (connect #:database database
-                 #:user [user #f]
-                 #:password [auth #f])
+(define (odbc-connect #:database database
+                      #:user [user #f]
+                      #:password [auth #f])
   (call-with-env 'odbc-connect
     (lambda (env)
       (call-with-db 'odbc-connect env
@@ -36,7 +27,7 @@
             (handle-status 'odbc-connect status db)
             (new connection% (env env) (db db))))))))
 
-(define (driver-connect connection-string)
+(define (odbc-driver-connect connection-string)
   (call-with-env 'odbc-driver-connect
     (lambda (env)
       (call-with-db 'odbc-driver-connect env
@@ -45,7 +36,7 @@
             (handle-status 'odbc-driver-connect status db)
             (new connection% (env env) (db db))))))))
 
-(define (data-sources)
+(define (odbc-data-sources)
   (call-with-env 'odbc-data-sources
     (lambda (env)
       (begin0
@@ -57,7 +48,7 @@
                      null])))
         (handle-status 'odbc-data-sources (SQLFreeHandle SQL_HANDLE_ENV env))))))
 
-(define (drivers)
+(define (odbc-drivers)
   (call-with-env 'odbc-drivers
    (lambda (env)
      (begin0

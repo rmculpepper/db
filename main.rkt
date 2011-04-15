@@ -10,7 +10,6 @@
 (provide (all-from-out "base.rkt"))
 
 ;; Lazy instantiation 
-;; FIXME: Turns into dynamic require of syntax-bound name (due to provide/contract)
 
 (define-syntax-rule (define-lazy-functions modpath fun ...)
   (begin (define-runtime-module-path-index mpi modpath)
@@ -38,25 +37,25 @@
 
 ;; ----
 
-(define-lazy-functions "postgresql.rkt"
+(define-lazy-functions "private/postgresql/main.rkt"
   postgresql-connect
   postgresql-guess-socket-path)
 
-(define-lazy-functions "mysql.rkt"
+(define-lazy-functions "private/mysql/main.rkt"
   mysql-connect
   mysql-guess-socket-path)
 
-(define-lazy-functions "sqlite3.rkt"
+(define-lazy-functions "private/sqlite3/main.rkt"
   sqlite3-connect)
 
-(define-lazy-functions "odbc.rkt"
+(define-lazy-functions "private/odbc/main.rkt"
   odbc-connect
   odbc-driver-connect
   odbc-data-sources
   odbc-drivers)
 
 (provide/contract
- ;; Duplicates contracts at db/postgresql/main.rkt
+ ;; Duplicates contracts at postgresql.rkt
  [postgresql-connect
   (->* (#:user string?
         #:database string?)
@@ -73,7 +72,7 @@
  [postgresql-guess-socket-path
   (-> (or/c string? path?))]
 
- ;; Duplicates contracts at db/mysql/main.rkt
+ ;; Duplicates contracts at mysql.rkt
  [mysql-connect
   (->* (#:user string?
         #:database string?)
@@ -86,12 +85,12 @@
  [mysql-guess-socket-path
   (-> (or/c string? path?))]
 
- ;; Duplicates contracts at db/sqlite3/main.rkt
+ ;; Duplicates contracts at sqlite3.rkt
  [sqlite3-connect
   (-> #:database (or/c string? path? bytes? 'memory 'temporary)
       any/c)]
 
- ;; Duplicates contracts at db/odbc/main.rkt
+ ;; Duplicates contracts at odbc.rkt
  [odbc-connect
   (->* (#:database string?)
        (#:user (or/c string? #f)

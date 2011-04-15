@@ -8,13 +8,13 @@
          racket/unit
          "../base.rkt"
          (only-in "../postgresql.rkt" postgresql-connect)
-         (only-in "../private/postgresql/main.rkt" [dbsystem postgresql-dbsystem])
+         (only-in "../private/postgresql/main.rkt" postgresql-dbsystem)
          (only-in "../mysql.rkt" mysql-connect)
-         (only-in "../private/mysql/main.rkt" [dbsystem mysql-dbsystem])
+         (only-in "../private/mysql/main.rkt" mysql-dbsystem)
          (only-in "../sqlite3.rkt" sqlite3-connect)
-         (only-in "../private/sqlite3/main.rkt" [dbsystem sqlite3-dbsystem])
+         (only-in "../private/sqlite3/main.rkt" sqlite3-dbsystem)
          (only-in "../odbc.rkt" odbc-connect)
-         (only-in "../private/odbc/main.rkt" [dbsystem odbc-dbsystem])
+         (only-in "../private/odbc/main.rkt" odbc-dbsystem)
          "config.rkt"
          "connection.rkt"
          "query.rkt"

@@ -11,33 +11,19 @@
          "../generic/find-socket.rkt"
          "connection.rkt"
          "dbsystem.rkt")
+(provide mysql-connect
+         mysql-guess-socket-path
+         (rename-out [dbsystem mysql-dbsystem]))
 
-;; FIXME: Contracts duplicated at db/main.rkt
-(provide/contract
- [connect
-  (->* (#:user string?
-        #:database string?)
-       (#:password (or/c string? false/c)
-        #:server (or/c string? false/c)
-        #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c string? path? false/c)
-        #:input-port (or/c input-port? false/c)
-        #:output-port (or/c output-port? false/c)
-        #:allow-cleartext-password? boolean?)
-       any/c)]
- [guess-socket-path
-  (-> (or/c string? path?))])
-(provide dbsystem)
-
-(define (connect #:user user
-                 #:database database
-                 #:password [password #f]
-                 #:server [server #f]
-                 #:port [port #f]
-                 #:socket [socket #f]
-                 #:input-port [input-port #f]
-                 #:output-port [output-port #f]
-                 #:allow-cleartext-password? [allow-cleartext-password? #f])
+(define (mysql-connect #:user user
+                       #:database database
+                       #:password [password #f]
+                       #:server [server #f]
+                       #:port [port #f]
+                       #:socket [socket #f]
+                       #:input-port [input-port #f]
+                       #:output-port [output-port #f]
+                       #:allow-cleartext-password? [allow-cleartext-password? #f])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0)
@@ -69,5 +55,5 @@
 (define socket-paths
   '("/var/run/mysqld/mysqld.sock"))
 
-(define (guess-socket-path)
+(define (mysql-guess-socket-path)
   (guess-socket-path/paths 'mysql-guess-socket-path socket-paths))

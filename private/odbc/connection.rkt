@@ -16,20 +16,20 @@
          "ffi-constants.rkt"
          "dbsystem.rkt")
 (provide connection%
-         handle-status
+         handle-status*
          dbsystem)
 
 ;; == Connection
 
 (define connection%
   (class* object% (connection<%>)
-    (init db)
-    (init env)
+    (init-private db
+                  env
+                  notice-handler)
 
-    (define -db db)
-    (define -env env)
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
+    (define async-handler-calls null)
 
     (define has-describe-param?
       (let-values ([(status supported?) (SQLGetFunctions db SQL_API_SQLDESCRIBEPARAM)])
@@ -37,18 +37,24 @@
         supported?))
 
     (define-syntax-rule (with-lock . body)
+      (call-with-lock (lambda () . body)))
+
+    (define/private (call-with-lock proc)
       (begin (semaphore-wait lock)
              (with-handlers ([values (lambda (e) (semaphore-post lock) (raise e))])
-               (begin0 (let () . body)
-                 (semaphore-post lock)))))
+               (begin0 (proc)
+                 (let ([handler-calls async-handler-calls])
+                   (set! async-handler-calls null)
+                   (semaphore-post lock)
+                   (for-each (lambda (p) (p)) handler-calls))))))
 
     (define/public (get-db fsym)
-      (unless -db
+      (unless db
         (error fsym "not connected"))
-      -db)
+      db)
 
     (define/public (get-dbsystem) dbsystem)
-    (define/public (connected?) (and -db #t))
+    (define/public (connected?) (and db #t))
 
     (define/public (query fsym stmt collector)
       (query1 fsym stmt collector))
@@ -306,18 +312,18 @@
 
     (define/public (disconnect)
       (with-lock
-       (when -db
-         (let ([db -db]
-               [env -env]
+       (when db
+         (let ([db* db]
+               [env* env]
                [statements (hash-map statement-table (lambda (k v) k))])
-           (set! -db #f)
-           (set! -env #f)
+           (set! db #f)
+           (set! env #f)
            (set! statement-table #f)
            (for ([pst (in-list statements)])
              (free-statement* 'disconnect pst))
-           (handle-status 'disconnect (SQLDisconnect db) db)
-           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_DBC db))
-           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_ENV env))
+           (handle-status 'disconnect (SQLDisconnect db*) db*)
+           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_DBC db*))
+           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_ENV env*))
            (void)))))
 
     (define/public (free-statement pst)
@@ -332,26 +338,35 @@
           (handle-status 'free-statement (SQLFreeHandle SQL_HANDLE_STMT stmt) stmt)
           (void))))
 
+    (define/private (handle-status who s [handle #f]
+                                   #:ignore-ok/info? [ignore-ok/info? #f])
+      (handle-status* who s handle
+                      #:ignore-ok/info? ignore-ok/info?
+                      #:on-notice (lambda (sqlstate message)
+                                    (set! async-handler-calls
+                                          (cons (lambda ()
+                                                  (notice-handler sqlstate message))
+                                                async-handler-calls)))))
+
     (super-new)
     (register-finalizer this (lambda (obj) (send obj disconnect)))))
 
 ;; ----------------------------------------
 
-;; handle-status : symbol integer -> integer
-;; Returns the status code if no error occurred, otherwise
-;; raises an exception with an appropriate message.
-(define (handle-status who s [handle #f] #:ignore-ok/info? [ignore-ok/info? #f])
+(define (handle-status* who s [handle #f]
+                        #:ignore-ok/info? [ignore-ok/info? #f]
+                        #:on-notice [on-notice void])
   (cond [(= s SQL_SUCCESS_WITH_INFO)
          (when (and handle (not ignore-ok/info?))
-           (diag-info who handle 'print))
+           (diag-info who handle 'notice on-notice))
          s]
         [(= s SQL_ERROR)
-         (when handle (diag-info who handle 'error))
+         (when handle (diag-info who handle 'error #f))
          (error who "error: ~e" s)]
         [else s]))
 ;; FIXME: check codes, what to allow, what to get error on
 
-(define (diag-info who handle mode)
+(define (diag-info who handle mode on-notice)
   (let ([handle-type
          (cond [(sqlhenv? handle) SQL_HANDLE_ENV]
                [(sqlhdbc? handle) SQL_HANDLE_DBC]
@@ -366,8 +381,8 @@
                           `((code . ,sqlstate)
                             (message . ,message)
                             (native-errcode . ,native-errcode))))
-        ((print)
-         (eprintf "~a: ~a (SQLSTATE ~a)\n" who message sqlstate))))))
+        ((notice)
+         (on-notice sqlstate message))))))
 
 (define (field-dvec->field-info dvec)
   `((name . ,(vector-ref dvec 0))

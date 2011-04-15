@@ -6,6 +6,7 @@
 (require racket/class
          racket/contract
          "../generic/main.rkt"
+         (only-in "../generic/interfaces.rkt" make-handler)
          "../generic/check-access.rkt"
          "connection.rkt"
          "dbsystem.rkt"
@@ -18,23 +19,27 @@
 
 (define (odbc-connect #:database database
                       #:user [user #f]
-                      #:password [auth #f])
-  (call-with-env 'odbc-connect
-    (lambda (env)
-      (call-with-db 'odbc-connect env
-        (lambda (db)
-          (let ([status (SQLConnect db database user auth)])
-            (handle-status 'odbc-connect status db)
-            (new connection% (env env) (db db))))))))
+                      #:password [auth #f]
+                      #:notice-handler [notice-handler void])
+  (let ([notice-handler (make-handler notice-handler "notice")])
+    (call-with-env 'odbc-connect
+      (lambda (env)
+        (call-with-db 'odbc-connect env
+          (lambda (db)
+            (let ([status (SQLConnect db database user auth)])
+              (handle-status* 'odbc-connect status db)
+              (new connection% (env env) (db db) (notice-handler notice-handler)))))))))
 
-(define (odbc-driver-connect connection-string)
-  (call-with-env 'odbc-driver-connect
-    (lambda (env)
-      (call-with-db 'odbc-driver-connect env
-        (lambda (db)
-          (let ([status (SQLDriverConnect db connection-string SQL_DRIVER_NOPROMPT)])
-            (handle-status 'odbc-driver-connect status db)
-            (new connection% (env env) (db db))))))))
+(define (odbc-driver-connect connection-string
+                             #:notice-handler [notice-handler void])
+  (let ([notice-handler (make-handler notice-handler "notice")])
+    (call-with-env 'odbc-driver-connect
+      (lambda (env)
+        (call-with-db 'odbc-driver-connect env
+          (lambda (db)
+            (let ([status (SQLDriverConnect db connection-string SQL_DRIVER_NOPROMPT)])
+              (handle-status* 'odbc-driver-connect status db)
+              (new connection% (env env) (db db) (notice-handler notice-handler)))))))))
 
 (define (odbc-data-sources)
   (call-with-env 'odbc-data-sources
@@ -46,7 +51,7 @@
                      (cons (list name description) (loop))]
                     [else ;; SQL_NO_DATA
                      null])))
-        (handle-status 'odbc-data-sources (SQLFreeHandle SQL_HANDLE_ENV env))))))
+        (handle-status* 'odbc-data-sources (SQLFreeHandle SQL_HANDLE_ENV env))))))
 
 (define (odbc-drivers)
   (call-with-env 'odbc-drivers
@@ -58,7 +63,7 @@
                     (cons (list name #f) (loop))]
                    [else ;; SQL_NO_DATA
                     null])))
-       (handle-status 'odbc-drivers (SQLFreeHandle SQL_HANDLE_ENV env))))))
+       (handle-status* 'odbc-drivers (SQLFreeHandle SQL_HANDLE_ENV env))))))
 
 ;; ----
 
@@ -70,8 +75,8 @@
                      (lambda (e)
                        (SQLFreeHandle SQL_HANDLE_ENV env)
                        (raise e))])
-      (handle-status fsym status env)
-      (handle-status fsym (SQLSetEnvAttr env SQL_ATTR_ODBC_VERSION SQL_OV_ODBC3))
+      (handle-status* fsym status env)
+      (handle-status* fsym (SQLSetEnvAttr env SQL_ATTR_ODBC_VERSION SQL_OV_ODBC3))
       (proc env))))
 
 (define (call-with-db fsym env proc)
@@ -80,5 +85,5 @@
                      (lambda (e)
                        (SQLFreeHandle SQL_HANDLE_DBC db)
                        (raise e))])
-      (handle-status fsym status db)
+      (handle-status* fsym status db)
       (proc db))))

@@ -7,6 +7,7 @@
          racket/contract
          racket/tcp
          "../generic/main.rkt"
+         (only-in "../generic/interfaces.rkt" make-handler)
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
          "connection.rkt"
@@ -26,16 +27,13 @@
                             #:allow-cleartext-password? [allow-cleartext-password? #f]
                             #:ssl [ssl 'no]
                             #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
-                            #:notice-handler [notice-handler 'error]
-                            #:notification-handler [notification-handler 'error])
+                            #:notice-handler [notice-handler void]
+                            #:notification-handler [notification-handler void])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0)
             (if (or input-port output-port) 1 0))]
-        [notice-handler
-         (if (procedure? notice-handler)
-             notice-handler
-             (make-print-notice notice-handler))]
+        [notice-handler (make-handler notice-handler "notice")]
         [notification-handler
          (if (procedure? notification-handler)
              notification-handler
@@ -69,15 +67,7 @@
 (define (postgresql-guess-socket-path)
   (guess-socket-path/paths 'postgresql-guess-socket-path socket-paths))
 
-;; make-print-notice : output-port -> string string -> void
-(define ((make-print-notice out) code message)
-  (fprintf (case out
-             ((output) (current-output-port))
-             ((error) (current-error-port))
-             (else out))
-           "notice: ~a (SQL code ~a)\n" message code))
-
-;; make-print-notification : output-port -> string string -> void
+;; make-print-notification : output-port -> string -> void
 (define ((make-print-notification out) condition)
   (fprintf (case out
              ((output) (current-output-port))

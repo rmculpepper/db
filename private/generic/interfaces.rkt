@@ -19,7 +19,9 @@
          define-type-table
 
          no-cache-prepare<%>
-         connector<%>)
+         connector<%>
+
+         make-handler)
 
 ;; ==== Connection
 
@@ -179,3 +181,16 @@
     attach-to-ports            ;; input-port output-port -> void
     start-connection-protocol  ;; string string string/#f -> void
     ))
+
+;; == Notice/notification handler maker
+
+;; make-handler : output-port/symbol string -> string string -> void
+(define (make-handler out header)
+  (if (procedure? out)
+      out
+      (lambda (code message)
+        (fprintf (case out
+                   ((output) (current-output-port))
+                   ((error) (current-error-port))
+                   (else out))
+                 "~a: ~a (SQLSTATE ~a)\n" header message code))))

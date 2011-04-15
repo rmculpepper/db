@@ -28,11 +28,11 @@ Connections are made using the following functions.
                   [#:notice-handler notice-handler
                    (or/c 'output 'error output-port?
                          (-> string? string? any))
-                   'error]
+                   void]
                   [#:notification-handler notification-handler
                    (or/c 'output 'error output-port?
                          (-> string? any))
-                   'error])
+                   void])
          connection?]{
 
   Creates a connection to a PostgreSQL server. The
@@ -75,14 +75,15 @@ Connections are made using the following functions.
   received asynchronously from the server. A common example is notice
   of an index created automatically for a table's primary key. The
   @racket[notice-handler] function takes two string arguments: the
-  condition's SQL code and a message. The
+  condition's SQLSTATE and a message. The
   @racket[notification-handler] is called in response to an event
   notification (see the @tt{LISTEN} and @tt{NOTIFY} statements); its
-  argument is the name of the event as a string. The default behavior
-  for both handlers (represented by an @racket['error] argument
-  value) is to print a message to the current error port; a value of
-  @racket['output] sends the messages to the current output port
-  instead, and an output port sends the message to that output port.
+  argument is the name of the event as a string. An output port may be
+  supplied instead of a procedure, in which case a message is printed
+  to the given port. Finally, the symbol @racket['output] causes the
+  message to be printed to the current output port, and
+  @racket['error] causes the message to be printed to the current
+  error port.
 
   If the connection cannot be made, an exception is raised.
 
@@ -192,15 +193,26 @@ Connections are made using the following functions.
 
 @defproc[(odbc-connect [#:database database string?]
                        [#:user user (or/c string? #f) #f]
-                       [#:password password (or/c string? #f) #f])
+                       [#:password password (or/c string? #f) #f]
+                       [#:notice-handler notice-handler
+                        (or/c output-port? 'output 'error 
+                              (-> string? string? any))
+                        void])
          connection?]{
 
   Creates a connection to the ODBC Data Source named
   @racket[database]. The @racket[user] and @racket[password] arguments
   are optional.
+
+  The @racket[notice-handler] argument behaves the same as in
+  @racket[postgresql-connect].
 }
 
-@defproc[(odbc-driver-connect [connection-string string?])
+@defproc[(odbc-driver-connect [connection-string string?]
+                              [#:notice-handler notice-handler
+                               (or/c output-port? 'output 'error
+                                     (-> string? string? any))
+                               void])
          connection?]{
 
   Creates a connection using a connection string containing a sequence

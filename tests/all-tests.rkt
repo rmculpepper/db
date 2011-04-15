@@ -6,17 +6,29 @@
 (require rackunit
          rackunit/gui
          racket/unit
-         "../private/generic/functions.rkt"
-         "../private/generic/signatures.rkt"
-         "../private/postgresql/unit.rkt"
-         "../private/mysql/unit.rkt"
-         "../private/sqlite3/unit.rkt"
-         "../private/odbc/unit.rkt"
+         "../base.rkt"
+         (only-in "../postgresql.rkt" postgresql-connect)
+         (only-in "../private/postgresql/main.rkt" [dbsystem postgresql-dbsystem])
+         (only-in "../mysql.rkt" mysql-connect)
+         (only-in "../private/mysql/main.rkt" [dbsystem mysql-dbsystem])
+         (only-in "../sqlite3.rkt" sqlite3-connect)
+         (only-in "../private/sqlite3/main.rkt" [dbsystem sqlite3-dbsystem])
+         (only-in "../odbc.rkt" odbc-connect)
+         (only-in "../private/odbc/main.rkt" [dbsystem odbc-dbsystem])
          "config.rkt"
          "connection.rkt"
          "query.rkt"
          "sql-types.rkt"
          "concurrent.rkt")
+(provide (all-defined-out))
+
+(define (db-unit connect dbsystem)
+  (unit-from-context database^))
+
+(define postgresql@ (db-unit postgresql-connect postgresql-dbsystem))
+(define mysql@ (db-unit mysql-connect mysql-dbsystem))
+(define sqlite3@ (db-unit sqlite3-connect sqlite3-dbsystem))
+(define odbc@ (db-unit odbc-connect odbc-dbsystem))
 
 (define-unit all-tests@
   (import database^
@@ -35,37 +47,30 @@
            concurrent:test))))
 
 (define (specialize-test db@)
-  (compound-unit
+  (define-values/invoke-unit 
+    (compound-unit
+     (import)
+     (export ALL-TESTS)
+     (link (((DB : database^)) db@)
+           (((CONFIG : config^)) config@ DB)
+           (((CONNECT-TEST : test^)) connection@ CONFIG)
+           (((QUERY-TEST : test^)) query@ DB CONFIG)
+           (((SQL-TYPES-TEST : test^)) sql-types@ CONFIG DB)
+           (((CONCURRENT-TEST : test^)) concurrent@ CONFIG DB)
+           (((ALL-TESTS : test^)) all-tests@
+                                  DB
+                                  (tag connect CONNECT-TEST)
+                                  (tag query QUERY-TEST)
+                                  (tag sql-types SQL-TYPES-TEST)
+                                  (tag concurrent CONCURRENT-TEST))))
     (import)
-    (export ALL-TESTS)
-    (link (((DB : database^)) db@)
-          (((CONFIG : config^)) config@ DB)
-          (((CONNECT-TEST : test^)) connection@ CONFIG)
-          (((QUERY-TEST : test^)) query@ DB CONFIG)
-          (((SQL-TYPES-TEST : test^)) sql-types@ CONFIG DB)
-          (((CONCURRENT-TEST : test^)) concurrent@ CONFIG DB)
-          (((ALL-TESTS : test^)) all-tests@
-                                 DB
-                                 (tag connect CONNECT-TEST)
-                                 (tag query QUERY-TEST)
-                                 (tag sql-types SQL-TYPES-TEST)
-                                 (tag concurrent CONCURRENT-TEST)))))
+    (export test^))
+  test)
 
-(define-values/invoke-unit (specialize-test postgresql@)
-  (import)
-  (export (prefix postgresql: test^)))
-
-(define-values/invoke-unit (specialize-test mysql@)
-  (import)
-  (export (prefix mysql: test^)))
-
-(define-values/invoke-unit (specialize-test sqlite3@)
-  (import)
-  (export (prefix sqlite3: test^)))
-
-(define-values/invoke-unit (specialize-test odbc@)
-  (import)
-  (export (prefix odbc: test^)))
+(define postgresql:test (specialize-test postgresql@))
+(define mysql:test (specialize-test mysql@))
+(define sqlite3:test (specialize-test sqlite3@))
+(define odbc:test (specialize-test odbc@))
 
 #|
 ;; Normal testing:

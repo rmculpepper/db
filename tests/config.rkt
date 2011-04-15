@@ -4,11 +4,15 @@
 
 #lang racket/base
 (require racket/unit
-         "../private/generic/signatures.rkt"
-         "../private/generic/functions.rkt")
-(provide test^
+         "../base.rkt")
+(provide database^
+         test^
          config^
          config@)
+
+(define-signature database^
+  (connect
+   dbsystem))
 
 (define-signature test^ (test))
 (define-signature config^
@@ -38,9 +42,9 @@
                 #:database (or (getenv "DBDB") (getenv "DBUSER"))
                 #:password (getenv "DBPASSWORD")))
       ((sqlite3)
-       (connect #:database 'memory))
+       (connect #:database (or 'memory)))
       ((odbc)
-       (connect #:database (getenv "DBDB")))
+       (connect #:database (or (getenv "DBODBC"))))
       (else
        (error 'connect-for-test "unknown database system: ~e" dbsystem))))
 

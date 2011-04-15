@@ -8,7 +8,6 @@
          (prefix-in srfi: srfi/19)
          "../private/generic/main.rkt"
          "../private/generic/sql-convert.rkt"
-         "../private/generic/signatures.rkt"
          "config.rkt")
 (import config^ database^)
 (export test^)

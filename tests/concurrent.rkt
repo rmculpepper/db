@@ -5,12 +5,13 @@
 #lang racket/unit
 (require racket/class
          rackunit
-         "../private/generic/functions.rkt"
-         "../private/generic/signatures.rkt"
+         "../base.rkt"
          "../util/connect.rkt"
          "config.rkt")
 (import database^ config^)
 (export test^)
+
+(define NOISY? #f)
 
 (define (sql str)
   (case (dbsystem-name dbsystem)
@@ -37,9 +38,10 @@
     (insert (+ n (query-value c "select max(n) from play_numbers"))))
   (for-each insert (build-list iterations add1))
   (for-each add-to-max (build-list iterations add1))
-  (printf "~s: ~s\n"
-          tid
-          (query-value c "select max(n) from play_numbers")))
+  (when NOISY?
+    (printf "~s: ~s\n"
+            tid
+            (query-value c "select max(n) from play_numbers"))))
 
 (define (kill-safe-test proxy?)
   (test-case (format "kill-safe test~a" (if proxy? " (proxy)" ""))

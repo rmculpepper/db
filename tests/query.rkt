@@ -8,10 +8,11 @@
          racket/string
          rackunit
          "config.rkt"
-         "../private/generic/signatures.rkt"
-         "../private/generic/main.rkt")
+         "../base.rkt")
 (import database^ config^)
 (export test^)
+
+(define NOISY? #f)
 
 (define-syntax-rule (with-connection c . body)
   (call-with-connection (lambda (c) . body)))
@@ -232,10 +233,10 @@
                     (lambda (id)
                       (let/cc k
                         (set! k2 k1)
-                        (printf "saw ~s~n" id)
+                        (when NOISY? (printf "saw ~s~n" id))
                         (when (= id search-id)
                           (set! k1 k)
-                          (printf "found ~s~n~n" id)
+                          (when NOISY? (printf "found ~s~n~n" id))
                           (return id))))
                     (query-list c "select N from the_numbers order by N asc"))
                    (error 'search-failed "couldn't find ~s" search-id)))]

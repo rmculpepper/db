@@ -5,7 +5,6 @@
 #lang racket/base
 (require (except-in "interfaces.rkt"
                     statement-generator)
-         "signatures.rkt"
          "sql-data.rkt"
          "functions.rkt")
 (provide (struct-out simple-result)

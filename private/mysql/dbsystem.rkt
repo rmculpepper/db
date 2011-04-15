@@ -13,8 +13,6 @@
   (class* object% (dbsystem<%>)
 
     (define/public (get-short-name) 'mysql)
-    (define/public (typeids->types typeids)
-      (map typeid->type typeids))
     (define/public (get-known-types) supported-types)
 
     (define/public (has-support? option)
@@ -33,6 +31,9 @@
 
     (define/public (field-dvecs->typeids dvecs)
       (map field-dvec->typeid dvecs))
+
+    (define/public (describe-typeids typeids)
+      (map describe-typeid typeids))
 
     (super-new)))
 
@@ -58,6 +59,7 @@
                     type-alias->type
                     typeid->type
                     type->typeid
+                    describe-typeid
                     type->type-reader
                     type->type-writer)
 

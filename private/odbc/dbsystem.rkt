@@ -14,7 +14,6 @@
 (define odbc-dbsystem%
   (class* object% (dbsystem<%>)
     (define/public (get-short-name) 'odbc) ;; FIXME: need also underlying driver info
-    (define/public (typeids->types typeids) (map typeid->type typeids))
     (define/public (get-known-types) supported-types)
     (define/public (has-support? x) #f)
 
@@ -26,6 +25,9 @@
 
     (define/public (field-dvecs->typeids dvecs)
       (map (lambda (dvec) (vector-ref dvec 1)) dvecs))
+
+    (define/public (describe-typeids typeids)
+      (map describe-typeid typeids))
 
     (super-new)))
 
@@ -51,6 +53,7 @@
                     type-alias->type
                     typeid->type
                     type->typeid
+                    describe-typeid
                     type->type-reader
                     type->type-writer)
 

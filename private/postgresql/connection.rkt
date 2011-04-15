@@ -350,11 +350,8 @@
 
     (define/private (query1:get-type-readers fsym field-dvecs)
       (map (lambda (dvec)
-             (let* ([typeid (field-dvec->typeid dvec)]
-                    [type (or (typeid->type typeid)
-                              (error fsym "unsupported type: (typeid ~a)" typeid))])
-               (or (type->type-reader type)
-                   (error fsym "unsupported type: ~a" type))))
+             (let ([typeid (field-dvec->typeid dvec)])
+               (typeid->type-reader fsym typeid)))
            field-dvecs))
 
 

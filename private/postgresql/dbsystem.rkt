@@ -8,15 +8,13 @@
          "../generic/sql-convert.rkt"
          (only-in "msg.rkt" field-dvec->typeid))
 (provide dbsystem
-         typeid->type
-         type->type-reader)
+         typeid->type-reader)
 
 (define postgresql-dbsystem%
   (class* object% (dbsystem<%>)
 
     (define/public (get-short-name) 'postgresql)
     (define/public (get-known-types) supported-types)
-    (define/public (typeids->types typeids) (map typeid->type typeids))
 
     (define/public (has-support? option)
       (case option
@@ -26,13 +24,14 @@
 
     (define/public (get-parameter-handlers param-typeids)
       (map (lambda (param-typeid)
-             (let ([type (typeid->type param-typeid)])
-               (or (type->type-writer type)
-                   (make-default-marshal type))))
+             (typeid->type-writer param-typeid))
            param-typeids))
 
     (define/public (field-dvecs->typeids dvecs)
       (map field-dvec->typeid dvecs))
+
+    (define/public (describe-typeids typeids)
+      (map describe-typeid typeids))
 
     (super-new)))
 
@@ -48,8 +47,9 @@
                     type-alias->type
                     typeid->type
                     type->typeid
-                    type->type-reader
-                    type->type-writer)
+                    describe-typeid
+                    typeid->type-reader
+                    typeid->type-writer)
   (16   boolean    (bool)    #t     parse-boolean      marshal-bool)
   (17   bytea      ()        #t     parse-bytea        marshal-bytea)
   (18   char1      ()        #t     parse-char1        marshal-char1)

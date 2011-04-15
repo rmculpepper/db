@@ -269,9 +269,9 @@
                     [id (send pst get-handle)]
                     [params (statement-binding-params stmt)]
                     [null-map (map not params)]
-                    [param-types (send pst get-param-types)])
+                    [param-typeids (send pst get-param-typeids)])
                (send-message
-                (make-execute-packet id null 1 null-map 1 param-types params)))]
+                (make-execute-packet id null 1 null-map 1 param-typeids params)))]
             [else ;; string
              (send-message (make-command-packet 'query stmt))]))
 

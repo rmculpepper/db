@@ -49,17 +49,21 @@
 ;; Represents brand of database system, SQL dialect, etc
 (define dbsystem<%>
   (interface ()
-    get-short-name      ;; -> symbol
-    get-known-types     ;; -> (listof symbol)
-    typeids->types      ;; (listof typeid) -> (listof type)
+    get-short-name         ;; -> symbol
 
     get-parameter-handlers ;; (listof typeid) -> (listof ParameterHandler)
-    field-dvecs->typeids)) ;; (listof field-dvec) -> (listof typeid)
+    field-dvecs->typeids   ;; (listof field-dvec) -> (listof typeid)
+
+    ;; inspection only
+    get-known-types        ;; -> (listof symbol)
+    describe-typeids))     ;; (listof typeid) -> (listof TypeDesc)
+
 
 ;; ParameterHandler = (fsym index datum -> ???)
 ;; Each system gets to choose its checked-param representation.
 ;; Maybe check and convert to string. Maybe just check, do binary conversion later.
 
+;; TypeDesc = (list boolean symbol/#f typeid)
 
 ;; ==== Prepared
 
@@ -73,12 +77,10 @@
 
     get-param-count    ;; -> nat or #f
     get-param-typeids  ;; -> (listof typeid)
-    get-param-types    ;; -> (listof type)
 
     get-result-dvecs   ;; -> (listof vector)
     get-result-count   ;; -> nat or #f
     get-result-typeids ;; -> (listof typeid) or #f
-    get-result-types   ;; -> (listof type) or #f
 
     check-owner        ;; symbol connection any -> #t (or error)
     bind               ;; symbol (listof param) -> statement-binding
@@ -86,6 +88,10 @@
     ;; extension hooks: usually shouldn't need to override
     finalize           ;; -> void
     register-finalizer ;; -> void
+
+    ;; inspection only
+    get-param-types    ;; -> (listof TypeDesc)
+    get-result-types   ;; -> (listof TypeDesc)
     ))
 
 
@@ -140,8 +146,9 @@
                                         type-alias->type
                                         typeid->type
                                         type->typeid
-                                        type->type-reader
-                                        type->type-writer)
+                                        describe-typeid
+                                        typeid->type-reader
+                                        typeid->type-writer)
                       (typeid type (alias ...) supported? reader writer) ...)
   (begin
     (define all-types '((type supported?) ...))
@@ -162,14 +169,33 @@
       (case x
         ((type) 'typeid) ...
         (else #f)))
-    (define (type->type-reader x)
-      (case x
-        ((type) reader) ...
-        (else #f)))
-    (define (type->type-writer x)
-      (case x
-        ((type) writer) ...
-        (else #f)))))
+    (define (describe-typeid x)
+      (let ([t (typeid->type x)]
+            [ok? (case x ((typeid) supported?) ... (else #f))])
+        (list ok? t x)))
+    (define (typeid->type-reader fsym x)
+      (let ([result
+             (case x
+               ((typeid) reader) ...
+               (else #f))])
+        (or result
+            (unsupported-type fsym x (typeid->type x)))))
+    (define (typeid->type-writer x)
+      (let ([result
+             (case x
+               ((typeid) writer) ...
+               (else #f))])
+        (or result
+            (make-unsupported-writer x (typeid->type x)))))))
+
+(define (make-unsupported-writer x t)
+  (lambda (fsym . args)
+    (unsupported-type fsym x t)))
+
+(define (unsupported-type fsym x t)
+  (if t
+      (error fsym "unsupported type: ~a (typeid ~a)" t x)
+      (error fsym "unsupported type: (typeid ~a)" x)))
 
 
 ;; == Internal staging interfaces

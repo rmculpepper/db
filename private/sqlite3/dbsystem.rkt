@@ -14,8 +14,6 @@
     (define/public (get-short-name) 'sqlite3)
     (define/public (get-known-types) '(any))
     (define/public (has-support? x) #f)
-    (define/public (typeids->types typeids)
-      (map (lambda _ 'any) typeids))
 
     (define/public (get-parameter-handlers param-typeids)
       (map (lambda (param-typeid) check-param)
@@ -24,6 +22,10 @@
     (define/public (field-dvecs->typeids dvecs)
       (map (lambda (dvec) (vector-ref dvec 0))
            dvecs))
+
+    (define/public (describe-typeids typeids)
+      (map (lambda _ '(#t any #f))
+           typeids))
 
     (super-new)))
 

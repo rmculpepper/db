@@ -33,13 +33,15 @@
 
     (define/public (get-param-count) (length param-typeids))
     (define/public (get-param-typeids) param-typeids)
-    (define/public (get-param-types) (send dbsystem typeids->types param-typeids))
 
     (define/public (get-result-dvecs) result-dvecs)
     (define/public (get-result-count) (length result-dvecs))
     (define/public (get-result-typeids) result-typeids)
+
+    (define/public (get-param-types)
+      (send dbsystem describe-typeids param-typeids))
     (define/public (get-result-types)
-      (send dbsystem typeids->types result-typeids))
+      (send dbsystem describe-typeids result-typeids))
 
     (define/public (check-results fsym checktype obj)
       (case checktype

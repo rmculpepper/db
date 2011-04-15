@@ -208,8 +208,7 @@ No conversion may be passed sql-null.
          marshal-day-time-interval
          marshal-interval
 
-         marshal-error
-         make-default-marshal)
+         marshal-error)
 
 (define (marshal-string f i s)
   (unless (string? s)
@@ -398,8 +397,3 @@ No conversion may be passed sql-null.
 (define (marshal-error f i type datum)
   (error f "cannot marshal as SQL type ~s: ~e"
          type datum))
-
-;; make-default-marshal : Type -> datum -> string
-(define ((make-default-marshal type) f i datum)
-  (cond [(string? datum) datum]
-        [else (marshal-error f i type datum)]))

@@ -10,5 +10,6 @@
 ;; FIXME: Contracts duplicated at main.rkt
 (provide/contract
  [sqlite3-connect
-  (-> #:database (or/c string? path? bytes? 'memory 'temporary)
-      any/c)])
+  (->* (#:database (or/c path-string? 'memory 'temporary))
+       (#:mode (or/c 'read-only 'read/write 'create))
+       any/c)])

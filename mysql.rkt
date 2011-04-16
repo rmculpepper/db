@@ -15,10 +15,7 @@
        (#:password (or/c string? false/c)
         #:server (or/c string? false/c)
         #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c string? path? false/c)
-        #:input-port (or/c input-port? false/c)
-        #:output-port (or/c output-port? false/c)
-        #:allow-cleartext-password? boolean?)
+        #:socket (or/c path-string? false/c))
        any/c)]
  [mysql-guess-socket-path
-  (-> (or/c string? path?))])
+  (-> path-string?)])

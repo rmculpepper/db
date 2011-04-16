@@ -9,4 +9,4 @@
   (or (for/or ([path (in-list paths)])
         (and (file-exists? path) path))
       (error function
-             "automatic socket path search failed")))
+             "could not find socket path")))

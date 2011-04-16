@@ -30,13 +30,13 @@
                                                  (case mode
                                                    ((read-only) 0)
                                                    (else SCHEME_GUARD_FILE_WRITE))))
-                  path)])])
+                  (path->bytes path))])])
     (let-values ([(db open-status)
                   (sqlite3_open_v2 path
                                    (case mode
                                      ((read-only) SQLITE_OPEN_READONLY)
                                      ((read/write) SQLITE_OPEN_READWRITE)
-                                     ((read/write/create)
+                                     ((create)
                                       (+ SQLITE_OPEN_READWRITE SQLITE_OPEN_CREATE))))])
       (handle-status 'sqlite3-connect open-status)
       (new connection% (db db)))))

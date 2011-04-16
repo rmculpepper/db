@@ -15,9 +15,7 @@
        (#:password (or/c string? false/c)
         #:server (or/c string? false/c)
         #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c string? path? false/c)
-        #:input-port (or/c input-port? false/c)
-        #:output-port (or/c output-port? false/c)
+        #:socket (or/c path-string? false/c)
         #:allow-cleartext-password? boolean?
         #:ssl (symbols 'yes 'no 'optional)
         #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
@@ -25,4 +23,4 @@
         #:notification-handler (or/c 'output 'error output-port? procedure?))
        any/c)]
  [postgresql-guess-socket-path
-  (-> (or/c string? path?))])
+  (-> path-string?)])

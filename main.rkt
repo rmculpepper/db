@@ -28,7 +28,8 @@
 (define known-keywords
   (sort '(#:user #:database #:password #:server #:port #:socket
           #:allow-cleartext-password? #:ssl #:ssl-encrypt
-          #:notice-handler #:notification-handler)
+          #:notice-handler #:notification-handler
+          #:mode)
         keyword<?))
 
 (define (wrap-kw-fun proc)
@@ -62,7 +63,7 @@
        (#:password (or/c string? false/c)
         #:server (or/c string? false/c)
         #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c string? path? false/c)
+        #:socket (or/c path-string? false/c)
         #:allow-cleartext-password? boolean?
         #:ssl (symbols 'yes 'no 'optional)
         #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
@@ -70,7 +71,7 @@
         #:notification-handler (or/c 'output 'error output-port? procedure?))
        any/c)]
  [postgresql-guess-socket-path
-  (-> (or/c string? path?))]
+  (-> path-string?)]
 
  ;; Duplicates contracts at mysql.rkt
  [mysql-connect
@@ -79,16 +80,17 @@
        (#:password (or/c string? false/c)
         #:server (or/c string? false/c)
         #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c string? path? false/c)
+        #:socket (or/c path-string? false/c)
         #:allow-cleartext-password? boolean?)
        any/c)]
  [mysql-guess-socket-path
-  (-> (or/c string? path?))]
+  (-> path-string?)]
 
  ;; Duplicates contracts at sqlite3.rkt
  [sqlite3-connect
-  (-> #:database (or/c string? path? bytes? 'memory 'temporary)
-      any/c)]
+  (->* (#:database (or/c path-string? 'memory 'temporary))
+       (#:mode (or/c 'read-only 'read/write 'create))
+       any/c)]
 
  ;; Duplicates contracts at odbc.rkt
  [odbc-connect

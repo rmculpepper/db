@@ -22,8 +22,7 @@
                        #:port [port #f]
                        #:socket [socket #f]
                        #:input-port [input-port #f]
-                       #:output-port [output-port #f]
-                       #:allow-cleartext-password? [allow-cleartext-password? #f])
+                       #:output-port [output-port #f])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0)

@@ -14,6 +14,6 @@
     "The optional SQLite and ODBC support requires the appropriate "
     "native client libraries."))
 (define scribblings '(("scribblings/db.scrbl" (multi-page))))
-(define categories '(net))
+(define categories '(io net))
 (define can-be-loaded-with 'all)
 (define required-core-version "5.1")

@@ -20,7 +20,7 @@ Connections are made using the following functions.
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 5432]
-                  [#:socket socket (or/c path? string? false/c) #f]
+                  [#:socket socket (or/c path-string? false/c) #f]
                   [#:password password (or/c string? false/c) #f]
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
@@ -110,7 +110,7 @@ Connections are made using the following functions.
 }
 
 @defproc[(postgresql-guess-socket-path)
-         (or/c path? string?)]{
+         path-string?]{
 
   Attempts to guess the path for the socket based on conventional
   locations. This function returns the first such conventional path
@@ -124,7 +124,7 @@ Connections are made using the following functions.
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port number? 3306]
-                  [#:socket socket (or/c path? string? false/c) #f]
+                  [#:socket socket (or/c path-string? false/c) #f]
                   [#:password password (or/c string? false/c) #f])
          connection?]{
 
@@ -155,7 +155,7 @@ Connections are made using the following functions.
 }
 
 @defproc[(mysql-guess-socket-path)
-         (or/c path? string?)]{
+         path-string?]{
 
   Attempts to guess the path for the socket based on conventional
   locations. This function returns the first such conventional path
@@ -166,8 +166,8 @@ Connections are made using the following functions.
 }
 
 @defproc[(sqlite3-connect
-                [#:database database (or/c path? string? 'memory 'temporary)]
-                [#:mode mode (or/c 'read-only 'read/write 'read/write/create) 'read/write])
+                [#:database database (or/c path-string? 'memory 'temporary)]
+                [#:mode mode (or/c 'read-only 'read/write 'create) 'read/write])
          connection?]{
 
   Opens the SQLite database at the file named by @racket[database], if
@@ -179,15 +179,15 @@ Connections are made using the following functions.
   If @racket[mode] is @racket['read-only], the database is opened in
   read-only mode. If @racket[mode] is @racket['read/write] (the
   default), the database is opened for reading and writing (if
-  filesystem permissions permit). The @racket['read/write/create] mode
-  is like @racket['read/write], except that if the given file does not
-  exist, it is created as a new database.
+  filesystem permissions permit). The @racket['create] mode is like
+  @racket['read/write], except that if the given file does not exist,
+  it is created as a new database.
 
   @(examples/results
     [(sqlite3-connect #:database "/path/to/my.db")
      (new connection%)]
     [(sqlite3-connect #:database "relpath/to/my.db"
-                      #:mode 'read/write/create)
+                      #:mode 'create)
      (new connection%)])
 }
 

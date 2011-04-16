@@ -287,7 +287,7 @@ following:
          (listof symbol?)]{
 
 Returns a list of symbols identifying types supported by the database
-system.
+system. See @secref["db-types"].
 }
 
 

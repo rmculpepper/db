@@ -43,17 +43,21 @@
     (define/public (get-result-types)
       (send dbsystem describe-typeids result-typeids))
 
+    ;; checktype is either #f, 'recordset, or exact-positive-integer
     (define/public (check-results fsym checktype obj)
-      (case checktype
-        ((recordset)
-         (unless (positive? (get-result-count))
-           (when close-on-exec? (finalize))
-           (error fsym "expected statement producing recordset, got ~e" obj)))
-        ((column)
-         (unless (= (get-result-count) 1)
-           (when close-on-exec? (finalize))
-           (error fsym "expected statement producing recordset with single column, got ~e" obj)))
-        (else (void))))
+      (cond [(eq? checktype 'recordset)
+             (unless (positive? (get-result-count))
+               (when close-on-exec? (finalize))
+               (error fsym "expected statement producing recordset, got ~e" obj))]
+            [(exact-positive-integer? checktype)
+             (unless (= (get-result-count) checktype)
+               (when close-on-exec? (finalize))
+               (error fsym
+                      "expected statement producing recordset with ~a ~a, got ~e"
+                      checktype
+                      (if (= checktype 1) "column" "columns")
+                      obj))]
+            [else (void)]))
 
     (define/public (check-owner fsym c obj)
       (unless (eq? c (weak-box-value owner))

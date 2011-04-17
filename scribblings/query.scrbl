@@ -227,6 +227,18 @@ statement-binding, no inline parameters are permitted.
  (for-each (lambda (n d) (printf "~a: ~a\n" n d))
            '(0 1 2 3) '("nothing" "the loneliest number" "company" "a crowd"))]
 ]
+
+An @racket[in-query] application can provide better performance when
+it appears directly in a @racket[for] clause. In addition, it may
+perform stricter checks on the number of columns returned by the query
+based on the number of variables in the clause's left-hand side:
+
+@examples/results[
+[(for ([n (in-query pgc "select * from the_numbers")])
+   (displayln n))
+ (error 'in-query "query returned 2 columns (expected 1): ~e"
+        "select * from the_numbers")]
+]
 }
 
 

@@ -3,7 +3,8 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require racket/contract
+(require (for-syntax racket/base)
+         racket/contract
          racket/class
          (rename-in "interfaces.rkt"
                     [statement-generator make-statement-generator]))
@@ -116,14 +117,24 @@
                     (f acc row)))
                 #f))))
 
+(define (mk-N-column-collector fsym N sql)
+  (lambda (fields ordered?)
+    (when (and N (not (= fields N)))
+      (error fsym "query returned ~a ~a (expected ~a): ~e"
+             fields (if (= fields 1) "column" "columns") N sql))
+    (values null
+            (lambda (b av) (cons av b))
+            (if ordered? reverse values)
+            #f)))
+
 (define (mk-single-column-collector fsym sql)
   ;; The field count check is usually redundant, only needed for string queries
   ;; that don't go through prepare path.
   (lambda (fields ordered?)
     (case fields
-      ((0) (error fsym "query returned zero columns: ~e " sql))
+      ((0) (error fsym "query returned 0 columns (expected 1): ~e " sql))
       ((1) 'ok)
-      (else (error 'fsym "query returned multiple columns: ~e" sql)))
+      (else (error 'fsym "query returned ~a columns (expected 1): ~e" fields sql)))
     (values null
             (lambda (b av) (cons (vector-ref av 0) b))
             (if ordered? reverse values)
@@ -183,7 +194,7 @@
 ;; query-list : connection Statement arg ... -> (listof 'a)
 ;; Expects to get back a recordset with one field per row.
 (define (query-list c sql . args)
-  (let ([sql (compose-statement 'query-list c sql args 'column)])
+  (let ([sql (compose-statement 'query-list c sql args 1)])
     (recordset-rows
      (query/recordset c 'query-list sql
                       (mk-single-column-collector 'query-list sql)))))
@@ -209,7 +220,7 @@
 ;; query-value : connection string arg ... -> value | raises error
 ;; Expects to get back a recordset of exactly one row, exactly one column.
 (define (query-value c sql . args)
-  (let ([sql (compose-statement 'query-value c sql args 'column)])
+  (let ([sql (compose-statement 'query-value c sql args 1)])
     (recordset->one-row
      'query-value
      (query/recordset c 'query-value sql
@@ -219,7 +230,7 @@
 ;; query-maybe-value : connection Statement arg ... -> value/#f
 ;; Expects to get back a recordset of zero or one rows, exactly one column.
 (define (query-maybe-value c sql . args)
-  (let ([sql (compose-statement 'query-maybe-value c sql args 'column)])
+  (let ([sql (compose-statement 'query-maybe-value c sql args 1)])
     (recordset->maybe-row
      'query-maybe-value
      (query/recordset c 'query-maybe-value sql
@@ -275,8 +286,7 @@
 ;; ========================================
 
 (define (in-query c stmt . args)
-  (let* ([stmt (compose-statement 'in-query c stmt args 'recordset)]
-         [rows (recordset-rows (query/recordset c 'in-query stmt vectorlist-collector))])
+  (let ([rows (in-query-helper #f c stmt args)])
     (make-do-sequence
      (lambda ()
        (values (lambda (p) (vector->values (car p)))
@@ -285,6 +295,34 @@
                pair?
                (lambda _ #t)
                (lambda _ #t))))))
+
+(define-sequence-syntax in-query*
+  (lambda () #'in-query)
+  (lambda (stx)
+    (syntax-case stx ()
+      [[(var ...) (in-query c stmt arg ...)]
+       #'[(var ...)
+          (:do-in ([(rows) (in-query-helper (length '(var ...)) c stmt (list arg ...))])
+                  (void) ;; outer check
+                  ([rows rows]) ;; loop inits
+                  (pair? rows) ;; pos guard
+                  ([(var ...) (vector->values (car rows))]) ;; inner bindings
+                  #t ;; pre guard
+                  #t ;; post guard
+                  ((cdr rows)))]] ;; loop args
+      [_ #f])))
+
+(define (in-query-helper vars c stmt args)
+  ;; Not protected by contract
+  (unless (connection? c)
+    (apply raise-type-error 'in-query "connection" 0 c stmt args))
+  (unless (statement? stmt)
+    (apply raise-type-error 'in-query "statement" 1 c stmt args))
+  (let* ([check (or vars 'recordset)]
+         [stmt (compose-statement 'in-query c stmt args check)])
+    (recordset-rows
+     (query/recordset c 'in-query stmt
+                      (mk-N-column-collector 'in-query vars stmt)))))
 
 ;; ========================================
 
@@ -364,6 +402,8 @@
 
 (define preparable/c (or/c string? statement-generator?))
 
+(provide (rename-out [in-query* in-query]))
+
 (provide/contract
  [connection?
   (-> any/c any)]
@@ -413,8 +453,10 @@
  [query-fold
   (-> connection? complete-statement? procedure? any/c any)]
 
+ #|
  [in-query
   (->* (connection? statement?) () #:rest list? sequence?)]
+ |#
 
  [prepare
   (-> connection? preparable/c any)]

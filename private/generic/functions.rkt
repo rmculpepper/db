@@ -274,6 +274,20 @@
 
 ;; ========================================
 
+(define (in-query c stmt . args)
+  (let* ([stmt (compose-statement 'in-query c stmt args 'recordset)]
+         [rows (recordset-rows (query/recordset c 'in-query stmt vectorlist-collector))])
+    (make-do-sequence
+     (lambda ()
+       (values (lambda (p) (vector->values (car p)))
+               cdr
+               rows
+               pair?
+               (lambda _ #t)
+               (lambda _ #t))))))
+
+;; ========================================
+
 (define (prepare c stmt)
   (prepare1 'prepare c stmt #f))
 
@@ -294,6 +308,7 @@
                    pst))))]))
 
 ;; ========================================
+
 #|
 (define-syntax defprepare
   (syntax-rules ()
@@ -397,6 +412,9 @@
 
  [query-fold
   (-> connection? complete-statement? procedure? any/c any)]
+
+ [in-query
+  (->* (connection? statement?) () #:rest list? sequence?)]
 
  [prepare
   (-> connection? preparable/c any)]

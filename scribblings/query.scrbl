@@ -208,6 +208,27 @@ statement-binding, no inline parameters are permitted.
 ]
 }
 
+@defproc[(in-query [connection connection?]
+                   [stmt statement?]
+                   [arg any/c] ...)
+         sequence?]{
+
+  Executes a SQL query, which must produce a recordset, and returns a
+  sequence. Each step in the sequence produces as many values as the
+  recordset has columns.
+
+@examples/results[
+[(for/list ([n (in-query pgc "select n from the_numbers where n < 2")])
+   n)
+ '(0 1)]
+[(for ([(n d)
+        (in-query pgc "select * from the_numbers where n < $1" 4)])
+   (printf "~a is ~a\n" n d))
+ (for-each (lambda (n d) (printf "~a: ~a\n" n d))
+           '(0 1 2 3) '("nothing" "the loneliest number" "company" "a crowd"))]
+]
+}
+
 
 @section{General query support}
 
@@ -260,6 +281,7 @@ future version of this library (even new minor versions).
   of columns returned by the query. Inline parameter arguments ae not
   supported; parameter binding must be done explicitly.
 }
+
 
 @section{Prepared statements}
 

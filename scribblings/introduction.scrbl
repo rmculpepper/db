@@ -112,6 +112,21 @@ When a query may return zero or one rows, as the last example, use
  #f]
 ]
 
+The @racket[in-query] function produces a sequence that can be used
+with Racket's iteration forms:
+
+@my-interaction[
+[(for ([(n d) (in-query pgc "select * from the_numbers where n < 4")])
+   (printf "~a is ~a\n" n d))
+ (for-each (lambda (n d) (printf "~a: ~a\n" n d))
+           '(0 1 2 3)
+           '("nothing" "the loneliest number" "company" "a crowd"))]
+[(for/fold ([sum 0]) ([n (in-query pgc "select n from the_numbers")])
+   (+ sum n))
+ (for/fold ([sum 0]) ([n (in-list '(0 1 2 3))])
+   (+ sum n))]
+]
+
 Errors in queries are usually non-fatal.
 
 @my-interaction[

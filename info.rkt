@@ -10,7 +10,7 @@
 (define scribblings '(("scribblings/db.scrbl" (multi-page))))
 
 (define blurb
-  '("A database interface for functional programmers."
+  '("A database interface for functional programmers. "
     "This library provides a high-level, functional interface to PostgreSQL, "
     "MySQL, and SQLite databases as well as ODBC data sources. "
     "PostgreSQL and MySQL support is implemented in pure Racket. "

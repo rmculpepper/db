@@ -122,10 +122,7 @@ Based on protocol documentation here:
 (define-struct (execute-packet packet)
   (statement-id
    flags
-   iterations
    null-map
-   first-execution?
-   param-types
    params)
   #:transparent)
 
@@ -163,20 +160,22 @@ Based on protocol documentation here:
      (io:write-le-int16 out type)
      (io:write-bytes out (string->bytes/utf-8 data))]
     [(struct execute-packet
-             (statement-id flags iterations null-map first? param-types params))
+             (statement-id flags null-map params))
      (io:write-byte out (encode-command 'statement-execute))
      (io:write-le-int32 out statement-id)
      (io:write-byte out (encode-execute-flags flags))
-     (io:write-le-int32 out iterations)
+     (io:write-le-int32 out 1) ;; iterations = 1
      (io:write-le-intN out
                        (null-map-length null-map)
                        (null-map->integer null-map))
-     (io:write-byte out (if first? 1 0))
-     (when first?
+     (io:write-byte out 1) ;; first? = 1
+     (let ([param-types (map choose-param-type params)])
        (for-each (lambda (pt) (io:write-le-int16 out (encode-type pt)))
-                 param-types))
-     (for-each (lambda (type param) (write-binary-datum out type param))
-               param-types params)]))
+                 param-types)
+       (for-each (lambda (type param)
+                   (unless (sql-null? param)
+                     (write-binary-datum out type param)))
+                 param-types params))]))
 
 (define (parse-packet in expect field-dvecs)
   (let* ([len (io:read-le-int24 in)]
@@ -496,34 +495,68 @@ Based on protocol documentation here:
     (else
      (error 'get-result "unknown type: ~s" type))))
 
+(define (choose-param-type param)
+  (cond [(or (string? param)
+             (sql-null? param))
+         'var-string]
+        [(and (exact-integer? param)
+              (<= (- (expt 2 63)) param (sub1 (expt 2 63))))
+         'longlong]
+        [(rational? param)
+         'double]
+        [(sql-date? param)
+         'date]
+        [(sql-timestamp? param)
+         'timestamp]
+        [(or (sql-time? param) (sql-day-time-interval? param))
+         'time]
+        [(bytes? param)
+         'blob]
+        [else
+         (error 'choose-param-type "internal error: bad parameter value: ~e" param)]))
+
 (define (write-binary-datum out type param)
   (case type
-    ((tiny) (io:write-byte out param))
-    ((short) (io:write-le-int16 out param #t))
-    ((long) (io:write-le-int32 out param #t))
-    ((longlong) (io:write-le-intN out param 8 #t))
-
-    ;; Special case: mysql gives all parameters type var-string,
-    ;; even when obviously not (eg, "select 1 + ?")
-    ;; So, convert all reasonable data to string rep on send.
     ((var-string)
-     (let ([param
-            (cond [(string? param) param]
-                  [(exact-integer? param) (number->string param)]
-                  [(rational? param) (number->string param)] ;; inf, nan not allowed
-                  ;; FIXME: can mysql interpret as date, time, etc?
-                  [(sql-date? param) (marshal-date 'send-param #f param)]
-                  [(sql-time? param) (marshal-time 'send-param #f param)]
-                  [(sql-timestamp? param) (marshal-timestamp 'send-param #f param)]
-                  [(sql-day-time-interval? param)
-                   (marshal-day-time-interval 'send-param #f param)]
-                  [else
-                   (error 'send-param
-                          "internal error: cannot marshal as var-string: ~e" param)])])
-       (io:write-length-coded-string out param)))
-
-    (else (error 'send-param "internal error: unimplemented: ~s" type))))
-
+     (io:write-length-coded-string out param))
+    ((longlong) (io:write-le-int64 out param #t))
+    ((double)
+     (io:write-bytes out (real->floating-point-bytes (exact->inexact param) 8)))
+    ((date)
+     (let ([bs (bytes-append (integer->integer-bytes (sql-date-year param) 2 #t #f)
+                             (bytes (sql-date-month param))
+                             (bytes (sql-date-day param)))])
+       (io:write-length-coded-bytes out bs)))
+    ((timestamp)
+     (let ([bs (bytes-append (integer->integer-bytes (sql-timestamp-year param) 2 #t #f)
+                             (bytes (sql-timestamp-month param))
+                             (bytes (sql-timestamp-day param))
+                             (bytes (sql-timestamp-hour param))
+                             (bytes (sql-timestamp-minute param))
+                             (bytes (sql-timestamp-second param))
+                             (integer->integer-bytes
+                              (quotient (sql-timestamp-nanosecond param) 1000)
+                              4 #t #f))])
+       (io:write-length-coded-bytes out bs)))
+    ((time)
+     (let* ([param (if (sql-time? param) (sql-time->sql-interval param) param)]
+            [days (sql-interval-days param)]
+            [hours (sql-interval-hours param)]
+            [minutes (sql-interval-minutes param)]
+            [seconds (sql-interval-seconds param)]
+            [nanoseconds (sql-interval-nanoseconds param)]
+            [neg? (ormap negative? (list days hours minutes seconds nanoseconds))]
+            [bs (bytes-append (bytes (if neg? 1 0))
+                              (integer->integer-bytes (abs days) 4 #t #f)
+                              (bytes (abs hours))
+                              (bytes (abs minutes))
+                              (bytes (abs seconds))
+                              (integer->integer-bytes
+                               (quotient (abs nanoseconds) 1000)
+                               4 #t #f))])
+       (io:write-length-coded-bytes out bs)))
+    ((blob)
+     (io:write-length-coded-bytes out param))))
 
 ;; ----
 

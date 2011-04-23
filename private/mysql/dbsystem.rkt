@@ -46,11 +46,12 @@
 (define (check-param fsym index param)
   (unless (or (string? param)
               (rational? param)
+              (bytes? param)
               (sql-date? param)
               (sql-time? param)
               (sql-timestamp? param)
               (sql-day-time-interval? param))
-    (error fsym "cannot marshal as var-string: ~e" param))
+    (error fsym "cannot marshal as MySQL parameter: ~e" param))
   param)
 
 ;; ========================================

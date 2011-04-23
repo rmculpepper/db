@@ -114,7 +114,7 @@ with their corresponding Racket representations.
   @racket['bigint]             @& @scheme[exact-integer?] @//
   @racket['real]               @& @scheme[real?] @//
   @racket['double]             @& @scheme[real?] @//
-  @racket['decimal]            @& @scheme[number?] @//
+  @racket['decimal]            @& @scheme[exact?] @//
   @racket['varchar]            @& @scheme[string?] @//
   @racket['var-string]         @& @scheme[string?] or @scheme[bytes?], but see below @//
   @racket['date]               @& @scheme[sql-date?] @//
@@ -126,14 +126,10 @@ with their corresponding Racket representations.
 
 MySQL does not report specific parameter types for prepared queries,
 instead assigning them the type @tt{var-string}. Consequently,
-conversion of Racket values to @tt{var-string} parameters accepts, in
-addition to strings, numbers (@racket[rational?]---no infinities or
-NaN) and SQL date/time structures (@racket[sql-date?],
-@racket[sql-time?], @racket[sql-timestamp?], and
-@racket[sql-day-time-interval?]).
-
-A SQL value of type @tt{decimal} is converted to an exact rational
-(MySQL seems not to support infinite @tt{decimal} values).
+conversion of Racket values to @tt{var-string} parameters accepts
+strings, numbers (@racket[rational?]---no infinities or NaN), bytes,
+and SQL date/time structures (@racket[sql-date?], @racket[sql-time?],
+@racket[sql-timestamp?], and @racket[sql-day-time-interval?]).
 
 In MySQL, the @tt{time} type represents time intervals, which may not
 correspond to times of day (for example, the interval may be negative

@@ -268,10 +268,9 @@
              (let* ([pst (statement-binding-pst stmt)]
                     [id (send pst get-handle)]
                     [params (statement-binding-params stmt)]
-                    [null-map (map not params)]
-                    [param-typeids (send pst get-param-typeids)])
+                    [null-map (map sql-null? params)])
                (send-message
-                (make-execute-packet id null 1 null-map 1 param-typeids params)))]
+                (make-execute-packet id null null-map params)))]
             [else ;; string
              (send-message (make-command-packet 'query stmt))]))
 

@@ -19,7 +19,9 @@
          "db-connection.rkt"
          "db-query.rkt"
          "db-sql-types.rkt"
-         "db-concurrent.rkt")
+         "db-concurrent.rkt"
+
+         "gen-sql-types.rkt")
 (provide (all-defined-out))
 
 #|
@@ -107,7 +109,9 @@ the user name and password (or not require it):
         [omy:test (specialize-test odbc-my@)]
         [osl:test (specialize-test odbc-sl@)])
     (make-test-suite "All tests"
-      (list postgresql:test
+      (list (make-test-suite "Generic tests (no db)"
+              (list gen-sql-types:test))
+            postgresql:test
             mysql:test
             sqlite3:test
             opg:test

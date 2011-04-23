@@ -43,15 +43,16 @@ change and automatically disconnect with an error.
 
 In most cases, a PostgreSQL or MySQL database's character encoding is
 irrelevant, since the connect function always requests translation to
-Unicode (UTF-8) when creating a connection. If a database's character
-encoding is @tt{SQL_ASCII}, however, PostgreSQL will not honor the
-connection encoding; it will instead send untranslated octets, which
-will cause corrupt data or internal errors in the client connection.
+Unicode (UTF-8) when creating a connection. If a PostgreSQL database's
+character encoding is @tt{SQL_ASCII}, however, PostgreSQL will not
+honor the connection encoding; it will instead send untranslated
+octets, which will cause corrupt data or internal errors in the client
+connection.
 
 To convert a PostgreSQL database from @tt{SQL_ASCII} to something
-sensible, @tt{pg_dump} the database, recode the dump file, create a
-new database with the desired encoding (eg, with @tt{iconv}), and
-@tt{pg_restore} from the recoded dump file.
+sensible, @tt{pg_dump} the database, recode the dump file (using a
+utility such as @tt{iconv}), create a new database with the desired
+encoding, and @tt{pg_restore} from the recoded dump file.
 
 
 @section{Prepared query parameter types}
@@ -84,13 +85,13 @@ not supported.
 
 @section{SQLite and ODBC native libraries}
 
-SQLite support requires the @tt{libsqlite3} native library,
-specifically @tt{libsqlite3.so.0}.
+SQLite support requires the appropriate native library, specifically
+@tt{libsqlite3.so.0} on Unix or @tt{sqlite3.dll} on Windows.
 
-ODBC support requires the @tt{libodbc} native library, specifically
-@tt{libodbc.so.1}. This library is provided by packages such as
-@tt{unixODBC} or @tt{iODBC}. In addition, the appropriate ODBC Drivers
-must be installed and any Data Sources configured.
+ODBC support requires the appropriate native library, specifically
+@tt{libodbc.so.1} on Unix or @tt{odbc32.dll} on Windows. In addition,
+the appropriate ODBC Drivers must be installed and any Data Sources
+configured.
 
 
 @section{ODBC}
@@ -100,11 +101,11 @@ ODBC 3.x drivers. The behavior of ODBC connections can vary widely
 depending on the driver in use and even the configuration of a
 particular data source.
 
-This library has been tested with @tt{unixODBC} on Linux/x86 (32-bit)
-running Ubuntu 10.10 with the following drivers: PostgreSQL Unicode
-(from the @tt{odbc-postgresql} package), MySQL (from the
-@tt{libmyodbc} package), and SQLite3 (from the @tt{libsqliteodbc}
-package).
+This library has been tested with @tt{unixODBC} on Linux/x86 (32-bit
+and 64-bit) running Ubuntu 11.04 with the following drivers:
+PostgreSQL Unicode (from the @tt{odbc-postgresql} package), MySQL
+(from the @tt{libmyodbc} package), and SQLite3 (from the
+@tt{libsqliteodbc} package).
 
 @bold{PostgreSQL Unicode} I have not been able to configure the driver
 to support @tt{SQLDescribeParam}, so all parameter types are set to

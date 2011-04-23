@@ -197,8 +197,8 @@
                   [else (let ([in (open-input-bytes buf)])
                           (for/list ([size (in-list sizes)])
                             (case size
-                              ((2) (io:read-le-int16 in)) ;; FIXME: use host byte order?
-                              ((4) (io:read-le-int32 in))
+                              ((2) (integer-bytes->integer (read-bytes 2 in) #f))
+                              ((4) (integer-bytes->integer (read-bytes 4 in) #f))
                               (else (error 'get-int-list
                                            "internal error: bad size: ~e" size)))))]))))
       (define (get-string)

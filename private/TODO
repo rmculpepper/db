@@ -22,8 +22,6 @@ Types
 
 - add sql-bits datatype for BIT, VARBIT types
 
-- odbc: avoid marshaling params to strings
-
 - stricter range checking, etc, of params before entering critical section
 
 - permit type annotations for
@@ -45,7 +43,7 @@ Types
 
 - some parts of docs are Linux-centric, especially ODBC part; broaden
 
-- clean up le/be/host in generic/io, odbc
+- clean up le/be/host in generic/io
 
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)

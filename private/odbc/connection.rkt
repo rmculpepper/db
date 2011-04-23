@@ -119,11 +119,13 @@
              (bind SQL_C_CHAR SQL_VARCHAR (copy-buffer param))]
             [(bytes? param)
              (bind SQL_C_BINARY SQL_BINARY (copy-buffer param))]
-            [(exact-integer? param)
-             (bind SQL_C_CHAR SQL_NUMERIC (copy-buffer (number->string param)))]
+            [(and (exact-integer? param)
+                  (<= (- (expt 2 63)) param (sub1 (expt 2 63))))
+             (bind SQL_C_SBIGINT SQL_BIGINT
+                   (copy-buffer (integer->integer-bytes param 8 #t)))]
             [(rational? param)
-             (bind SQL_C_CHAR SQL_DOUBLE
-                   (copy-buffer (number->string (exact->inexact  param))))]
+             (bind SQL_C_DOUBLE SQL_DOUBLE
+                   (copy-buffer (real->floating-point-bytes (exact->inexact param) 8)))]
             [(sql-date? param)
              (bind SQL_C_TYPE_DATE SQL_TYPE_DATE
                    (copy-buffer

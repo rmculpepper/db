@@ -56,7 +56,7 @@
       (with-connection c
         (check-pred void? (Q c query-exec "delete from the_numbers where N <> $1" 0))
         (check-equal? (Q c query-value "select count(*) from the_numbers")
-                      1)
+                      (if (equal? dbdb "test-sl") "1" 1))
         (check-equal? (Q c query-list "select N from the_numbers")
                       (list 0))))
 
@@ -139,26 +139,6 @@
 
 (define low-level-tests
   (test-suite "low-level"
-    #|
-    (test-case "query-multiple"
-      (with-connection c
-        (let [(q (query-multiple c (list "select N from the_numbers" "select 5 as N")))]
-          (check-pred list? q)
-          (check-equal? 2 (length q))
-          (check-true (andmap recordset? q))
-          (check-true (andmap (lambda (r) (list? (recordset-rows r))) q))
-          (check-true (andmap (lambda (r) (list? (recordset-headers r))) q))
-          (check-true (andmap (lambda (v) (= (vector-length v) 1))
-                              (recordset-rows (car q))))
-          (check-true (list? (recordset-headers (cadr q))))
-          (check-equal? (length (recordset-headers (cadr q))) 1)
-          (check-equal? (recordset-rows (cadr q))
-                        (list (vector 5)))
-          (check-true 
-           (set-equal? (map car test-data)
-                       (map (lambda (v) (vector-ref v 0) )
-                            (recordset-rows (car q))))))))
-    |#
     (test-case "query - select"
       (with-connection c
         (let [(q (query c "select N from the_numbers"))]
@@ -248,48 +228,52 @@
     ;; Added 18 May 2003: Corrected a bug which incorrectly interleaved
     ;; nulls with returned fields.
     (test-case "nulls arrive in correct order"
-      (with-connection c
-        ;; raw NULL has PostgreSQL type "unknown", not allowed
-        (define (clean . strs)
-          (regexp-replace* #rx"NULL" (apply string-append strs)
-                           (case (dbsystem-name dbsystem)
-                             ((postgresql) "cast(NULL as integer)")
-                             (else "NULL"))))
-        (check-equal? (query-row c (clean "select NULL, 1, NULL"))
-                      (vector sql-null 1 sql-null))
-        (check-equal? (query-row c (clean "select 1, NULL"))
-                      (vector 1 sql-null))
-        (check-equal? (query-row c (clean "select NULL, 1"))
-                      (vector sql-null 1))
-        (check-equal?
-         (query-row c (clean "select 1, 2, 3, 4, NULL, 6, NULL, "
-                             "8, 9, 10, 11, 12, NULL, 14, 15, NULL, "
-                             "NULL, 18, 19, 20, NULL, "
-                             "NULL, " "NULL, " "NULL, " "NULL, " "NULL, "
-                             "27, 28, 29, 30, NULL, 32, 33, NULL, 35"))
-         (vector 1 2 3 4 sql-null 6 sql-null 8 9 10 11 12 sql-null 14 15 sql-null
-                 sql-null 18 19 20 sql-null sql-null sql-null sql-null sql-null
-                 sql-null 27 28 29 30 sql-null 32 33 sql-null 35))))))
+      (unless (XFAIL "test-sl")
+        (with-connection c
+          ;; raw NULL has PostgreSQL type "unknown", not allowed
+          (define (clean . strs)
+            (regexp-replace* #rx"NULL" (apply string-append strs)
+                             (case (dbsystem-name dbsystem)
+                               ((postgresql) "cast(NULL as integer)")
+                               (else "NULL"))))
+          (check-equal? (query-row c (clean "select NULL, 1, NULL"))
+                        (vector sql-null 1 sql-null))
+          (check-equal? (query-row c (clean "select 1, NULL"))
+                        (vector 1 sql-null))
+          (check-equal? (query-row c (clean "select NULL, 1"))
+                        (vector sql-null 1))
+          (check-equal?
+           (query-row c (clean "select 1, 2, 3, 4, NULL, 6, NULL, "
+                               "8, 9, 10, 11, 12, NULL, 14, 15, NULL, "
+                               "NULL, 18, 19, 20, NULL, "
+                               "NULL, " "NULL, " "NULL, " "NULL, " "NULL, "
+                               "27, 28, 29, 30, NULL, 32, 33, NULL, 35"))
+           (vector 1 2 3 4 sql-null 6 sql-null 8 9 10 11 12 sql-null 14 15 sql-null
+                   sql-null 18 19 20 sql-null sql-null sql-null sql-null sql-null
+                   sql-null 27 28 29 30 sql-null 32 33 sql-null 35)))))))
 
 (define error-tests
   (test-suite "errors"
-    (test-suite "low-level"
-      (test-case "query - not a statement"
+    (test-case "query - not a statement"
+      (with-connection c
+        (check-exn exn:fail? (lambda () (query c 5)))))
+    (test-case "query - multiple statements in string"
+      (unless (XFAIL "test-pg")
         (with-connection c
-          (check-exn exn:fail? (lambda () (query c 5)))))
-      (test-case "query - multiple statements in string"
+          (check-exn exn:fail? (lambda () (query c "select 3; select 4;"))))))
+    (test-case "query - unowned prepared stmt"
+      (with-connection c1 
         (with-connection c
-          (check-exn exn:fail? (lambda () (query c "select 3; select 4;")))))
-      (test-case "query - unowned prepared stmt"
-        (with-connection c1 
-          (with-connection c
-            (let ([pst (prepare c1 "select 5")])
-              (let ([stmt (bind-prepared-statement pst null)])
-                (check-exn exn:fail? (lambda () (query c stmt))))))))
-      (test-case "query errors - nonfatal"
-        (with-connection c
-          (check-exn exn:fail? (lambda () (query-value c "select nonsuch")))
-          (check-equal? (query-value c "select 17") 17))))))
+          (let ([pst (prepare c1 "select 5")])
+            (let ([stmt (bind-prepared-statement pst null)])
+              (check-exn exn:fail? (lambda () (query c stmt))))))))
+    (test-case "query errors - nonfatal"
+      (with-connection c
+        (check-exn exn:fail? (lambda () (query-value c "select nonsuch")))
+        (check-equal? (query-value c "select 17")
+                      (if (equal? dbdb "test-sl")
+                          "17"
+                          17))))))
 
 (define test
   (test-suite "query API"

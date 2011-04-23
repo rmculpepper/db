@@ -16,21 +16,47 @@
          (only-in "../odbc.rkt" odbc-connect)
          (only-in "../private/odbc/main.rkt" odbc-dbsystem)
          "config.rkt"
-         "connection.rkt"
-         "query.rkt"
-         "sql-types.rkt"
-         "concurrent.rkt")
+         "db-connection.rkt"
+         "db-query.rkt"
+         "db-sql-types.rkt"
+         "db-concurrent.rkt")
 (provide (all-defined-out))
 
-(define (db-unit connect dbsystem)
-  (unit-from-context database^))
+#|
+
+RUNNING THE TESTS
+-----------------
+
+The following environment variables must be defined, and must be valid
+for both PostgreSQL and MySQL:
+
+  DBDB
+  DBUSER
+  DBPASSWORD
+
+The following ODBC Data Sources must exist and must already contain
+the user name and password (or not require it):
+
+  test-pg      (driver = PostgreSQL Unicode)
+  test-my      (driver = MySQL)
+  test-sl      (driver = SQLite3)
+
+|#
+
+(define (db-unit connect dbsystem [dbdb #f])
+  (let ([dbuser #f] [dbpassword #f])
+    (unit-from-context database^)))
 
 (define postgresql@ (db-unit postgresql-connect postgresql-dbsystem))
 (define mysql@ (db-unit mysql-connect mysql-dbsystem))
 (define sqlite3@ (db-unit sqlite3-connect sqlite3-dbsystem))
 (define odbc@ (db-unit odbc-connect odbc-dbsystem))
 
-(define-unit all-tests@
+(define odbc-pg@ (db-unit odbc-connect odbc-dbsystem "test-pg"))
+(define odbc-my@ (db-unit odbc-connect odbc-dbsystem "test-my"))
+(define odbc-sl@ (db-unit odbc-connect odbc-dbsystem "test-sl"))
+
+(define-unit db-test@
   (import database^
           (tag connect (prefix connect: test^))
           (tag query (prefix query: test^))
@@ -40,31 +66,33 @@
 
   (define test
     (make-test-suite
-     (format "~a tests" (dbsystem-name dbsystem))
+     (format "~a~a tests"
+             (dbsystem-name dbsystem)
+             (if dbdb (format " (~a)" dbdb) ""))
      (list connect:test
            query:test
            sql-types:test
            concurrent:test))))
 
+(define (specialize-test@ db@)
+  (compound-unit
+   (import)
+   (export DB-TEST)
+   (link (((DB : database^)) db@)
+         (((CONFIG : config^)) config@ DB)
+         (((CONNECT-TEST : test^)) db-connection@ CONFIG)
+         (((QUERY-TEST : test^)) db-query@ DB CONFIG)
+         (((SQL-TYPES-TEST : test^)) db-sql-types@ CONFIG DB)
+         (((CONCURRENT-TEST : test^)) db-concurrent@ CONFIG DB)
+         (((DB-TEST : test^)) db-test@
+                               DB
+                               (tag connect CONNECT-TEST)
+                               (tag query QUERY-TEST)
+                               (tag sql-types SQL-TYPES-TEST)
+                               (tag concurrent CONCURRENT-TEST)))))
+
 (define (specialize-test db@)
-  (define-values/invoke-unit 
-    (compound-unit
-     (import)
-     (export ALL-TESTS)
-     (link (((DB : database^)) db@)
-           (((CONFIG : config^)) config@ DB)
-           (((CONNECT-TEST : test^)) connection@ CONFIG)
-           (((QUERY-TEST : test^)) query@ DB CONFIG)
-           (((SQL-TYPES-TEST : test^)) sql-types@ CONFIG DB)
-           (((CONCURRENT-TEST : test^)) concurrent@ CONFIG DB)
-           (((ALL-TESTS : test^)) all-tests@
-                                  DB
-                                  (tag connect CONNECT-TEST)
-                                  (tag query QUERY-TEST)
-                                  (tag sql-types SQL-TYPES-TEST)
-                                  (tag concurrent CONCURRENT-TEST))))
-    (import)
-    (export test^))
+  (define-values/invoke-unit (specialize-test@ db@) (import) (export test^))
   test)
 
 (define postgresql:test (specialize-test postgresql@))
@@ -72,21 +100,21 @@
 (define sqlite3:test (specialize-test sqlite3@))
 (define odbc:test (specialize-test odbc@))
 
-#|
-;; Normal testing:
-(putenv "DBUSER" "ryan")  ;; or whoever you are
-(putenv "DBDB" "ryan")    ;; or any db that exists
-(putenv "DBPASSWORD" ???)
-(test/gui postgresql:test)
-(test/gui mysql:test)
+;; ----
 
-;; sqlite3 test just uses 'memory
-(test/gui sqlite3:test)
+(define all-tests
+  (let ([opg:test (specialize-test odbc-pg@)]
+        [omy:test (specialize-test odbc-my@)]
+        [osl:test (specialize-test odbc-sl@)])
+    (make-test-suite "All tests"
+      (list postgresql:test
+            mysql:test
+            sqlite3:test
+            opg:test
+            omy:test
+            osl:test))))
 
-;; ODBC testing:
-(putenv "DBDB" <data-source-name>")
-(test/gui odbc:test)
-|#
+;; ----
 
 (define-syntax-rule (setup-debug db@ c)
   (begin (define-values/invoke-unit db@ (import) (export database^))

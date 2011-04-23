@@ -3,16 +3,23 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require racket/unit
-         "../base.rkt")
+(require racket/class
+         racket/unit
+         "../base.rkt"
+         (only-in "../private/generic/interfaces.rkt" connection<%>))
 (provide database^
          test^
          config^
-         config@)
+         config@
+
+         dummy-c)
 
 (define-signature database^
   (connect
-   dbsystem))
+   dbsystem
+   dbuser
+   dbdb
+   dbpassword))
 
 (define-signature test^ (test))
 (define-signature config^
@@ -24,7 +31,8 @@
        [(with-connection c . body)
         (call-with-connection (lambda (c) . body))]))
    test-data
-   set-equal?))
+   set-equal?
+   XFAIL))
 
 (define-unit config@
   (import database^)
@@ -33,18 +41,18 @@
   (define (connect-for-test)
     (case (dbsystem-name dbsystem)
       ((postgresql)
-       (connect #:user (getenv "DBUSER")
-                #:database (or (getenv "DBDB") (getenv "DBUSER"))
-                #:password (getenv "DBPASSWORD")
+       (connect #:user (or dbuser (getenv "DBUSER"))
+                #:database (or dbdb (getenv "DBDB"))
+                #:password (or dbpassword (getenv "DBPASSWORD"))
                 #:notice-handler void))
       ((mysql)
-       (connect #:user (getenv "DBUSER")
-                #:database (or (getenv "DBDB") (getenv "DBUSER"))
-                #:password (getenv "DBPASSWORD")))
+       (connect #:user (or dbuser (getenv "DBUSER"))
+                #:database (or dbdb (getenv "DBDB"))
+                #:password (or dbpassword (getenv "DBPASSWORD"))))
       ((sqlite3)
-       (connect #:database (or 'memory)))
+       (connect #:database (or dbdb 'memory)))
       ((odbc)
-       (connect #:database (or (getenv "DBODBC"))))
+       (connect #:database (or dbdb (getenv "DBODBC"))))
       (else
        (error 'connect-for-test "unknown database system: ~e" dbsystem))))
 
@@ -77,4 +85,25 @@
     (let [(c (connect-and-setup))]
       (dynamic-wind void
                     (lambda () (f c))
-                    (lambda () (disconnect c))))))
+                    (lambda () (disconnect c)))))
+
+  ;; returns #t if current dbsys/db is config;
+  ;; use like (unless (XFAIL 'sqlite3) ...)
+  (define (XFAIL config)
+    (or (equal? config dbdb)
+        (equal? config (dbsystem-name dbsystem)))))
+
+;; ----
+
+(define dummy-connection%
+  (class* object% (connection<%>)
+    (define/public (connected?) (bad))
+    (define/public (disconnect) (bad))
+    (define/public (get-dbsystem) (bad))
+    (define/public (query . _) (bad))
+    (define/public (prepare . _) (bad))
+    (define/public (free-statement . _) (bad))
+    (define/private (bad) (error 'dummy-connection "not implemented"))
+    (super-new)))
+
+(define dummy-c (new dummy-connection%))

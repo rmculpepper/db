@@ -18,13 +18,13 @@
                     (all-from-out (planet ryanc/db:1:1/util/connect))))
 
 (define (my-package-version) "1.1")
-(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:0)))))
+(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:1)))))
 
 (define-syntax-rule (defmy name underlying)
   (define-syntax (name stx)
     (syntax-case stx ()
       [(name)
-       #'(underlying (planet ryanc/db:1:0))]
+       #'(underlying (planet ryanc/db:1:1))]
       [(name id)
        (identifier? #'id)
        (with-syntax ([mod (format-id #'id "ryanc/db:1:1/~a" #'id)])

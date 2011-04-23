@@ -32,7 +32,10 @@
 Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
 |#
 
-(define-ffi-definer define-odbc (ffi-lib "libodbc" '("1" #f)))
+(define-ffi-definer define-odbc
+  (case (system-type)
+    ((windows) (ffi-lib "odbc32.dll"))
+    (else (ffi-lib "libodbc" '("1" #f)))))
 
 (define-odbc SQLAllocHandle
   (_fun (type : _sqlsmallint)

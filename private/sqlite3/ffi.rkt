@@ -13,7 +13,10 @@
 (require "ffi-constants.rkt")
 (provide (all-from-out "ffi-constants.rkt"))
 
-(define-ffi-definer define-sqlite (ffi-lib "libsqlite3" '("0" #f)))
+(define-ffi-definer define-sqlite
+  (case (system-type)
+    ((windows) (ffi-lib "sqlite3.dll"))
+    (else (ffi-lib "libsqlite3" '("0" #f)))))
 
 ; Types
 (define-cpointer-type _sqlite3_database)

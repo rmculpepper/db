@@ -212,7 +212,7 @@
 
     ;; expect-auth-confirmation : -> void
     (define/private (expect-auth-confirmation)
-      (let ([r (recv 'connect 'auth)])
+      (let ([r (recv 'mysql-connect 'auth)])
         (match r
           [(struct ok-packet (_ _ status warnings message))
            (after-connect)]

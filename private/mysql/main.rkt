@@ -28,13 +28,13 @@
             (if socket 1 0)
             (if (or input-port output-port) 1 0))])
     (when (> connection-options 1)
-      (raise-user-error 'connect
+      (raise-user-error 'mysql-connect
                         (string-append
                          "cannot specify more than one of server/port, "
                          "socket, or input-port/output-port arguments"))))
   (when (or input-port output-port)
     (unless (and input-port output-port)
-      (raise-user-error 'connect
+      (raise-user-error 'mysql-connect
                         "must give input-port and output-port arguments together")))
   (let ([c (new connection%)])
     (cond [socket

@@ -17,7 +17,7 @@
     "The optional SQLite and ODBC support requires the appropriate "
     "native client libraries."))
 (define release-notes
-  '("Initial release."))
+  '("Fixed native library names for ODBC, SQLite on Windows."))
 (define categories '(io net))
 (define can-be-loaded-with 'all)
 (define primary-file "main.rkt")

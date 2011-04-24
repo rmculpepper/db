@@ -9,25 +9,25 @@
          racket/sandbox
          (for-label racket/base
                     racket/contract
-                    (planet ryanc/db:1:1)
-                    (planet ryanc/db:1:1/util/connect)))
+                    (planet ryanc/db:1:2)
+                    (planet ryanc/db:1:2/util/connect)))
 (provide (all-defined-out)
          (for-label (all-from-out racket/base)
                     (all-from-out racket/contract)
-                    (all-from-out (planet ryanc/db:1:1))
-                    (all-from-out (planet ryanc/db:1:1/util/connect))))
+                    (all-from-out (planet ryanc/db:1:2))
+                    (all-from-out (planet ryanc/db:1:2/util/connect))))
 
-(define (my-package-version) "1.1")
-(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:1)))))
+(define (my-package-version) "1.2")
+(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:2)))))
 
 (define-syntax-rule (defmy name underlying)
   (define-syntax (name stx)
     (syntax-case stx ()
       [(name)
-       #'(underlying (planet ryanc/db:1:1))]
+       #'(underlying (planet ryanc/db:1:2))]
       [(name id)
        (identifier? #'id)
-       (with-syntax ([mod (format-id #'id "ryanc/db:1:1/~a" #'id)])
+       (with-syntax ([mod (format-id #'id "ryanc/db:1:2/~a" #'id)])
          #'(underlying (planet mod)))])))
 
 (defmy my-defmodule defmodule)

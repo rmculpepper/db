@@ -1,6 +1,13 @@
 To do
 =====
 
+- after Racket 5.1.1 release:
+  - set required-core-version to 5.1.1
+  - drop private/generic/check-access.rkt
+  - split private/generic/socket.rkt into separate package
+  - use ryanc/macros:2/lazy-require in main.rkt
+  - use ryanc/macros:2/relation in message modules
+
 ----
 
 Testing

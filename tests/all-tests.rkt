@@ -45,6 +45,12 @@ the user name and password (or not require it):
 
 |#
 
+(for ([var (in-list '("DBDB" "DBUSER" "DBPASSWORD"))])
+  (unless (getenv var)
+    (eprintf "warning: ~a environment variable not set\n" var)))
+
+;; ----
+
 (define (db-unit connect dbsystem [dbdb #f])
   (let ([dbuser #f] [dbpassword #f])
     (unit-from-context database^)))

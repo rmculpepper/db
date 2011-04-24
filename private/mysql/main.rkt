@@ -20,29 +20,16 @@
                        #:password [password #f]
                        #:server [server #f]
                        #:port [port #f]
-                       #:socket [socket #f]
-                       #:input-port [input-port #f]
-                       #:output-port [output-port #f])
+                       #:socket [socket #f])
   (let ([connection-options
          (+ (if (or server port) 1 0)
-            (if socket 1 0)
-            (if (or input-port output-port) 1 0))])
+            (if socket 1 0))])
     (when (> connection-options 1)
-      (raise-user-error 'mysql-connect
-                        (string-append
-                         "cannot specify more than one of server/port, "
-                         "socket, or input-port/output-port arguments"))))
-  (when (or input-port output-port)
-    (unless (and input-port output-port)
-      (raise-user-error 'mysql-connect
-                        "must give input-port and output-port arguments together")))
+      (error 'mysql-connect "cannot give both server/port and socket arguments")))
   (let ([c (new connection%)])
     (cond [socket
-           (let-values ([(in out)
-                         (unix-socket-connect socket)])
+           (let-values ([(in out) (unix-socket-connect socket)])
              (send c attach-to-ports in out))]
-          [input-port
-           (send c attach-to-port input-port output-port)]
           [else
            (let ([server (or server "localhost")]
                  [port (or port 3306)])

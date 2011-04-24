@@ -22,8 +22,6 @@
                             #:server [server #f]
                             #:port [port #f]
                             #:socket [socket #f]
-                            #:input-port [input-port #f]
-                            #:output-port [output-port #f]
                             #:allow-cleartext-password? [allow-cleartext-password? #f]
                             #:ssl [ssl 'no]
                             #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
@@ -31,29 +29,20 @@
                             #:notification-handler [notification-handler void])
   (let ([connection-options
          (+ (if (or server port) 1 0)
-            (if socket 1 0)
-            (if (or input-port output-port) 1 0))]
+            (if socket 1 0))]
         [notice-handler (make-handler notice-handler "notice")]
         [notification-handler
          (if (procedure? notification-handler)
              notification-handler
              (make-print-notification notification-handler))])
     (when (> connection-options 1)
-      (raise-user-error 'connect
-                        (string-append
-                         "cannot specify more than one of server/port, "
-                         "socket, or input-port/output-port arguments")))
-    (when (or input-port output-port)
-      (unless (and input-port output-port)
-        (raise-user-error 'connect
-                          "must give input-port and output-port arguments together")))
+      (error 'postgresql-connect "cannot give both server/port and socket arguments"))
     (let ([c (new connection%
                   (notice-handler notice-handler)
                   (notification-handler notification-handler)
                   (allow-cleartext-password? allow-cleartext-password?))])
       (let-values ([(in out)
                     (cond [socket (unix-socket-connect socket)]
-                          [input-port (values input-port output-port)]
                           [else (let ([server (or server "localhost")]
                                       [port (or port 5432)])
                                   (tcp-connect server port))])])

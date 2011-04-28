@@ -106,7 +106,7 @@
     [(io:read port #:byte/char)
      #'(io:read-byte/char port)]
     [(io:read port #:bytes length)
-     #'(io:read-bytes port length)]
+     #'(io:read-bytes-as-bytes port length)]
     [(io:read port #:length+bytes)
      #'(io:read-length+bytes port)]
     [(io:read port #:length+string)

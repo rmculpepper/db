@@ -301,7 +301,7 @@
     (define/private (query1:data-loop fsym)
       (match (recv-message fsym)
         [(struct DataRow (row))
-         (cons (list->vector row) (query1:data-loop fsym))]
+         (cons row (query1:data-loop fsym))]
         [(struct CommandComplete (command)) null]
         [other-r (query1:error fsym other-r)]))
 
@@ -336,7 +336,8 @@
                    (lambda (row)
                      (vector-map! (lambda (value type-reader)
                                     (cond [(sql-null? value) sql-null]
-                                          [type-reader (type-reader value)]
+                                          [type-reader
+                                           (type-reader (bytes->string/utf-8 value))]
                                           [else value]))
                                   row
                                   type-reader-v))])

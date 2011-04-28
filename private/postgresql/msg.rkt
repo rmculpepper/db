@@ -165,8 +165,12 @@
 (define (parse:DataRow p)
   (with-length-in p #\D
     (let* ([values
-            (for/list ([i (in-range (io:read p #:int16))])
-              (string/f->string/sql-null (io:read p #:length+string)))])
+            (build-vector (io:read p #:int16)
+                          (lambda (i)
+                            (let ([len (io:read p #:int32)])
+                              (if (= len -1)
+                                  sql-null
+                                  (io:read-bytes-as-bytes p len)))))])
       (make-DataRow values))))
 
 (define-struct Describe (type name))

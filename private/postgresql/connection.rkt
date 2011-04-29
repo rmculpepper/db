@@ -264,7 +264,7 @@
                  (begin0 (query1:collect fsym stmt)
                    (check-ready-for-query fsym #f))))])
         (statement:after-exec stmt)
-        (query1:process-result fsym collector result)))
+        (query1:process-result fsym collector result (string? stmt))))
 
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
@@ -274,7 +274,10 @@
           (let* ([pst (statement-binding-pst stmt)]
                  [pst-name (send pst get-handle)]
                  [params (statement-binding-params stmt)])
-            (buffer-message (make-Bind "" pst-name null params null))))
+            (buffer-message (make-Bind "" pst-name
+                                       (map typeid->format (send pst get-param-typeids))
+                                       params
+                                       (map typeid->format (send pst get-result-typeids))))))
       (buffer-message (make-Describe 'portal ""))
       (buffer-message (make-Execute "" 0))
       (buffer-message (make-Close 'portal "")))
@@ -324,20 +327,19 @@
          (error fsym (nosupport "COPY OUT statements"))]
         [_ (error fsym "internal error: unexpected message")]))
 
-    (define/private (query1:process-result fsym collector result)
+    (define/private (query1:process-result fsym collector result text-format?)
       (match result
         [(vector 'recordset field-dvecs rows)
          (let-values ([(init combine finalize headers?)
                        (collector (length field-dvecs) #t)])
            (let* ([type-reader-v
-                   (list->vector (query1:get-type-readers fsym field-dvecs))]
+                   (list->vector (query1:get-type-readers fsym field-dvecs text-format?))]
                   [row-length (length field-dvecs)]
                   [convert-row
                    (lambda (row)
                      (vector-map! (lambda (value type-reader)
                                     (cond [(sql-null? value) sql-null]
-                                          [type-reader
-                                           (type-reader (bytes->string/utf-8 value))]
+                                          [type-reader (type-reader value)]
                                           [else value]))
                                   row
                                   type-reader-v))])
@@ -349,10 +351,10 @@
         [(vector 'command command)
          (simple-result command)]))
 
-    (define/private (query1:get-type-readers fsym field-dvecs)
+    (define/private (query1:get-type-readers fsym field-dvecs text-format?)
       (map (lambda (dvec)
              (let ([typeid (field-dvec->typeid dvec)])
-               (typeid->type-reader fsym typeid)))
+               (typeid->type-reader fsym typeid text-format?)))
            field-dvecs))
 
 

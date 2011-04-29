@@ -57,7 +57,11 @@
          (case (send dbsystem get-short-name)
            ((postgresql)
             ;; only valid Postgreql syntax!
-            (check (let ([q (format "select $1::~a" (current-type))])
+            (check (let ([q (format "select $1::~a"
+                                    (let ([t (current-type)])
+                                      (case t
+                                        ((double) "float8")
+                                        (else t))))])
                      (query-value c q value))
                    value))
            ((mysql)
@@ -110,23 +114,52 @@
          (check-roundtrip c #"this is the time to remember")
          (check-roundtrip c #"that's the way it is")
          (check-roundtrip c (list->bytes (build-list 256 values))))))
+
+    (type-test-case '(smallint)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c 5)
+         (check-roundtrip c -1)
+         (check-roundtrip c #x7FFF)
+         (check-roundtrip c #x-8000))))
     (type-test-case '(integer)
       (call-with-connection
        (lambda (c)
          (check-roundtrip c 5)
          (check-roundtrip c -1)
-         (check-roundtrip c #x7FFFFF)
-         (check-roundtrip c #x-800000))))
+         (check-roundtrip c #x7FFFFFFF)
+         (check-roundtrip c #x-80000000))))
+    (type-test-case '(bigint)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c 5)
+         (check-roundtrip c -1)
+         (check-roundtrip c (sub1 (expt 2 63)))
+         (check-roundtrip c (- (expt 2 63))))))
+
     (type-test-case '(real)
       (call-with-connection
        (lambda (c)
          (check-roundtrip c 1.0)
+         (check-roundtrip c 1.5)
+         (check-roundtrip c -5.5)
+         (when (supported? 'real-infinities)
+           (check-roundtrip c +inf.0)
+           (check-roundtrip c -inf.0)
+           (check-roundtrip c +nan.0)))))
+    (type-test-case '(double)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c 1.0)
+         (check-roundtrip c 1.5)
+         (check-roundtrip c -5.5)
          (check-roundtrip c 1.1)
          (check-roundtrip c -5.8)
          (when (supported? 'real-infinities)
            (check-roundtrip c +inf.0)
            (check-roundtrip c -inf.0)
            (check-roundtrip c +nan.0)))))
+
     (type-test-case '(numeric decimal)
       (call-with-connection
        (lambda (c)
@@ -134,6 +167,7 @@
          (check-roundtrip c #e1234567890.0987654321)
          (when (supported? 'numeric-infinities)
            (check-roundtrip c +nan.0)))))
+
     (type-test-case '(varchar)
       (call-with-connection
        (lambda (c)
@@ -157,6 +191,7 @@
                              (build-list 800
                                          (lambda (n)
                                            (integer->char (add1 n))))))))))
+
     (type-test-case '(date)
       (call-with-connection
        (lambda (c)

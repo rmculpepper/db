@@ -146,10 +146,8 @@
                                         type-alias->type
                                         typeid->type
                                         type->typeid
-                                        describe-typeid
-                                        typeid->type-reader
-                                        typeid->type-writer)
-                      (typeid type (alias ...) supported? reader writer) ...)
+                                        describe-typeid)
+                      (typeid type (alias ...) supported?) ...)
   (begin
     (define all-types '((type supported?) ...))
     (define supported-types
@@ -172,30 +170,7 @@
     (define (describe-typeid x)
       (let ([t (typeid->type x)]
             [ok? (case x ((typeid) supported?) ... (else #f))])
-        (list ok? t x)))
-    (define (typeid->type-reader fsym x)
-      (let ([result
-             (case x
-               ((typeid) reader) ...
-               (else #f))])
-        (or result
-            (unsupported-type fsym x (typeid->type x)))))
-    (define (typeid->type-writer x)
-      (let ([result
-             (case x
-               ((typeid) writer) ...
-               (else #f))])
-        (or result
-            (make-unsupported-writer x (typeid->type x)))))))
-
-(define (make-unsupported-writer x t)
-  (lambda (fsym . args)
-    (unsupported-type fsym x t)))
-
-(define (unsupported-type fsym x t)
-  (if t
-      (error fsym "unsupported type: ~a (typeid ~a)" t x)
-      (error fsym "unsupported type: (typeid ~a)" x)))
+        (list ok? t x)))))
 
 
 ;; == Internal staging interfaces

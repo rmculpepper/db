@@ -114,7 +114,10 @@
          (io:write p #:int16 param-format))
        (io:write p #:int16 (length values))
        (for ([value (in-list values)])
-         (io:write p #:length+string (string/sql-null->string/f value)))
+         (io:write p #:length+bytes
+                   (cond [(bytes? value) value]
+                         [(string? value) (string->bytes/utf-8 value)]
+                         [(sql-null? value) #f])))
        (io:write p #:int16 (length result-formats))
        (for ([result-format (in-list result-formats)])
          (io:write p #:int16 result-format)))]))

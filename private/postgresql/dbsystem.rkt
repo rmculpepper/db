@@ -117,6 +117,33 @@
 (define (recv-float x)
   (floating-point-bytes->real x #t))
 
+#|
+(define (recv-numeric x)
+  (define (get-int2 start) (integer-bytes->integer x #t #t start (+ 2 start)))
+  (let* ([NBASE  #e1e4]
+         [NUMERIC_POS #x0000]
+         [NUMERIC_NEG #x4000]
+         [NUMERIC_NAN #xC000]
+         [digits (get-int2 0)]
+         [weight (get-int2 2)]
+         [sign   (get-int2 4)]
+         [dscale (get-int2 6)]
+         [unscaled-digits
+          (for/list ([offset (in-range 8 (+ 8 (* 2 digits)) 2)])
+            (get-int2 offset))]
+         [scaled-digits
+          (for/list ([unscaled-digit (in-list unscaled-digits)]
+                     [i (in-naturals)])
+            (* unscaled-digit (expt NBASE (- weight i))))]
+         [abs-number (apply + scaled-digits)])
+    (cond [(= sign NUMERIC_POS)
+           abs-number]
+          [(= sign NUMERIC_NEG)
+           (- abs-number)]
+          [(= sign NUMERIC_NAN)
+           +nan.0])))
+|#
+
 (define-values (c-parse-char1
                 c-parse-date
                 c-parse-time

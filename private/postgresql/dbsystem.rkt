@@ -80,17 +80,18 @@
   (1560 bit      () #f)
   (1562 varbit   () #f)
 
-  (142 xml       () #f)
-  (600 point     () #f)
-  (601 lseg      () #f)
-  (602 path      () #f)
-  (603 box       () #f)
-  (604 polygon   () #f)
+  (600 point     () #t)
+  (601 lseg      () #t)
+  (602 path      () #t)
+  (603 box       () #t)
+  (604 polygon   () #t)
+  (718 circle    () #t)
+
   (628 line      () #f)
+  (142 xml       () #f)
   (702 abstime   () #f)
   (703 reltime   () #f)
   (704 tinterval () #f)
-  (718 circle    () #f)
   (790 money     () #f)
   (829 macaddr   () #f)
   (869 inet      () #f)
@@ -324,9 +325,21 @@ polygon = #points:int4 (x y : float8)*
     ((1186) c-parse-interval)
     ((1266) c-parse-time-tz)
     ((1700) c-parse-decimal)
+
+    ((600) recv-point)
+    ((601) recv-lseg)
+    ((602) recv-path)
+    ((603) recv-box)
+    ((604) recv-polygon)
+    ((718) recv-circle)
+
     ;; "string" literals have type unknown; just treat as string
     ((705)  (pick recv-string parse-string))
-    (else (unsupported-type fsym typeid (typeid->type typeid)))))
+    ;; FIXME
+    (else
+     (lambda (bs) bs)
+     #|(unsupported-type fsym typeid (typeid->type typeid))|#
+     )))
 
 (define (typeid->type-writer typeid)
   (case typeid
@@ -350,12 +363,21 @@ polygon = #points:int4 (x y : float8)*
     ((1186) marshal-interval)
     ((1266) marshal-time-tz)
     ((1700) marshal-decimal)
+
+    ((600) send-point)
+    ((601) send-lseg)
+    ((602) send-path)
+    ((603) send-box)
+    ((604) send-polygon)
+    ((718) send-circle)
+
     ((705)  send-string) ;; "string" literals have type unknown; just treat as string
     (else (make-unsupported-writer typeid (typeid->type typeid)))))
 
 (define (typeid->format x)
   (case x
     ((16 17 19 20 21 23 25 26 700 701 1042 1043 705) 1)
+    ((600 601 602 603 604 718) 1)
     (else 0)))
 
 (define (make-unsupported-writer x t)

@@ -1,6 +1,8 @@
 To do
 =====
 
+- document sql-bits, util/sql-type-ext
+
 - after Racket 5.1.1 release:
   - set required-core-version to 5.1.1
   - drop private/generic/check-access.rkt
@@ -26,8 +28,6 @@ Testing
 Types
 
 - add sql-interval to ODBC (easy as result, complicated as param, I think)
-
-- add sql-bits datatype for BIT, VARBIT types
 
 - stricter range checking, etc, of params before entering critical section
 

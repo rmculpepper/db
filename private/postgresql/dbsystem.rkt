@@ -72,12 +72,6 @@
   (1266 timetz     ()        #t)
   (1700 decimal    (numeric) #t)
 
-  ;; "string" literals have type unknown; just treat as string
-  (705 unknown     ()        #t)
-
-  ;; The following types are not supported.
-  ;; (But putting their names here yields better not-supported errors.)
-
   (1560 bit      () #t)
   (1562 varbit   () #t)
 
@@ -87,6 +81,12 @@
   (603 box       () #t)
   (604 polygon   () #t)
   (718 circle    () #t)
+
+  ;; "string" literals have type unknown; just treat as string
+  (705 unknown     ()        #t)
+
+  ;; The following types are not supported.
+  ;; (But putting their names here yields better not-supported errors.)
 
   (628 line      () #f)
   (142 xml       () #f)
@@ -327,6 +327,8 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     ((603)  recv-box)
     ((604)  recv-polygon)
     ((718)  recv-circle)
+    ((1560) recv-bits)
+    ((1562) recv-bits)
     ((1082) c-parse-date)
     ((1083) c-parse-time)
     ((1114) c-parse-timestamp)
@@ -334,9 +336,6 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     ((1186) c-parse-interval)
     ((1266) c-parse-time-tz)
     ((1700) c-parse-decimal)
-
-    ((1560) recv-bits)
-    ((1562) recv-bits)
 
     ;; "string" literals have type unknown; just treat as string
     ((705) recv-string)
@@ -363,6 +362,8 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     ((603)  send-box)
     ((604)  send-polygon)
     ((718)  send-circle)
+    ((1560) send-bits)
+    ((1562) send-bits)
     ((1082) marshal-date)
     ((1083) marshal-time)
     ((1114) marshal-timestamp)
@@ -370,9 +371,6 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     ((1186) marshal-interval)
     ((1266) marshal-time-tz)
     ((1700) marshal-decimal)
-
-    ((1560) send-bits)
-    ((1562) send-bits)
 
     ;; "string" literals have type unknown; just treat as string
     ((705)  send-string)

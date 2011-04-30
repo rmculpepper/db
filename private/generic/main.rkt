@@ -12,5 +12,7 @@
          statement-binding?
          statement-generator?
 
-         (all-from-out "sql-data.rkt")
+         (except-out (all-from-out "sql-data.rkt")
+                     make-sql-bits/bytes
+                     sql-bits-bv)
          (all-from-out "functions.rkt"))

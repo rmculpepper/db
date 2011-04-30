@@ -5,6 +5,7 @@
 #lang racket/base
 (require racket/class
          "../generic/interfaces.rkt"
+         "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
          "../../util/sql-type-ext.rkt"
          (only-in "msg.rkt" field-dvec->typeid))
@@ -77,8 +78,8 @@
   ;; The following types are not supported.
   ;; (But putting their names here yields better not-supported errors.)
 
-  (1560 bit      () #f)
-  (1562 varbit   () #f)
+  (1560 bit      () #t)
+  (1562 varbit   () #t)
 
   (600 point     () #t)
   (601 lseg      () #t)
@@ -108,8 +109,7 @@ isn't worth it (yet).
 
 ----
 
-bit
-varbit
+bit, varbit = len:int4 byte* (0-padded on *left*)
 
 date = int4 (days since 2000-01-01)
 timestamp = (int8 or float8)
@@ -127,6 +127,10 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
 
 ;; Binary readers
 
+(define (recv-bits x)
+  (let* ([len (integer-bytes->integer x #t #t 0 4)])
+    (make-sql-bits/bytes len (subbytes x 4))))
+
 (define (recv-boolean x)
   (case (bytes-ref x 0)
     ((0) #f)
@@ -134,9 +138,7 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     (else (error 'recv-boolean "bad value: ~e" x))))
 
 (define (recv-char1 x)
-  (let* ([n (bytes-ref x 0)]
-         [n (if (>= n 0) n (+ 256 n))])
-    (integer->char x)))
+  (integer->char (bytes-ref x 0)))
 
 (define (recv-bytea x)
   x)
@@ -223,30 +225,29 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     ((#f) (bytes 0))
     (else (send-error f i "boolean" x))))
 
+(define (send-bits f i x)
+  (unless (sql-bits? x) (send-error f i "bits" x))
+  (bytes-append (integer->integer-bytes (sql-bits-length x) 4 #t #t)
+                (sql-bits-bv x)))
+
 (define (send-char1 f i x)
   (let ([n (if (char? x) (char->integer x) x)])
     (unless (and (exact-nonnegative-integer? n) (< n 256))
       (send-error f i "char1" x))
-    (cond [(< n 128) (bytes n)]
-          [else (bytes (- (- 256 n)))])))
+    (bytes n)))
 
 (define (send-bytea f i x)
-  (unless (bytes? x)
-    (send-error f i "bytea" x))
+  (unless (bytes? x) (send-error f i "bytea" x))
   x)
 
 (define (send-string f i x)
-  (unless (string? x)
-    (send-error f i "string" x))
+  (unless (string? x) (send-error f i "string" x))
   (string->bytes/utf-8 x))
 
 (define (send-int* f i n type size min max)
   (unless (and (exact-integer? n) (<= min n max))
     (send-error f i type n))
   (integer->integer-bytes n size #t #t))
-
-(define (send-int1 f i n)
-  (send-int* f i n "int1" 1 #x-80 #x7F))
 
 (define (send-int2 f i n)
   (send-int* f i n "int2" 2 #x-8000 #x7FFF))
@@ -258,8 +259,7 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
   (send-int* f i n "int8" 8 #x-8000000000000000 #x7FFFFFFFFFFFFFFF))
 
 (define (send-float* f i n type size)
-  (unless (real? n)
-    (send-error f i type n))
+  (unless (real? n) (send-error f i type n))
   (real->floating-point-bytes n size #t))
 
 (define (send-float4 f i n)
@@ -335,6 +335,9 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     ((1266) c-parse-time-tz)
     ((1700) c-parse-decimal)
 
+    ((1560) recv-bits)
+    ((1562) recv-bits)
+
     ;; "string" literals have type unknown; just treat as string
     ((705) recv-string)
     (else (unsupported-type fsym typeid (typeid->type typeid)))))
@@ -368,6 +371,9 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
     ((1266) marshal-time-tz)
     ((1700) marshal-decimal)
 
+    ((1560) send-bits)
+    ((1562) send-bits)
+
     ;; "string" literals have type unknown; just treat as string
     ((705)  send-string)
     (else (make-unsupported-writer typeid (typeid->type typeid)))))
@@ -375,7 +381,7 @@ inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
 (define (typeid->format x)
   (case x
     ((16 17 18 19 20 21 23 25 26 700 701 1042 1043 705) 1)
-    ((600 601 602 603 604 718) 1)
+    ((600 601 602 603 604 718 1560 1562) 1)
     (else 0)))
 
 (define (make-unsupported-writer x t)

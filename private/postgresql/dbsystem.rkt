@@ -100,32 +100,28 @@
 ;; ============================================================
 
 #|
-Other types
+BINARY VS TEXT FORMAT
+
+For most types, we send and receive data in binary format
+only. However, datetime types are tricky enough that binary format
+isn't worth it (yet).
+
+----
 
 bit
 varbit
 
 date = int4 (days since 2000-01-01)
-
-timestamp (depends on result of "SHOW integer_datetimes")
-  = int8 or float8
-timestamptz = int8 or float8
-
-time = int8 or float8
+timestamp = (int8 or float8)
+timestamptz = (int8 or float8)
+time = (int8 or float8)
 timetz = (int8 or float8) zone-secs:int4
-
 interval = (usecs:int8 or secs:float8) days:int4 months:int4
+
+  (time*, timestamp* depend on "SHOW integer_datetimes")
 
 inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
   is_cidr is ignored
-
-box = x1 y1 x2 y2 (all float8)
-circle = x y rad (all float8)
-line = not yet implemented
-lseg = x1 y1 x2 y2 (all float8)
-path = closed?:byte #points:int4 (x y : float8)*
-point = x y (all float8)
-polygon = #points:int4 (x y : float8)*
 
 |#
 
@@ -136,6 +132,11 @@ polygon = #points:int4 (x y : float8)*
     ((0) #f)
     ((1) #t)
     (else (error 'recv-boolean "bad value: ~e" x))))
+
+(define (recv-char1 x)
+  (let* ([n (bytes-ref x 0)]
+         [n (if (>= n 0) n (+ 256 n))])
+    (integer->char x)))
 
 (define (recv-bytea x)
   x)
@@ -222,6 +223,13 @@ polygon = #points:int4 (x y : float8)*
     ((#f) (bytes 0))
     (else (send-error f i "boolean" x))))
 
+(define (send-char1 f i x)
+  (let ([n (if (char? x) (char->integer x) x)])
+    (unless (and (exact-nonnegative-integer? n) (< n 256))
+      (send-error f i "char1" x))
+    (cond [(< n 128) (bytes n)]
+          [else (bytes (- (- 256 n)))])))
+
 (define (send-bytea f i x)
   (unless (bytes? x)
     (send-error f i "bytea" x))
@@ -298,26 +306,27 @@ polygon = #points:int4 (x y : float8)*
 
 ;; == Readers and writers ==
 
-(define (typeid->type-reader fsym typeid text-format?)
-  ;; text-format? is for queries presented as strings (not prepared)
-  (define (pick recv parse)
-    (if text-format?
-        (lambda (x) (parse (bytes->string/utf-8 x)))
-        recv))
+(define (typeid->type-reader fsym typeid)
   (case typeid
-    ((16)   (pick recv-boolean parse-boolean))
-    ((17)   (pick recv-bytea parse-bytea))
-    ((18)   c-parse-char1)
-    ((19)   (pick recv-string parse-string))
-    ((20)   (pick recv-integer parse-integer))
-    ((21)   (pick recv-integer parse-integer))
-    ((23)   (pick recv-integer parse-integer))
-    ((25)   (pick recv-string parse-string))
-    ((26)   (pick recv-integer parse-integer))
-    ((700)  (pick recv-float parse-real))
-    ((701)  (pick recv-float parse-real))
-    ((1042) (pick recv-string parse-string))
-    ((1043) (pick recv-string parse-string))
+    ((16)   recv-boolean)
+    ((17)   recv-bytea)
+    ((18)   recv-char1)
+    ((19)   recv-string)
+    ((20)   recv-integer)
+    ((21)   recv-integer)
+    ((23)   recv-integer)
+    ((25)   recv-string)
+    ((26)   recv-integer)
+    ((700)  recv-float)
+    ((701)  recv-float)
+    ((1042) recv-string)
+    ((1043) recv-string)
+    ((600)  recv-point)
+    ((601)  recv-lseg)
+    ((602)  recv-path)
+    ((603)  recv-box)
+    ((604)  recv-polygon)
+    ((718)  recv-circle)
     ((1082) c-parse-date)
     ((1083) c-parse-time)
     ((1114) c-parse-timestamp)
@@ -326,26 +335,15 @@ polygon = #points:int4 (x y : float8)*
     ((1266) c-parse-time-tz)
     ((1700) c-parse-decimal)
 
-    ((600) recv-point)
-    ((601) recv-lseg)
-    ((602) recv-path)
-    ((603) recv-box)
-    ((604) recv-polygon)
-    ((718) recv-circle)
-
     ;; "string" literals have type unknown; just treat as string
-    ((705)  (pick recv-string parse-string))
-    ;; FIXME
-    (else
-     (lambda (bs) bs)
-     #|(unsupported-type fsym typeid (typeid->type typeid))|#
-     )))
+    ((705) recv-string)
+    (else (unsupported-type fsym typeid (typeid->type typeid)))))
 
 (define (typeid->type-writer typeid)
   (case typeid
     ((16)   send-boolean)
     ((17)   send-bytea)
-    ((18)   marshal-char1)
+    ((18)   send-char1)
     ((19)   send-string)
     ((20)   send-int8)
     ((21)   send-int2)
@@ -356,6 +354,12 @@ polygon = #points:int4 (x y : float8)*
     ((701)  send-float8)
     ((1042) send-string)
     ((1043) send-string)
+    ((600)  send-point)
+    ((601)  send-lseg)
+    ((602)  send-path)
+    ((603)  send-box)
+    ((604)  send-polygon)
+    ((718)  send-circle)
     ((1082) marshal-date)
     ((1083) marshal-time)
     ((1114) marshal-timestamp)
@@ -364,19 +368,13 @@ polygon = #points:int4 (x y : float8)*
     ((1266) marshal-time-tz)
     ((1700) marshal-decimal)
 
-    ((600) send-point)
-    ((601) send-lseg)
-    ((602) send-path)
-    ((603) send-box)
-    ((604) send-polygon)
-    ((718) send-circle)
-
-    ((705)  send-string) ;; "string" literals have type unknown; just treat as string
+    ;; "string" literals have type unknown; just treat as string
+    ((705)  send-string)
     (else (make-unsupported-writer typeid (typeid->type typeid)))))
 
 (define (typeid->format x)
   (case x
-    ((16 17 19 20 21 23 25 26 700 701 1042 1043 705) 1)
+    ((16 17 18 19 20 21 23 25 26 700 701 1042 1043 705) 1)
     ((600 601 602 603 604 718) 1)
     (else 0)))
 

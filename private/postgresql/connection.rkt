@@ -254,30 +254,38 @@
     ;; == Query
 
     ;; query : symbol Statement Collector -> QueryResult
-    (define/public (query fsym stmt collector)
-      (check-statement fsym stmt)
-      (let ([result
-             (call-with-lock fsym
-               (lambda ()
-                 (query1:enqueue stmt)
-                 (send-message (make-Sync))
-                 (begin0 (query1:collect fsym stmt)
-                   (check-ready-for-query fsym #f))))])
+    (define/public (query fsym stmt0 collector)
+      (let-values ([(stmt result)
+                    (call-with-lock fsym
+                      (lambda ()
+                        (let ([stmt (check-statement fsym stmt0)])
+                          (query1:enqueue stmt)
+                          (send-message (make-Sync))
+                          (begin0 (values stmt (query1:collect fsym stmt))
+                            (check-ready-for-query fsym #f)))))])
         (statement:after-exec stmt)
-        (query1:process-result fsym collector result (string? stmt))))
+        (query1:process-result fsym collector result)))
+
+    ;; check-statement : symbol statement -> statement-binding
+    ;; Always prepare, so we can have type information to choose result formats.
+    (define/private (check-statement fsym stmt)
+      (cond [(statement-binding? stmt)
+             (let ([pst (statement-binding-pst stmt)])
+               (send pst check-owner fsym this stmt))
+             stmt]
+            [(string? stmt)
+             (let ([pst (prepare1 fsym stmt #t)])
+               (send pst bind fsym null))]))
 
     ;; query1:enqueue : Statement -> void
     (define/private (query1:enqueue stmt)
-      (if (string? stmt)
-          (begin (buffer-message (make-Parse "" stmt null))
-                 (buffer-message (make-Bind "" "" null null null)))
-          (let* ([pst (statement-binding-pst stmt)]
-                 [pst-name (send pst get-handle)]
-                 [params (statement-binding-params stmt)])
-            (buffer-message (make-Bind "" pst-name
-                                       (map typeid->format (send pst get-param-typeids))
-                                       params
-                                       (map typeid->format (send pst get-result-typeids))))))
+      (let* ([pst (statement-binding-pst stmt)]
+             [pst-name (send pst get-handle)]
+             [params (statement-binding-params stmt)])
+        (buffer-message (make-Bind "" pst-name
+                                   (map typeid->format (send pst get-param-typeids))
+                                   params
+                                   (map typeid->format (send pst get-result-typeids)))))
       (buffer-message (make-Describe 'portal ""))
       (buffer-message (make-Execute "" 0))
       (buffer-message (make-Close 'portal "")))
@@ -327,13 +335,13 @@
          (error fsym (nosupport "COPY OUT statements"))]
         [_ (error fsym "internal error: unexpected message")]))
 
-    (define/private (query1:process-result fsym collector result text-format?)
+    (define/private (query1:process-result fsym collector result)
       (match result
         [(vector 'recordset field-dvecs rows)
          (let-values ([(init combine finalize headers?)
                        (collector (length field-dvecs) #t)])
            (let* ([type-reader-v
-                   (list->vector (query1:get-type-readers fsym field-dvecs text-format?))]
+                   (list->vector (query1:get-type-readers fsym field-dvecs))]
                   [row-length (length field-dvecs)]
                   [convert-row
                    (lambda (row)
@@ -351,27 +359,28 @@
         [(vector 'command command)
          (simple-result command)]))
 
-    (define/private (query1:get-type-readers fsym field-dvecs text-format?)
+    (define/private (query1:get-type-readers fsym field-dvecs)
       (map (lambda (dvec)
              (let ([typeid (field-dvec->typeid dvec)])
-               (typeid->type-reader fsym typeid text-format?)))
+               (typeid->type-reader fsym typeid)))
            field-dvecs))
 
 
     ;; == Prepare
 
-    ;; prepare : symbol string -> PreparedStatement
     (define/public (prepare fsym stmt close-on-exec?)
       (call-with-lock fsym
         (lambda ()
-          ;; name generation within exchange: synchronized
-          (let ([name (generate-name)])
-            (prepare1:enqueue name stmt)
-            (send-message (make-Sync))
-            (begin0 (prepare1:collect fsym name close-on-exec?)
-              (check-ready-for-query fsym #f))))))
+          (prepare1 fsym stmt close-on-exec?))))
 
-    ;; prepare1:enqueue : string string boolean -> void
+    (define/private (prepare1 fsym stmt close-on-exec?)
+      ;; name generation within exchange: synchronized
+      (let ([name (generate-name)])
+        (prepare1:enqueue name stmt)
+        (send-message (make-Sync))
+        (begin0 (prepare1:collect fsym name close-on-exec?)
+          (check-ready-for-query fsym #f))))
+
     (define/private (prepare1:enqueue name stmt)
       (buffer-message (make-Parse name stmt null))
       (buffer-message (make-Describe 'statement name)))
@@ -402,14 +411,6 @@
 
     (define/private (prepare1:error fsym r)
       (error fsym "internal error: unexpected message in prepare"))
-
-    ;; check-statement : symbol any -> void
-    (define/private (check-statement fsym stmt)
-      (unless (or (string? stmt) (statement-binding? stmt))
-        (raise-type-error fsym "string or statement-binding" stmt))
-      (when (statement-binding? stmt)
-        (let ([pst (statement-binding-pst stmt)])
-          (send pst check-owner fsym this stmt))))
 
     ;; name-counter : nat
     (define name-counter 0)

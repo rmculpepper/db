@@ -6,6 +6,7 @@
 (require racket/class
          "../generic/interfaces.rkt"
          "../generic/sql-convert.rkt"
+         "../../util/sql-type-ext.rkt"
          (only-in "msg.rkt" field-dvec->typeid))
 (provide dbsystem
          typeid->type-reader
@@ -97,6 +98,36 @@
 
 ;; ============================================================
 
+#|
+Other types
+
+bit
+varbit
+
+date = int4 (days since 2000-01-01)
+
+timestamp (depends on result of "SHOW integer_datetimes")
+  = int8 or float8
+timestamptz = int8 or float8
+
+time = int8 or float8
+timetz = (int8 or float8) zone-secs:int4
+
+interval = (usecs:int8 or secs:float8) days:int4 months:int4
+
+inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
+  is_cidr is ignored
+
+box = x1 y1 x2 y2 (all float8)
+circle = x y rad (all float8)
+line = not yet implemented
+lseg = x1 y1 x2 y2 (all float8)
+path = closed?:byte #points:int4 (x y : float8)*
+point = x y (all float8)
+polygon = #points:int4 (x y : float8)*
+
+|#
+
 ;; Binary readers
 
 (define (recv-boolean x)
@@ -116,6 +147,26 @@
 
 (define (recv-float x)
   (floating-point-bytes->real x #t))
+
+(define (get-double bs offset)
+  (floating-point-bytes->real bs #t offset (+ 8 offset)))
+(define (recv-point x [offset 0])
+  (sql-point (get-double x (+ offset 0)) (get-double x (+ offset 8))))
+(define (recv-box x)
+  (sql-box (recv-point x 0) (recv-point x 16)))
+(define (recv-circle x)
+  (sql-circle (recv-point x 0) (get-double x 16)))
+(define (recv-lseg x)
+  (sql-lseg (recv-point x 0) (recv-point x 16)))
+(define (recv-path x)
+  (sql-path (not (zero? (bytes-ref x 0)))
+            (for/list ([i (integer-bytes->integer x #t #t 1 5)])
+              (recv-point x (+ 5 (* 16 i))))))
+(define (recv-polygon x)
+  (sql-polygon
+   (for/list ([i (integer-bytes->integer x #t #t 0 4)])
+     (recv-point x (+ 4 (* 16 i))))))
+
 
 #|
 (define (recv-numeric x)
@@ -207,6 +258,37 @@
 
 (define (send-float8 f i n)
   (send-float* f i n "float8" 8))
+
+(define (float8 x)
+  (real->floating-point-bytes x 8 #t))
+(define (send-point f i x)
+  (unless (sql-point? x) (send-error f i "point" x))
+  (bytes-append (float8 (sql-point-x x)) (float8 (sql-point-y x))))
+(define (send-box f i x)
+  (unless (sql-box? x) (send-error f i "box" x))
+  (bytes-append (send-point f #f (sql-box-ne x))
+                (send-point f #f (sql-box-sw x))))
+(define (send-circle f i x)
+  (unless (sql-circle? x) (send-error f i "circle" x))
+  (bytes-append (send-point f #f (sql-circle-center x))
+                (float8 (sql-circle-radius x))))
+(define (send-lseg f i x)
+  (unless (sql-lseg? x) (send-error f i "lseg" x))
+  (bytes-append (send-point f #f (sql-lseg-p1 x))
+                (send-point f #f (sql-lseg-p2 x))))
+(define (send-path f i x)
+  (unless (sql-path? x) (send-error f i "path" x))
+  (apply bytes-append
+         (bytes (if (sql-path-closed? x) 1 0))
+         (integer->integer-bytes (length (sql-path-points x)) 4 #t #t)
+         (for/list ([p (in-list (sql-path-points x))])
+           (send-point f #f p))))
+(define (send-polygon f i x)
+  (unless (sql-polygon? x) (send-error f i "polygon" x))
+  (apply bytes-append
+         (integer->integer-bytes (length (sql-polygon-points x)) 4 #t #t)
+         (for/list ([p (in-list (sql-polygon-points x))])
+           (send-point f #f p))))
 
 ;; send-error : string datum -> (raises error)
 (define (send-error f i type datum)

@@ -107,6 +107,9 @@ For most types, we send and receive data in binary format
 only. However, datetime types are tricky enough that binary format
 isn't worth it (yet).
 
+Domain typeids never seem to appear as result typeids, but do appear
+as parameter typeids.
+
 ----
 
 bit, varbit = len:int4 byte* (0-padded on *left*)
@@ -122,6 +125,8 @@ interval = (usecs:int8 or secs:float8) days:int4 months:int4
 
 inet, cidr = family:byte bits:byte is_cidr:byte addrlen:byte addr:be-integer
   is_cidr is ignored
+
+record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols 
 
 |#
 

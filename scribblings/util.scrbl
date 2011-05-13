@@ -7,9 +7,12 @@
 
 @title[#:tag "util"]{Utilities}
 
+This section describes bindings that are not provided by
+@(my-racketmodname).
+
 @section[#:tag "connect-util"]{Connection utilities}
 
-@(my-declare-exporting util/connect)
+@(my-defmodule util/connect)
 
 @defproc[(connection-generator
              [generator (-> connection?)]
@@ -87,3 +90,30 @@ Note: A kill-safe connection whose underlying connection uses ports to
 communicate with a database server is not protected from a custodian
 shutting down its ports.
 }
+
+
+@;{========================================}
+
+@section[#:tag "sql-type-ext"]{Extended SQL types}
+
+@(my-defmodule util/sql-type-ext)
+
+The following structures represent PostgreSQL's geometric types.
+
+@defstruct*[sql-point
+            ([x real?] [y real?])]
+
+@defstruct*[sql-box
+            ([ne sql-point?] [sw sql-point?])]
+
+@defstruct*[sql-lseg
+            ([p1 sql-point?] [p2 sql-point?])]
+
+@defstruct*[sql-path
+            ([closed? boolean?] [points (listof sql-point?)])]
+
+@defstruct*[sql-polygon
+            ([points (listof sql-point?)])]
+
+@defstruct*[sql-circle
+            ([center sql-point?] [radius real?])]

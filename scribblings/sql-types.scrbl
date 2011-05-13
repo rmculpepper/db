@@ -26,16 +26,17 @@ this library, an error is raised. As a workaround, cast the column to
 a supported type:
 
 @examples/results[
-[(query-value pgc "select point(1,2)")
- (error 'query-value "unsupported type: point (typeid 600)")]
-[(query-value pgc "select cast(point(1,2) as varchar)")
- "(1,2)"]
+[(query-value pgc "select inet '127.0.0.1'")
+ (error 'query-value "unsupported type: inet (typeid 869)")]
+[(query-value pgc "select cast(inet '127.0.0.1' as varchar)")
+ "127.0.0.1/32"]
 ]
 
 The error for unsupported types in result columns is raised when the
-query is executed; for parameters it is raised when the parameter
-values are supplied. Thus even unexecutable prepared statements can be
-inspected using @racket[prepared-statement-parameter-types] and
+query is executed, not when it is prepared; for parameters it is
+raised when the parameter values are supplied. Thus even unexecutable
+prepared statements can be inspected using
+@racket[prepared-statement-parameter-types] and
 @racket[prepared-statement-result-types].
 
 
@@ -69,7 +70,16 @@ along with their corresponding Racket representations.
   @racket['timetz]        @& @tt{timetz}             @& @scheme[sql-time?] @//
   @racket['timestamp]     @& @tt{timestamp}          @& @scheme[sql-timestamp?] @//
   @racket['timestamptz]   @& @tt{timestamptz}        @& @scheme[sql-timestamp?] @//
-  @racket['interval]      @& @tt{interval}           @& @scheme[sql-interval?]
+  @racket['interval]      @& @tt{interval}           @& @scheme[sql-interval?] @//
+  @racket['bit]           @& @tt{bit}                @& @scheme[sql-bits?] @//
+  @racket['varbit]        @& @tt{varbit}             @& @scheme[sql-bits?] @//
+
+  @racket['point]         @& @tt{point}              @& @scheme[sql-point?] @//
+  @racket['lseg]          @& @tt{lseg}               @& @scheme[sql-lseg?] @//
+  @racket['path]          @& @tt{path}               @& @scheme[sql-path?] @//
+  @racket['box]           @& @tt{box}                @& @scheme[sql-box?] @//
+  @racket['polygon]       @& @tt{polygon}            @& @scheme[sql-polygon?] @//
+  @racket['circle]        @& @tt{circle}             @& @scheme[sql-circle?]
 }
 }
 
@@ -93,10 +103,12 @@ to the same type.
  12345678901234567890]
 ]
 
-PostgreSQL defines many other types, such as network addresses,
-various geometric shapes, and array types. These are currently not
-supported, but future versions of this library may include new type
-correspondences and conversions.
+The geometric types such as @racket['point] are represented by
+structures defined in the @my-racketmodname[util/sql-type-ext] module.
+
+PostgreSQL defines many other types, such as network addresses and
+array types. These are currently not supported, but future versions of
+this library may include new type correspondences and conversions.
 
 
 @subsection[#:tag "mysql-types"]{MySQL}
@@ -222,6 +234,11 @@ standard SQL @tt{bit(N)} type.
 
 @section[#:tag "sql-data"]{SQL data}
 
+This section describes data types for representing various SQL types
+that have no existing appropriate counterpart in Racket.
+
+@subsection{NULL}
+
 SQL @tt{NULL} is translated into the unique @scheme[sql-null] value.
 
 @defthing[sql-null sql-null?]
@@ -259,8 +276,11 @@ If @racket[x] is @racket[#f], returns @racket[sql-null], otherwise returns @rack
 }
 
 
-New Racket datatypes are also provided for a few SQL types that have
-no existing close analogues.
+@subsection{Dates and times}
+
+The @tt{DATE}, @tt{TIME} (@tt{WITH TIME ZONE} and without),
+@tt{TIMESTAMP} (@tt{WITH TIME ZONE} and without), and @tt{INTERVAL}
+SQL types are represented by the following structures.
 
 @defstruct*[sql-date
             ([year exact-integer?]
@@ -438,4 +458,60 @@ no existing close analogues.
 
   Converts @racket[time] to an interval. If @racket[time] has
   time-zone information, it is ignored.
+}
+
+
+@subsection{Bits}
+
+The @tt{BIT} and @tt{BIT VARYING} (@tt{VARBIT}) SQL types are
+represented by sql-bits values.
+
+@defproc[(make-sql-bits [len exact-nonnegative-integer?]) 
+         sql-bits?]{
+
+  Creates a new sql-bits value containing @racket[len] zeros.
+}
+
+@defproc[(sql-bits? [v any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[v] is a sql-bits value, @racket[#f]
+  otherwise.
+}
+
+@defproc[(sql-bits-length [b sql-bits?])
+         exact-nonnegative-integer?]{
+
+  Returns the number of bits stored in @racket[b].
+}
+
+@defproc[(sql-bits-ref [b sql-bits?] [i exact-nonnegative-integer?])
+         boolean?]{
+
+  Returns the bit stored by @racket[b] at index @racket[i] as a
+  boolean.
+}
+
+@defproc[(sql-bits-set! [b sql-bits?] 
+                        [i exact-nonnegative-integer?] 
+                        [v boolean?])
+         void?]{
+
+  Updates @racket[b], setting the bit at index @racket[i] to @racket[v].
+}
+
+@deftogether[[
+@defproc[(sql-bits->list [b sql-bits?]) (listof boolean?)]
+@defproc[(sql-bits->string [b sql-bits?]) string?]
+@defproc[(list->sql-bits [lst (listof boolean?)]) sql-bits?]
+@defproc[(string->sql-bits [s string?]) sql-bits?]]]{
+
+  Converts a sql-bits value to or from its representation as a list or
+  string.
+
+@examples/results[
+[(sql-bits->list (string->sql-bits "1011"))
+ (sql-bits->list (string->sql-bits "1011"))]
+[(sql-bits->string (query-value pgc "select B'010110111'"))
+ (sql-bits->string (string->sql-bits "010110111"))]
+]
 }

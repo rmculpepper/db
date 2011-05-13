@@ -1,8 +1,6 @@
 To do
 =====
 
-- document sql-bits, util/sql-type-ext
-
 - after Racket 5.1.1 release:
   - set required-core-version to 5.1.1
   - drop private/generic/check-access.rkt

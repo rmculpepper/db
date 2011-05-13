@@ -10,12 +10,14 @@
          (for-label racket/base
                     racket/contract
                     (planet ryanc/db:1:2)
-                    (planet ryanc/db:1:2/util/connect)))
+                    (planet ryanc/db:1:2/util/connect)
+                    (planet ryanc/db:1:2/util/sql-type-ext)))
 (provide (all-defined-out)
          (for-label (all-from-out racket/base)
                     (all-from-out racket/contract)
                     (all-from-out (planet ryanc/db:1:2))
-                    (all-from-out (planet ryanc/db:1:2/util/connect))))
+                    (all-from-out (planet ryanc/db:1:2/util/connect))
+                    (all-from-out (planet ryanc/db:1:2/util/sql-type-ext))))
 
 (define (my-package-version) "1.2")
 (define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:2)))))

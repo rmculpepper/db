@@ -559,10 +559,8 @@
                   (cdr s)))
       s))
 
-;; parse-field-dvec : list (from RowDescription) -> field-dvec
-;; layout is #(name table-oid col-oid typeid typelen typemod text/binary)
-(define (parse-field-dvec info)
-  (list->vector info))
+
+;; dvec layout is #(name table-oid col-oid typeid typelen typemod text/binary)
 
 (define (field-dvec->typeid dvec)
   (vector-ref dvec 3))

@@ -95,7 +95,7 @@ Based on protocol documentation here:
          (io:write-le-int32 port n)]
         [else
          (io:write-byte port 254)
-         (io:write-le-intN port 8 n)]))
+         (io:write-le-int64 port n)]))
 
 (define (io:write-length-coded-bytes port b)
   (io:write-length-code port (bytes-length b))

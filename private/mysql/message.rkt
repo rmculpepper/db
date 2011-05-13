@@ -567,16 +567,21 @@ Based on protocol documentation here:
 (define (parse-binary-row-data-packet in len field-dvecs)
   (let* ([first (io:read-byte in)] ;; SKIP? seems to be always zero
          [result-count (length field-dvecs)]
-         ;; FIXME: avoid reifying null-map as list?
-         [null-map-length (floor (/ (+ 9 result-count) 8))]  ;; FIXME: use quotient?
-         [null-map-int (io:read-le-intN in null-map-length)]
-         [null-map (cddr (integer->null-map null-map-int (+ 2 result-count)))]
+         [null-map-length (quotient (+ 9 result-count) 8)]
+         [null-map (io:read-bytes-as-bytes in null-map-length)]
+         [is-null? (lambda (i)
+                     (let* ([i* (+ 2 i)] ;; skip first two bits
+                            [bytei (quotient i* 8)]
+                            [biti (remainder i* 8)])
+                       (bitwise-bit-set? (bytes-ref null-map bytei)
+                                         (if (system-big-endian?)
+                                             (- 7 biti)
+                                             biti))))]
          [field-v (make-vector result-count)])
     (for ([i (in-range result-count)]
-          [field-dvec (in-list field-dvecs)]
-          [is-null? (in-list null-map)])
+          [field-dvec (in-list field-dvecs)])
       (vector-set! field-v i
-                   (if is-null?
+                   (if (is-null? i)
                        sql-null
                        (read-binary-datum in field-dvec))))
     (make-binary-row-data-packet field-v)))
@@ -910,13 +915,6 @@ Based on protocol documentation here:
          (+ 1 (arithmetic-shift (null-map->integer (cdr null-map)) 1))]
         [else
          (arithmetic-shift (null-map->integer (cdr null-map)) 1)]))
-
-;; integer->null-map : number number -> (list-of boolean)
-(define (integer->null-map n len)
-  (if (zero? len)
-      null
-      (cons (= 1 (bitwise-and n 1))
-            (integer->null-map (arithmetic-shift n -1) (sub1 len)))))
 
 (define (at-eof? in)
   (eof-object? (peek-byte in)))

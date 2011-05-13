@@ -16,13 +16,8 @@ produces the corresponding racket datum.
 No conversion may be passed sql-null.
 |#
 
-(provide parse-string
-         parse-char1
-         parse-bytea
-         parse-integer
-         parse-real
+(provide parse-char1
          parse-decimal
-         parse-boolean
          parse-date
          parse-time
          parse-time-tz
@@ -30,57 +25,8 @@ No conversion may be passed sql-null.
          parse-timestamp-tz
          parse-interval)
 
-(define (parse-string s) s)
-
 (define (parse-char1 s)
   (string-ref s 0))
-
-(define (parse-bytea s)
-  (define (decode in out)
-    (define (loop)
-      (let ([next (read-char in)])
-        (cond [(eof-object? next)
-               (void)]
-              [(eq? next #\\)
-               (escaped-loop)]
-              [else
-               (let ([next-as-byte (char->integer next)])
-                 (unless (< next-as-byte 256)
-                   (parse-error "bytea" s))
-                 (write-byte next-as-byte out)
-                 (loop))])))
-    (define (escaped-loop)
-      (let ([next (peek-char in)])
-        (cond [(eq? next #\\)
-               (read-char in)
-               (write-char next out)]
-              [else
-               (let* ([s (read-string 3 in)]
-                      [n (string->number s 8)])
-                 (unless (< n 256)
-                   (parse-error "bytea" s))
-                 (write-byte n out))])
-        (loop)))
-    (loop))
-  (if (regexp-match? #rx"\\\\" s)
-      (let ([out (open-output-bytes)]
-            [in (open-input-string s)])
-        (decode in out)
-        (get-output-bytes out))
-      (with-handlers ([exn:fail?
-                       (lambda (e) (parse-error "bytea" s))])
-        (string->bytes/latin-1 s))))
-
-(define (parse-integer s)
-  (or (string->number s)
-      (parse-error "integer" s)))
-
-(define (parse-real s)
-  (cond [(string->number s) => exact->inexact]
-        [(equal? s "NaN") +nan.0]
-        [(equal? s "Infinity") +inf.0]
-        [(equal? s "-Infinity") -inf.0]
-        [else (parse-error "real" s)]))
 
 (define (parse-decimal s)
   (cond [(equal? s "NaN") +nan.0]
@@ -94,18 +40,10 @@ No conversion may be passed sql-null.
                  (parse-exact-fraction (caddr m))))]
         [else (parse-error "numeric" s)]))
 
-;; parse-exact-fraction : string[in #rx"[0-9]*"] -> exact number
-;; Given the fractional part of a number (including leading zeros),
-;; produces an exact number representing the fraction.
-;; eg: (parse-exact-fraction "12") = 12/100
 (define (parse-exact-fraction s)
+  ;; eg: (parse-exact-fraction "12") = 12/100
   (/ (string->number s)
      (expt 10 (string-length s))))
-
-(define (parse-boolean s)
-  (cond [(equal? s "t") #t]
-        [(equal? s "f") #f]
-        [else (parse-error "boolean" s)]))
 
 (define (parse-date d)
   (srfi-date->sql-date
@@ -186,118 +124,15 @@ Takes a racket datum and converts it into <type>'s text wire format.
 No conversion may be passed sql-null.
 |#
 
-(provide marshal-string
-         marshal-ascii-string
-         marshal-char1
-         marshal-bytea
-         marshal-integer
-         marshal-int1
-         marshal-int2
-         marshal-int3
-         marshal-int4
-         marshal-int8
-         marshal-real
-         marshal-decimal
-         marshal-bool
+(provide marshal-decimal
          marshal-date
          marshal-time
          marshal-time-tz
          marshal-timestamp
          marshal-timestamp-tz
-         marshal-day-time-interval
-         marshal-interval
-
-         marshal-error)
-
-(define (marshal-string f i s)
-  (unless (string? s)
-    (marshal-error f i "string" s))
-  s)
-
-(define (marshal-ascii-string f i s)
-  (unless (string? s)
-    (marshal-error f i "ascii-string" s))
-  (for ([i (in-range (string-length s))])
-    (unless (<= 0 (char->integer (string-ref s i)) 127)
-      (marshal-error f i "ascii-string" s)))
-  s)
-
-(define (marshal-char1 f i c)
-  (unless (and (char? c) (< (char->integer c) 128))
-    (marshal-error f i "char1"))
-  (string c))
-
-(define (marshal-bytea f i s)
-  (unless (bytes? s)
-    (marshal-error f i "bytea" s))
-  (let ([in (open-input-bytes s)]
-        [out (open-output-string)])
-    (encode in out)
-    (get-output-string out)))
-
-;; encode : input-port output-port boolean -> void
-(define (encode in out)
-  (define (loop)
-    (let ([next-byte (read-byte in)])
-      (cond [(eof-object? next-byte)
-             (void)]
-            [(= next-byte (char->integer #\\))
-             (write-char #\\ out)
-             (write-char #\\ out)
-             (loop)]
-            [(= next-byte 0)
-             (write-char #\\ out)
-             (write-string "000" out)
-             (loop)]
-            [(> next-byte 127)
-             (write-char #\\ out)
-             (let ([ns (number->string next-byte 8)])
-               (write-string "000" out (string-length ns) 3)
-               (write-string ns out))
-             (loop)]
-            [else
-             (write-byte next-byte out)
-             (loop)])))
-  (loop))
-
-(define (marshal-integer f i n)
-  (unless (exact-integer? n)
-    (marshal-error f i "integer" n))
-  (number->string n))
-
-(define (marshal-int* f i n type min max)
-  (unless (and (exact-integer? n) (<= min n max))
-    (marshal-error f i type n))
-  (number->string n))
-
-(define (marshal-int1 f i n)
-  (marshal-int* f i n "int1" #x-80 #x7F))
-
-(define (marshal-int2 f i n)
-  (marshal-int* f i n "int2" #x-8000 #x7FFF))
-
-(define (marshal-int3 f i n)
-  (marshal-int* f i n "int3" #x-800000 #x7FFFFF))
-
-(define (marshal-int4 f i n)
-  (marshal-int* f i n "int4" #x-80000000 #x7FFFFFFF))
-
-(define (marshal-int8 f i n)
-  (marshal-int* f i n "int8" #x-8000000000000000 #x7FFFFFFFFFFFFFFF))
-
-(define (marshal-real f i n)
-  (unless (real? n)
-    (marshal-error f i "real" n))
-  (cond [(eqv? n +inf.0) "Infinity"]
-        [(eqv? n -inf.0) "-Infinity"]
-        [(eqv? n +nan.0) "NaN"]
-        [else
-         (number->string
-          (exact->inexact n))]))
+         marshal-interval)
 
 (define (marshal-decimal f i n)
-  (define (dlog10 n)
-    (inexact->exact (ceiling (/ (log n) (log 2)))))
   (cond [(not (real? n))
          (marshal-error f i "numeric" n)]
         [(eqv? n +nan.0)
@@ -334,9 +169,6 @@ No conversion may be passed sql-null.
                                          #\0)
                             num-str))))))
 
-(define (marshal-bool f i v)
-  (if v "t" "f"))
-
 (define (marshal-date f i d)
   (unless (sql-date? d)
     (marshal-error f i "date" d))
@@ -361,18 +193,6 @@ No conversion may be passed sql-null.
   (unless (sql-timestamp? t)
     (marshal-error f i "timestamp" t))
   (srfi:date->string (sql-datetime->srfi-date t) "~Y-~m-~d ~k:~M:~S.~N~z"))
-
-(define (marshal-day-time-interval f i t)
-  (unless (sql-day-time-interval? t)
-    (marshal-error f i "simple time interval" t))
-  (let ([h (+ (sql-interval-hours t)
-              (* 24 (sql-interval-days t)))]
-        [m (abs (sql-interval-minutes t))]
-        [s (abs (sql-interval-seconds t))]
-        [ns (abs (sql-interval-nanoseconds t))])
-    (string-append (number->string h)
-                   (srfi:date->string (sql-datetime->srfi-date (sql-time 0 m s ns #f))
-                                      ":~M:~S.~N"))))
 
 (define (marshal-interval f i t)
   (define (tag num unit)

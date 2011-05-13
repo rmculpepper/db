@@ -13,23 +13,6 @@
 
 (define gen-sql-types:test
   (test-suite "Parsing SQL types"
-    (test-case "boolean"
-      (check-eq? (parse-boolean "t") #t)
-      (check-eq? (parse-boolean "f") #f)
-      (check-exn exn? (lambda () (parse-boolean "g"))))
-    (test-case "varchar"
-      (check-equal? (parse-string "abc") "abc")
-      (check-equal? (parse-string "") ""))
-    (test-case "integer"
-      (check-equal? (parse-integer "0") 0)
-      (check-equal? (parse-integer "17") 17)
-      (check-exn exn? (lambda () (parse-integer "")))
-      (check-exn exn? (lambda () (parse-integer "alpha"))))
-    (test-case "real"
-      (check-equal? (parse-real "0.0") 0.0)
-      (check-equal? (parse-real "17.123") 17.123)
-      (check-exn exn? (lambda () (parse-real "")))
-      (check-exn exn? (lambda () (parse-real "alpha"))))
     (test-case "date"
       (check-equal? (parse-date "1980-08-17")
                     (make-sql-date 1980 08 17)))

@@ -50,7 +50,5 @@ Types
 
 - some parts of docs are Linux-centric, especially ODBC part; broaden
 
-- clean up le/be/host in generic/io
-
 - disconnect should always work, even on damaged connections
   (eg kill-thread, custodian shutdown)

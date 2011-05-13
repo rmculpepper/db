@@ -12,7 +12,7 @@
          "../generic/sql-data.rkt"
          "../generic/prepared.rkt"
          "../generic/exceptions.rkt"
-         "msg.rkt"
+         "message.rkt"
          "dbsystem.rkt")
 (provide connection%)
 

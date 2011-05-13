@@ -10,7 +10,6 @@
          "../generic/prepared.rkt"
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
-         "../generic/io.rkt"
          "../generic/exceptions.rkt"
          "ffi.rkt"
          "ffi-constants.rkt"

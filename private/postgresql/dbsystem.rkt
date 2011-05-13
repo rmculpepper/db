@@ -8,7 +8,7 @@
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
          "../../util/sql-type-ext.rkt"
-         (only-in "msg.rkt" field-dvec->typeid))
+         (only-in "message.rkt" field-dvec->typeid))
 (provide dbsystem
          typeid->type-reader
          typeid->format)

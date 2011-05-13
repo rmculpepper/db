@@ -10,9 +10,187 @@ Based on protocol documentation here:
 #lang racket/base
 (require racket/match
          "../generic/sql-data.rkt"
-         "../generic/sql-convert.rkt"
-         "../generic/io.rkt")
-(provide (all-defined-out))
+         "../generic/sql-convert.rkt")
+(provide write-packet
+         parse-packet
+
+         packet?
+         (struct-out handshake-packet)
+         (struct-out client-authentication-packet)
+         (struct-out command-packet)
+         (struct-out command:statement-packet)
+         (struct-out command:change-user-packet)
+         (struct-out ok-packet)
+         (struct-out error-packet)
+         (struct-out result-set-header-packet)
+         (struct-out field-packet)
+         (struct-out eof-packet)
+         (struct-out row-data-packet)
+         (struct-out binary-row-data-packet)
+         (struct-out ok-prepared-statement-packet)
+         (struct-out parameter-packet)
+         (struct-out long-data-packet)
+         (struct-out execute-packet)
+
+         parse-field-dvec
+         field-dvec->typeid
+         field-dvec->field-info)
+
+;; subport : input-port num -> input-port
+;; Reads len bytes from input, then returns input port
+;; containing only those bytes.
+;; Raises error if fewer than len bytes available in input.
+(define (subport in len)
+  (let ([bytes (io:read-bytes-as-bytes in len)])
+    (unless (and (bytes? bytes) (= (bytes-length bytes) len))
+      (error 'subport "truncated input; expected ~s bytes, got ~s"
+             len (if (bytes? bytes) (bytes-length bytes) 0)))
+    (open-input-bytes bytes)))
+
+;; WRITING FUNCTIONS
+
+(define (io:write-byte port byte)
+  (write-byte byte port))
+
+(define (io:write-bytes port bytes)
+  (write-bytes bytes port))
+
+(define (io:write-null-terminated-bytes port bytes)
+  (write-bytes bytes port)
+  (write-byte 0 port))
+
+(define (io:write-null-terminated-string port string)
+  (write-string string port)
+  (write-byte 0 port))
+
+(define (io:write-le-int16 port n [signed? #f])
+  (write-bytes (integer->integer-bytes n 2 signed? #f) port))
+
+(define (io:write-le-int24 port n)
+  (write-bytes (subbytes (integer->integer-bytes n 4 #f #f) 0 3)
+                       port))
+
+(define (io:write-le-int32 port n [signed? #f])
+  (write-bytes (integer->integer-bytes n 4 signed? #f) port))
+
+(define (io:write-le-int64 port n [signed? #f])
+  (write-bytes (integer->integer-bytes n 8 signed? #f) port))
+
+(define (io:write-le-intN port count n)
+  (let loop ([count count] [n n])
+    (when (positive? count)
+      (io:write-byte port (bitwise-and #xFF n))
+      (loop (sub1 count) (arithmetic-shift n -8)))))
+
+(define (io:write-length-code port n)
+  (cond [(<= n 250) (io:write-byte port n)]
+        [(<= n #xFFFF)
+         (io:write-byte port 252)
+         (io:write-le-int16 port n)]
+        [(<= n #xFFFFFF)
+         (io:write-byte port 253)
+         (io:write-le-int24 port n)]
+        [(<= n #xFFFFFFFF)
+         (io:write-byte port 253)
+         (io:write-le-int32 port n)]
+        [else
+         (io:write-byte port 254)
+         (io:write-le-intN port 8 n)]))
+
+(define (io:write-length-coded-bytes port b)
+  (io:write-length-code port (bytes-length b))
+  (io:write-bytes port b))
+
+(define (io:write-length-coded-string port s)
+  (io:write-length-coded-bytes port (string->bytes/utf-8 s)))
+
+;; READING
+
+(define (io:read-null-terminated-string port)
+  (let [(strport (open-output-bytes))]
+    (let loop ()
+      (let ([next (read-byte port)])
+        (cond [(zero? next)
+               (get-output-string strport)]
+              [else
+               (write-byte next strport)
+               (loop)])))))
+
+(define (io:read-null-terminated-bytes port)
+  (let [(strport (open-output-bytes))]
+    (let loop ()
+      (let ([next (read-byte port)])
+        (cond [(zero? next)
+               (get-output-bytes strport)]
+              [else
+               (write-byte next strport)
+               (loop)])))))
+
+(define (io:read-byte port)
+  (read-byte port))
+
+(define (io:read-bytes-as-bytes port n)
+  (read-bytes n port))
+
+(define (io:read-bytes-as-string port n)
+  (bytes->string/utf-8 (read-bytes n port)))
+
+(define (io:read-le-int16 port [signed? #f])
+  (integer-bytes->integer (read-bytes 2 port) signed? #f))
+
+(define (io:read-le-int24 port)
+  (io:read-le-intN port 3))
+
+(define (io:read-le-int32 port [signed? #f])
+  (integer-bytes->integer (read-bytes 4 port) signed? #f))
+
+(define (io:read-le-int64 port [signed? #f])
+  (integer-bytes->integer (read-bytes 8 port) signed? #f))
+
+(define (io:read-le-intN port count)
+  (case count
+    ((2) (io:read-le-int16 port))
+    ((4) (io:read-le-int32 port))
+    (else
+     (let ([b (read-bytes count port)])
+       (unless (and (bytes? b) (= count (bytes-length b)))
+         (error 'io:read-le-intN "unexpected eof; got ~s" b))
+       (let loop ([pos 0])
+         (if (< pos count)
+             (+ (arithmetic-shift (loop (add1 pos)) 8)
+                (bytes-ref b pos))
+             0))))))
+
+(define (io:read-length-code port)
+  (let ([first (read-byte port)])
+    (cond [(<= first 250)
+           first]
+          [(= first 251)
+           ;; Indicates NULL record
+           #f]
+          [(= first 252)
+           (io:read-le-int16 port)]
+          [(= first 253)
+           (io:read-le-int32 port)]
+          [(= first 254)
+           (io:read-le-intN port 8)])))
+
+(define (io:read-length-coded-bytes port)
+  (let ([len (io:read-length-code port)])
+    (and len (read-bytes len port))))
+
+(define (io:read-length-coded-string port)
+  (let ([b (io:read-length-coded-bytes port)])
+    (and b (bytes->string/utf-8 b))))
+
+(define (io:read-bytes-to-eof port)
+  (let loop ([acc null])
+    (let ([next (read-bytes 1024 port)])
+      (if (eof-object? next)
+          (apply bytes-append (reverse acc))
+          (loop (cons next acc))))))
+
+;; ========================================
 
 (define-struct packet () #:transparent)
 
@@ -386,10 +564,7 @@ Based on protocol documentation here:
                            decimals
                            len)))
 
-(define (parse-binary-row-data-packet in0 len field-dvecs)
-  (define b (io:read-bytes-to-eof in0))
-  (define in (open-input-bytes b))
-  #|(printf "binary row: ~s or ~s\n" b (bytes->list b))|#
+(define (parse-binary-row-data-packet in len field-dvecs)
   (let* ([first (io:read-byte in)] ;; SKIP? seems to be always zero
          [result-count (length field-dvecs)]
          ;; FIXME: avoid reifying null-map as list?

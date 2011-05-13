@@ -5,13 +5,132 @@
 #lang racket/base
 (require (for-syntax racket/base)
          racket/match
-         "../generic/sql-data.rkt"
-         "../generic/io.rkt")
-(provide (all-defined-out))
+         "../generic/sql-data.rkt")
+(provide write-message
+         parse-server-message
+
+         (struct-out AuthenticationOk)
+         (struct-out AuthenticationKerberosV5)
+         (struct-out AuthenticationCleartextPassword)
+         (struct-out AuthenticationCryptPassword)
+         (struct-out AuthenticationMD5Password)
+         (struct-out AuthenticationSCMCredential)
+         (struct-out StartupMessage)
+         (struct-out SSLRequest)
+         (struct-out CancelRequest)
+         (struct-out ErrorResponse)
+         (struct-out NoticeResponse)
+         (struct-out BackendKeyData)
+         (struct-out Bind)
+         (struct-out BindComplete)
+         (struct-out Close)
+         (struct-out CloseComplete)
+         (struct-out CommandComplete)
+         (struct-out CopyInResponse)
+         (struct-out CopyOutResponse)
+         (struct-out DataRow)
+         (struct-out Describe)
+         (struct-out EmptyQueryResponse)
+         (struct-out Execute)
+         (struct-out Flush)
+         (struct-out NoData)
+         (struct-out NotificationResponse)
+         (struct-out ParameterDescription)
+         (struct-out ParameterStatus)
+         (struct-out Parse)
+         (struct-out ParseComplete)
+         (struct-out PasswordMessage)
+         (struct-out PortalSuspended)
+         (struct-out Query)
+         (struct-out ReadyForQuery)
+         (struct-out RowDescription)
+         (struct-out Sync)
+         (struct-out Terminate)
+
+         field-dvec->typeid
+         field-dvec->field-info)
+
+;; subport : input-port num -> input-port
+;; Reads len bytes from input, then returns input port
+;; containing only those bytes.
+;; Raises error if fewer than len bytes available in input.
+(define (subport in len)
+  (let ([bytes (io:read-bytes-as-bytes in len)])
+    (unless (and (bytes? bytes) (= (bytes-length bytes) len))
+      (error 'subport "truncated input; expected ~s bytes, got ~s"
+             len (if (bytes? bytes) (bytes-length bytes) 0)))
+    (open-input-bytes bytes)))
+
+
+;; Integers are signed, network order (big-endian).
+
+;; WRITING FUNCTIONS
+
+;; write-int16 : port integer -> (void)
+;; Writes a 16-bit integer, network byte order
+(define (io:write-int16 port val)
+  (write-bytes (integer->integer-bytes val 2 #t #t) port))
+
+;; write-int32 : port integer -> void
+;; Writes a 32-bit integer, network byte order
+(define (io:write-int32 port val)
+  (write-bytes (integer->integer-bytes val 4 #t #t) port))
+
+;; write-byte : port byte -> void
+(define (io:write-byte port byte)
+  (write-byte byte port))
+
+;; write-byte/char : port char -> void
+(define (io:write-byte/char port char)
+  (write-byte (char->integer char) port))
+
+;; write-bytes : port bytes -> void
+(define (io:write-bytes port bytes)
+  (write-bytes bytes port))
+
+;; write-null-terminated-string : port string -> void
+(define (io:write-null-terminated-string port string)
+  (write-string string port)
+  (write-byte 0 port))
+
+;; READING
+
+;; read-int16 : port -> integer
+(define (io:read-int16 port)
+  (integer-bytes->integer (read-bytes 2 port) #t #t))
+
+;; read-int32 : port -> integer
+(define (io:read-int32 port)
+  (integer-bytes->integer (read-bytes 4 port) #t #t))
+
+;; read-null-terminated-string : port -> string
+(define (io:read-null-terminated-string port)
+  (let [(strport (open-output-bytes))]
+    (let loop ()
+      (let ([next (read-byte port)])
+        (cond [(zero? next)
+               (get-output-string strport)]
+              [else
+               (write-byte next strport)
+               (loop)])))))
+
+;; read-byte : port -> byte
+(define (io:read-byte port)
+  (read-byte port))
+
+;; read-byte : port-> char
+(define (io:read-byte/char port)
+  (integer->char (read-byte port)))
+
+;; read-bytes-as-bytes : port number -> bytes
+(define (io:read-bytes-as-bytes port n)
+  (read-bytes n port))
+
+;; ========================================
 
 (define-syntax-rule (with-length-in p c . body)
   ;; header char read & discarded elsewhere
-  (let ([len (io:read p #:int32)])
+  (let ([len (io:read-int32 p)])
     (let ([p (subport p (- len 4))])
       . body)))
 
@@ -19,7 +138,7 @@
   (let ([bs (let ([p (open-output-bytes)])
               (let () (begin . body) (void))
               (get-output-bytes p))])
-    (when c (io:write p #:byte/char c))
+    (when c (io:write-byte/char p c))
     (io:write-int32 p (+ 4 (bytes-length bs)))
     (write-bytes bs p)))
 
@@ -52,8 +171,8 @@
   (with-length-out p #f
     (io:write-int32 p 196608)
     (for-each (lambda (param)
-                (io:write p #:string (car param))
-                (io:write p #:string (cdr param)))
+                (io:write-null-terminated-string p (car param))
+                (io:write-null-terminated-string p (cdr param)))
               (StartupMessage-parameters v))
     (io:write-byte p 0)))
 
@@ -107,20 +226,25 @@
   (match v
     [(struct Bind (portal statement param-formats values result-formats))
      (with-length-out p #\B
-       (io:write p #:string portal)
-       (io:write p #:string statement)
-       (io:write p #:int16 (length param-formats))
+       (io:write-null-terminated-string p portal)
+       (io:write-null-terminated-string p statement)
+       (io:write-int16 p (length param-formats))
        (for ([param-format (in-list param-formats)])
-         (io:write p #:int16 param-format))
-       (io:write p #:int16 (length values))
+         (io:write-int16 p param-format))
+       (io:write-int16 p (length values))
        (for ([value (in-list values)])
-         (io:write p #:length+bytes
-                   (cond [(bytes? value) value]
-                         [(string? value) (string->bytes/utf-8 value)]
-                         [(sql-null? value) #f])))
-       (io:write p #:int16 (length result-formats))
+         (cond [(bytes? value)
+                (io:write-int32 p (bytes-length value))
+                (io:write-bytes p value)]
+               [(string? value)
+                (let ([value (string->bytes/utf-8 value)])
+                  (io:write-int32 p (bytes-length value))
+                  (io:write-bytes p value))]
+               [(sql-null? value)
+                (io:write-int32 p -1)]))
+       (io:write-int16 p (length result-formats))
        (for ([result-format (in-list result-formats)])
-         (io:write p #:int16 result-format)))]))
+         (io:write-int16 p result-format)))]))
 
 (define-struct BindComplete ())
 (define (parse:BindComplete p)
@@ -132,8 +256,8 @@
   (match v
     [(struct Close (type name))
      (with-length-out p #\C
-       (io:write p #:byte/char (statement/portal->char type))
-       (io:write p #:string name))]))
+       (io:write-byte/char p (statement/portal->char type))
+       (io:write-null-terminated-string p name))]))
 
 (define-struct CloseComplete ())
 (define (parse:CloseComplete p)
@@ -143,34 +267,34 @@
 (define-struct CommandComplete (command))
 (define (parse:CommandComplete p)
   (with-length-in p #\C
-    (let* ([command (io:read p #:string)])
+    (let* ([command (io:read-null-terminated-string p)])
       (make-CommandComplete command))))
 
 (define-struct CopyInResponse (format column-formats))
 (define (parse:CopyInResponse p)
   (with-length-in p #\G
-    (let* ([format (io:read p #:byte)]
+    (let* ([format (io:read-byte p)]
            [column-formats
-            (for/list ([i (in-range (io:read p #:int16))])
-              (io:read p #:int16))])
+            (for/list ([i (in-range (io:read-int16 p))])
+              (io:read-int16 p))])
       (make-CopyInResponse format column-formats))))
 
 (define-struct CopyOutResponse (format column-formats))
 (define (parse:CopyOutResponse p)
   (with-length-in p #\H
-    (let* ([format (io:read p #:byte)]
+    (let* ([format (io:read-byte p)]
            [column-formats
-            (for/list ([i (in-range (io:read p #:int16))])
-              (io:read p #:int16))])
+            (for/list ([i (in-range (io:read-int16 p))])
+              (io:read-int16 p))])
       (make-CopyOutResponse format column-formats))))
 
 (define-struct DataRow (values))
 (define (parse:DataRow p)
   (with-length-in p #\D
     (let* ([values
-            (build-vector (io:read p #:int16)
+            (build-vector (io:read-int16 p)
                           (lambda (i)
-                            (let ([len (io:read p #:int32)])
+                            (let ([len (io:read-int32 p)])
                               (if (= len -1)
                                   sql-null
                                   (io:read-bytes-as-bytes p len)))))])
@@ -181,8 +305,8 @@
   (match v
     [(struct Describe (type name))
      (with-length-out p #\D
-       (io:write p #:byte/char (statement/portal->char type))
-       (io:write p #:string name))]))
+       (io:write-byte/char p (statement/portal->char type))
+       (io:write-null-terminated-string p name))]))
 
 (define-struct EmptyQueryResponse ())
 (define (parse:EmptyQueryResponse p)
@@ -194,8 +318,8 @@
   (match v
     [(struct Execute (portal row-limit))
      (with-length-out p #\E
-       (io:write p #:string portal)
-       (io:write p #:int32 row-limit))]))
+       (io:write-null-terminated-string p portal)
+       (io:write-int32 p row-limit))]))
 
 (define-struct Flush ())
 (define (write:Flush p v)
@@ -209,24 +333,24 @@
 (define-struct NotificationResponse (process-id condition info))
 (define (parse:NotificationResponse p)
   (with-length-in p #\A
-    (let* ([process-id (io:read p #:int32)]
-           [condition (io:read p #:int32)]
-           [info (io:read p #:int32)])
+    (let* ([process-id (io:read-int32 p)]
+           [condition (io:read-int32 p)]
+           [info (io:read-int32 p)])
       (make-NotificationResponse process-id condition info))))
 
 (define-struct ParameterDescription (type-oids))
 (define (parse:ParameterDescription p)
   (with-length-in p #\t
     (let* ([type-oids
-            (for/list ([i (in-range (io:read p #:int16))])
-              (io:read p #:int32))])
+            (for/list ([i (in-range (io:read-int16 p))])
+              (io:read-int32 p))])
       (make-ParameterDescription type-oids))))
 
 (define-struct ParameterStatus (name value))
 (define (parse:ParameterStatus p)
   (with-length-in p #\S
-    (let* ([name (io:read p #:string)]
-           [value (io:read p #:string)])
+    (let* ([name (io:read-null-terminated-string p)]
+           [value (io:read-null-terminated-string p)])
       (make-ParameterStatus name value))))
 
 (define-struct Parse (name query type-oids))
@@ -234,11 +358,11 @@
   (match v
     [(struct Parse (name query type-oids))
      (with-length-out p #\P
-       (io:write p #:string name)
-       (io:write p #:string query)
-       (io:write p #:int16 (length type-oids))
+       (io:write-null-terminated-string p name)
+       (io:write-null-terminated-string p query)
+       (io:write-int16 p (length type-oids))
        (for ([type-oid (in-list type-oids)])
-         (io:write p #:int32 type-oid)))]))
+         (io:write-int32 p type-oid)))]))
 
 (define-struct ParseComplete ())
 (define (parse:ParseComplete p)
@@ -250,7 +374,7 @@
   (match v
     [(struct PasswordMessage (password))
      (with-length-out p #\p
-       (io:write p #:string password))]))
+       (io:write-null-terminated-string p password))]))
 
 (define-struct PortalSuspended ())
 (define (parse:PortalSuspended p)
@@ -262,27 +386,27 @@
   (match v
     [(struct Query (query))
      (with-length-out p #\Q
-       (io:write p #:string query))]))
+       (io:write-null-terminated-string p query))]))
 
 (define-struct ReadyForQuery (transaction-status))
 (define (parse:ReadyForQuery p)
   (with-length-in p #\Z
     (let* ([transaction-status
-            (char->transaction-status (io:read p #:byte/char))])
+            (char->transaction-status (io:read-byte/char p))])
       (make-ReadyForQuery transaction-status))))
 
 (define-struct RowDescription (fields))
 (define (parse:RowDescription p)
   (with-length-in p #\T
     (let* ([fields
-            (for/list ([i (in-range (io:read p #:int16))])
-              (let* ([name (io:read p #:string)]
-                     [table-oid (io:read p #:int32)]
-                     [column-attid (io:read p #:int16)]
-                     [type-oid (io:read p #:int32)]
-                     [type-size (io:read p #:int16)]
-                     [type-mod (io:read p #:int32)]
-                     [format-code (io:read p #:int16)])
+            (for/list ([i (in-range (io:read-int16 p))])
+              (let* ([name (io:read-null-terminated-string p)]
+                     [table-oid (io:read-int32 p)]
+                     [column-attid (io:read-int16 p)]
+                     [type-oid (io:read-int32 p)]
+                     [type-size (io:read-int16 p)]
+                     [type-mod (io:read-int32 p)]
+                     [format-code (io:read-int16 p)])
                 (vector name table-oid column-attid type-oid type-size type-mod format-code)))])
       (make-RowDescription fields))))
 
@@ -352,8 +476,7 @@
                   "internal error: unknown message header byte: ~e" c))))))
 
 ;; ========================================
-
-;; == Helpers
+;; Helpers
 
 (define (string/f->string/sql-null b)
   (if b b sql-null))

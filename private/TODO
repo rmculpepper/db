@@ -37,6 +37,8 @@ Types
 
 ----
 
+- add transaction awareness to connections? (eg begin/commit/rollback-tx, in-tx?)
+
 - doc: enumerate errors
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 

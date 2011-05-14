@@ -667,10 +667,15 @@ Based on protocol documentation here:
     ((newdecimal)
      (parse-decimal (io:read-length-coded-string in)))
 
+    ((bit)
+     (let ([l (field-dvec->length field-dvec)]
+           [bv (io:read-length-coded-bytes in)])
+       (make-sql-bits/bytes l bv (- 8 (modulo l 8)))))
+
     ;; FIXME
     ((decimal)
      (error 'get-param "unimplemented decimal type: ~s" type))
-    ((bit enum set geometry)
+    ((enum set geometry)
      (error 'get-result "unimplemented type: ~s" type))
     (else
      (error 'get-result "unknown type: ~s" type))))
@@ -929,6 +934,9 @@ Based on protocol documentation here:
 
 (define (field-dvec->flags dvec)
   (vector-ref dvec 8))
+
+(define (field-dvec->length dvec)
+  (vector-ref dvec 6))
 
 (define (field-dvec->field-info dvec)
   (match dvec

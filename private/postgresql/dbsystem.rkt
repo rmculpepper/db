@@ -134,7 +134,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 
 (define (recv-bits x)
   (let* ([len (integer-bytes->integer x #t #t 0 4)])
-    (make-sql-bits/bytes len (subbytes x 4))))
+    (make-sql-bits/bytes len (subbytes x 4) 0)))
 
 (define (recv-boolean x)
   (case (bytes-ref x 0)

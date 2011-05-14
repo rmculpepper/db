@@ -230,21 +230,21 @@
 ;; ----
 
 #|
-A sql-bits is (sql-bits len bv)
-where len is the number of bits, and bv is a bytes.
+A sql-bits is (sql-bits len bv offset)
+where len is the number of bits, and bv is a bytes, offset is nat.
 
 Bit order is little-endian wrt bytes, but big-endian wrt bits within a
 byte. (Because that's PostgreSQL's binary format.) For example:
 
   (bytes 128 3) represents 1000000 0000011
 |#
-(struct sql-bits (length bv))
+(struct sql-bits (length bv offset))
 
 (define (make-sql-bits len)
-  (sql-bits len (make-bytes (/ceiling len 8) 0)))
+  (sql-bits len (make-bytes (/ceiling len 8) 0) 0))
 
-(define (make-sql-bits/bytes len bv)
-  (sql-bits len bv))
+(define (make-sql-bits/bytes len bv offset)
+  (sql-bits len bv offset))
 
 (define (check-index fsym b index)
   (let ([len (sql-bits-length b)])
@@ -255,14 +255,14 @@ byte. (Because that's PostgreSQL's binary format.) For example:
 
 (define (sql-bits-ref b i)
   (check-index 'sql-bits-ref b i)
-  (bv-ref (sql-bits-bv b) i))
+  (bv-ref (sql-bits-bv b) (+ i (sql-bits-offset b))))
 (define (bv-ref bv i)
   (let-values ([(bytei biti) (quotient/remainder i 8)])
     (bitwise-bit-set? (bytes-ref bv bytei) (- 7 biti))))
 
 (define (sql-bits-set! b i v)
   (check-index 'sql-bits-set! b i)
-  (bv-set! (sql-bits-bv b) i v))
+  (bv-set! (sql-bits-bv b) (+ i (sql-bits-offset b)) v))
 (define (bv-set! bv i v)
   (let-values ([(bytei biti) (quotient/remainder i 8)])
     (let* ([oldbyte (bytes-ref bv bytei)]
@@ -273,16 +273,18 @@ byte. (Because that's PostgreSQL's binary format.) For example:
 
 (define (sql-bits->list b)
   (let ([l (sql-bits-length b)]
-        [bv (sql-bits-bv b)])
+        [bv (sql-bits-bv b)]
+        [offset (sql-bits-offset b)])
     (for/list ([i (in-range l)])
-      (bv-ref bv i))))
+      (bv-ref bv (+ offset i)))))
 
 (define (sql-bits->string b)
   (let* ([l (sql-bits-length b)]
          [bv (sql-bits-bv b)]
+         [offset (sql-bits-offset b)]
          [s (make-string l)])
     (for ([i (in-range l)])
-      (string-set! s i (if (bv-ref bv i) #\1 #\0)))
+      (string-set! s i (if (bv-ref bv (+ offset i)) #\1 #\0)))
     s))
 
 (define (list->sql-bits lst)

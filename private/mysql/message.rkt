@@ -612,7 +612,7 @@ Based on protocol documentation here:
      (if (memq 'binary flags)
          (io:read-length-coded-bytes in)
          (io:read-length-coded-string in)))
-    ((blob) (io:read-length-coded-bytes in))
+    ((blob tiny-blob medium-blob long-blob) (io:read-length-coded-bytes in))
 
     ((float)
      (floating-point-bytes->real (io:read-bytes-as-bytes in 4) #f))
@@ -670,7 +670,7 @@ Based on protocol documentation here:
     ;; FIXME
     ((decimal)
      (error 'get-param "unimplemented decimal type: ~s" type))
-    ((bit enum set tiny-blob medium-blob long-blob geometry)
+    ((bit enum set geometry)
      (error 'get-result "unimplemented type: ~s" type))
     (else
      (error 'get-result "unknown type: ~s" type))))

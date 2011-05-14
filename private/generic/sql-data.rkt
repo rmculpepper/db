@@ -309,8 +309,32 @@ byte. (Because that's PostgreSQL's binary format.) For example:
   (let-values ([(q r) (quotient/remainder x y)])
     (+ q (if (zero? r) 0 1))))
 
+(define (align-sql-bits b dir)
+  (let* ([len (sql-bits-length b)]
+         [bv (sql-bits-bv b)]
+         [offset (sql-bits-offset b)]
+         [offset* (case dir
+                    ((left) 0)
+                    ((right) (- 8 (remainder len 8))))])
+    (cond [(= (remainder offset 8) offset*)
+           (values len bv (quotient offset 8))]
+          [else
+           (let ([b* (copy-sql-bits b offset*)])
+             (values len (sql-bits-bv b*) 0))])))
+
+(define (copy-sql-bits b [offset* 0])
+  (let* ([len (sql-bits-length b)]
+         [bv0 (sql-bits-bv b)]
+         [offset0 (sql-bits-offset b)]
+         [bytelen* (/ceiling (+ len offset*) 8)]
+         [bv* (make-bytes bytelen* 0)])
+    (for ([i (in-range len)])
+      (bv-set! bv* (+ i offset*) (bv-ref bv0 (+ offset0 i))))
+    (sql-bits len bv* offset*)))
+
 (provide make-sql-bits/bytes
-         sql-bits-bv)
+         sql-bits-bv
+         align-sql-bits)
 
 (provide/contract
  [make-sql-bits

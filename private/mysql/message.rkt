@@ -644,7 +644,7 @@ Based on protocol documentation here:
            ((time)
             (sql-time hour min sec nsec #f))))))
 
-    ((time) ;; FIXME: mysql TIME represents time intervals, not time-of-day
+    ((time)
      (let* ([bs (io:read-length-coded-bytes in)])
        (define (get-int start len)
          (if (<= (+ start len) (bytes-length bs))
@@ -697,6 +697,8 @@ Based on protocol documentation here:
          'time]
         [(bytes? param)
          'blob]
+        [(sql-bits? param)
+         'bit]
         [else
          (error 'choose-param-type "internal error: bad parameter value: ~e" param)]))
 
@@ -741,7 +743,11 @@ Based on protocol documentation here:
                                4 #t #f))])
        (io:write-length-coded-bytes out bs)))
     ((blob)
-     (io:write-length-coded-bytes out param))))
+     (io:write-length-coded-bytes out param))
+    ((bit)
+     (let-values ([(len bv start) (align-sql-bits param 'right)])
+       (io:write-length-code out (- (bytes-length bv) start))
+       (write-bytes bv out start)))))
 
 ;; ----
 

@@ -232,8 +232,9 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 
 (define (send-bits f i x)
   (unless (sql-bits? x) (send-error f i "bits" x))
-  (bytes-append (integer->integer-bytes (sql-bits-length x) 4 #t #t)
-                (sql-bits-bv x)))
+  (let ([(len bv start) (align-sql-bits x 'left)])
+    (bytes-append (integer->integer-bytes len 4 #t #t)
+                  (if (zero? start) bv (subbytes bv start)))))
 
 (define (send-char1 f i x)
   (let ([n (if (char? x) (char->integer x) x)])

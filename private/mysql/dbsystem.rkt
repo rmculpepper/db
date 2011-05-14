@@ -50,7 +50,8 @@
               (sql-date? param)
               (sql-time? param)
               (sql-timestamp? param)
-              (sql-day-time-interval? param))
+              (sql-day-time-interval? param)
+              (sql-bits? param))
     (error fsym "cannot marshal as MySQL parameter: ~e" param))
   param)
 

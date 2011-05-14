@@ -102,20 +102,23 @@ depending on the driver in use and even the configuration of a
 particular data source.
 
 This library has been tested with @tt{unixODBC} on Linux/x86 (32-bit
-and 64-bit) running Ubuntu 11.04 with the following drivers:
-PostgreSQL Unicode (from the @tt{odbc-postgresql} package), MySQL
-(from the @tt{libmyodbc} package), and SQLite3 (from the
-@tt{libsqliteodbc} package).
+and 64-bit) running Ubuntu 11.04 with the drivers listed below.
 
-@bold{PostgreSQL Unicode} I have not been able to configure the driver
-to support @tt{SQLDescribeParam}, so all parameter types are set to
+@bold{PostgreSQL Unicode} (from the @tt{odbc-postgresql} package): I
+have not been able to configure the driver to support
+@tt{SQLDescribeParam}, so all parameter types are set to
 @racket['unknown]. One test fails: no error is reported for multiple
 SQL statements in a string.
 
-@bold{MySQL} All tests pass.
+@bold{MySQL} (from the @tt{libmyodbc} package): All tests pass.
 
-@bold{SQLite3} This driver interprets the declared types of columns
-strictly, replacing nonconforming values in query results with
-@tt{NULL}. All computed columns, even those with explicit @tt{CAST}s,
-seem to be returned as text. Several tests fail because of this
-behavior.
+@bold{SQLite3} (from the @tt{libsqliteodbc} package): This driver
+interprets the declared types of columns strictly, replacing
+nonconforming values in query results with @tt{NULL}. All computed
+columns, even those with explicit @tt{CAST}s, seem to be returned as
+text. Several tests fail because of this behavior.
+
+@bold{DB2} (IBM DB2 Express-C v9.7): With @tt{Driver} set to
+@tt{/home/db2inst1/sqllib/lib32/libdb2.so} this library seems to work
+fine, but the automated test suite cannot be run because it uses an
+incompatible SQL dialect.

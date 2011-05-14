@@ -4,10 +4,12 @@
 
 #lang racket/base
 (require racket/class
+         racket/list
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
-         "../../util/sql-type-ext.rkt"
+         "../../util/geometry.rkt"
+         "../../util/postgresql.rkt"
          (only-in "message.rkt" field-dvec->typeid))
 (provide dbsystem
          typeid->type-reader
@@ -160,22 +162,24 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 (define (get-double bs offset)
   (floating-point-bytes->real bs #t offset (+ 8 offset)))
 (define (recv-point x [offset 0])
-  (sql-point (get-double x (+ offset 0)) (get-double x (+ offset 8))))
+  (point (get-double x (+ offset 0)) (get-double x (+ offset 8))))
 (define (recv-box x)
-  (sql-box (recv-point x 0) (recv-point x 16)))
+  (pg-box (recv-point x 0) (recv-point x 16)))
 (define (recv-circle x)
-  (sql-circle (recv-point x 0) (get-double x 16)))
+  (pg-circle (recv-point x 0) (get-double x 16)))
 (define (recv-lseg x)
-  (sql-lseg (recv-point x 0) (recv-point x 16)))
+  (pg-lseg (recv-point x 0) (recv-point x 16)))
 (define (recv-path x)
-  (sql-path (not (zero? (bytes-ref x 0)))
-            (for/list ([i (integer-bytes->integer x #t #t 1 5)])
-              (recv-point x (+ 5 (* 16 i))))))
+  (pg-path (not (zero? (bytes-ref x 0)))
+           (for/list ([i (integer-bytes->integer x #t #t 1 5)])
+             (recv-point x (+ 5 (* 16 i))))))
 (define (recv-polygon x)
-  (sql-polygon
-   (for/list ([i (integer-bytes->integer x #t #t 0 4)])
-     (recv-point x (+ 4 (* 16 i))))))
-
+  (let* ([points0
+          (for/list ([i (in-range (integer-bytes->integer x #t #t 0 4))])
+            (recv-point x (+ 4 (* 16 i))))]
+         [points (append points0 (list (car points0)))])
+    (polygon (line-string points)
+             null)))
 
 #|
 (define (recv-numeric x)
@@ -232,7 +236,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 
 (define (send-bits f i x)
   (unless (sql-bits? x) (send-error f i "bits" x))
-  (let ([(len bv start) (align-sql-bits x 'left)])
+  (let-values ([(len bv start) (align-sql-bits x 'left)])
     (bytes-append (integer->integer-bytes len 4 #t #t)
                   (if (zero? start) bv (subbytes bv start)))))
 
@@ -277,33 +281,35 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 (define (float8 x)
   (real->floating-point-bytes x 8 #t))
 (define (send-point f i x)
-  (unless (sql-point? x) (send-error f i "point" x))
-  (bytes-append (float8 (sql-point-x x)) (float8 (sql-point-y x))))
+  (unless (point? x) (send-error f i "point" x))
+  (bytes-append (float8 (point-x x)) (float8 (point-y x))))
 (define (send-box f i x)
-  (unless (sql-box? x) (send-error f i "box" x))
-  (bytes-append (send-point f #f (sql-box-ne x))
-                (send-point f #f (sql-box-sw x))))
+  (unless (pg-box? x) (send-error f i "box" x))
+  (bytes-append (send-point f #f (pg-box-ne x))
+                (send-point f #f (pg-box-sw x))))
 (define (send-circle f i x)
-  (unless (sql-circle? x) (send-error f i "circle" x))
-  (bytes-append (send-point f #f (sql-circle-center x))
-                (float8 (sql-circle-radius x))))
+  (unless (pg-circle? x) (send-error f i "circle" x))
+  (bytes-append (send-point f #f (pg-circle-center x))
+                (float8 (pg-circle-radius x))))
 (define (send-lseg f i x)
-  (unless (sql-lseg? x) (send-error f i "lseg" x))
-  (bytes-append (send-point f #f (sql-lseg-p1 x))
-                (send-point f #f (sql-lseg-p2 x))))
+  (unless (pg-lseg? x) (send-error f i "lseg" x))
+  (bytes-append (send-point f #f (pg-lseg-p1 x))
+                (send-point f #f (pg-lseg-p2 x))))
 (define (send-path f i x)
-  (unless (sql-path? x) (send-error f i "path" x))
+  (unless (pg-path? x) (send-error f i "path" x))
   (apply bytes-append
-         (bytes (if (sql-path-closed? x) 1 0))
-         (integer->integer-bytes (length (sql-path-points x)) 4 #t #t)
-         (for/list ([p (in-list (sql-path-points x))])
+         (bytes (if (pg-path-closed? x) 1 0))
+         (integer->integer-bytes (length (pg-path-points x)) 4 #t #t)
+         (for/list ([p (in-list (pg-path-points x))])
            (send-point f #f p))))
 (define (send-polygon f i x)
-  (unless (sql-polygon? x) (send-error f i "polygon" x))
-  (apply bytes-append
-         (integer->integer-bytes (length (sql-polygon-points x)) 4 #t #t)
-         (for/list ([p (in-list (sql-polygon-points x))])
-           (send-point f #f p))))
+  (unless (polygon? x) (send-error f i "polygon" x))
+  (let* ([points0 (line-string-points (polygon-exterior x))]
+         [points (drop-right points0 1)]) ;; drop closing copy of first point
+    (apply bytes-append
+           (integer->integer-bytes (length points) 4 #t #t)
+           (for/list ([p (in-list points)])
+             (send-point f #f p)))))
 
 ;; send-error : string datum -> (raises error)
 (define (send-error f i type datum)

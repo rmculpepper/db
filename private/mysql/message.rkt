@@ -10,7 +10,8 @@ Based on protocol documentation here:
 #lang racket/base
 (require racket/match
          "../generic/sql-data.rkt"
-         "../generic/sql-convert.rkt")
+         "../generic/sql-convert.rkt"
+         "../../util/geometry.rkt")
 (provide write-packet
          parse-packet
 
@@ -672,10 +673,15 @@ Based on protocol documentation here:
            [bv (io:read-length-coded-bytes in)])
        (make-sql-bits/bytes l bv (- 8 (modulo l 8)))))
 
+    ((geometry)
+     (bytes->geometry
+      (io:read-length-coded-bytes in)
+      #:srid? #t))
+
     ;; FIXME
     ((decimal)
      (error 'get-param "unimplemented decimal type: ~s" type))
-    ((enum set geometry)
+    ((enum set)
      (error 'get-result "unimplemented type: ~s" type))
     (else
      (error 'get-result "unknown type: ~s" type))))

@@ -1,36 +1,8 @@
 To do
 =====
 
-Geometry according to mysql:
-abstract Geometry
-- Point = (x, y)
-- abstract Curve
-  - LineString = (list of points)
-    - predicate Line
-    - predicate LinearRing (closed and non-self-intersecting, bleh)
-- abstract Surface
-  - Polygon (defined by LinearRings, bleh)
-      = exterior ring, list of interior rings
-- GeometryCollection = (list of geometry values)
-  - MultiPoint = (list of points)
-  - abstract MultiCurve
-    - MultiLineString = (list of line strings)
-  - abstract MultiSurface
-    - MultiPolygon = (list of polygons)
-
-every geometric value has an associated Spacial Reference System (SRID), ignored by mysql
-
-
-Geometry according to postgis:
-
-same as above, but with coordinate variants: eg pointm = (x, y, m)
-
-
-----------------------------------------
-
-- move util/sql-type-ext to type-ext/pg (or pg-geom?)
-- add type-ext/gis for geometric types
-  - mysql, postgresql when mapping is direct
+- add geometry types for mysql
+- document util/geometry, util/postgresql
 
 - after Racket 5.1.1 release:
   - set required-core-version to 5.1.1
@@ -58,9 +30,12 @@ Testing
 
 Types
 
+- util/postgresql: add inet types
+- util/geometry: add WKB, WKT functions
+
 - mysql geometry types
     - "select Point(1,2)" -> internal error, unsupported type "geometry"
-    - "select cast(Point(1,2) as character)" -> internal error, unsupported type "long-blob"
+    - "select cast(Point(1,2) as character)" -> long-blob
       grr, doesn't convert to character string at all
       grr, doesn't even convert to WKB format; use AsBinary for that
 
@@ -75,6 +50,8 @@ Types
 - sqlite: opportunistic conversions based on decltype (eg date, time)
 
 ----
+
+- Racket-specific ODBC-like config format?
 
 - add transaction awareness to connections? (eg begin/commit/rollback-tx, in-tx?)
 

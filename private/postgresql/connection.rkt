@@ -347,8 +347,7 @@
                    (lambda (row)
                      (vector-map! (lambda (value type-reader)
                                     (cond [(sql-null? value) sql-null]
-                                          [type-reader (type-reader value)]
-                                          [else value]))
+                                          [else (type-reader value)]))
                                   row
                                   type-reader-v))])
              (recordset (and headers?

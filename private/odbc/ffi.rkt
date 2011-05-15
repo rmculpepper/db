@@ -92,6 +92,19 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         -> (status : _sqlreturn)
         -> status))
 
+(define-odbc SQLBrowseConnect
+  (_fun (handle in-conn-string) ::
+        (handle : _sqlhdbc)
+        (in-conn-string : _string)
+        ((if in-conn-string (string-utf-8-length in-conn-string) 0) : _sqlsmallint)
+        (out-buf : _bytes = (make-bytes 1024))
+        ((bytes-length out-buf) : _sqlsmallint)
+        (out-len : (_ptr o _sqlsmallint))
+        -> (status : _sqlreturn)
+        -> (values status
+                   (and (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+                        (bytes->string/utf-8 out-buf #f 0 out-len)))))
+
 (define-odbc SQLDataSources
   (_fun (handle direction) ::
         (handle : _sqlhenv)

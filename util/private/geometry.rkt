@@ -128,8 +128,11 @@ same as above, but with coordinate variants: eg pointm = (x, y, m)
 
 ;; ----
 
-(define (geometry->wkb g)
-  (geometry->bytes 'geometry->wkb g #:srid? #f))
+(define (geometry->wkb g
+                       #:big-endian? [be? (system-big-endian?)])
+  (geometry->bytes 'geometry->wkb g
+                   #:big-endian? be?
+                   #:srid? #f))
 
 (define (geometry->bytes who g
                          #:big-endian? [be? (system-big-endian?)]

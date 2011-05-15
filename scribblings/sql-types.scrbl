@@ -74,12 +74,12 @@ along with their corresponding Racket representations.
   @racket['bit]           @& @tt{bit}                @& @scheme[sql-bits?] @//
   @racket['varbit]        @& @tt{varbit}             @& @scheme[sql-bits?] @//
 
-  @racket['point]         @& @tt{point}              @& @scheme[sql-point?] @//
-  @racket['lseg]          @& @tt{lseg}               @& @scheme[sql-lseg?] @//
-  @racket['path]          @& @tt{path}               @& @scheme[sql-path?] @//
-  @racket['box]           @& @tt{box}                @& @scheme[sql-box?] @//
-  @racket['polygon]       @& @tt{polygon}            @& @scheme[sql-polygon?] @//
-  @racket['circle]        @& @tt{circle}             @& @scheme[sql-circle?]
+  @racket['point]         @& @tt{point}              @& @scheme[point?] @//
+  @racket['lseg]          @& @tt{lseg}               @& @scheme[line?] @//
+  @racket['path]          @& @tt{path}               @& @scheme[pg-path?] @//
+  @racket['box]           @& @tt{box}                @& @scheme[pg-box?] @//
+  @racket['polygon]       @& @tt{polygon}            @& @scheme[polygon?] @//
+  @racket['circle]        @& @tt{circle}             @& @scheme[pg-circle?]
 }
 }
 
@@ -104,7 +104,8 @@ to the same type.
 ]
 
 The geometric types such as @racket['point] are represented by
-structures defined in the @my-racketmodname[util/sql-type-ext] module.
+structures defined in the @(my-racketmodname util/geometry) and
+@(my-racketmodname util/postgresql) modules.
 
 PostgreSQL defines many other types, such as network addresses and
 array types. These are currently not supported, but future versions of
@@ -131,8 +132,15 @@ with their corresponding Racket representations.
   @racket['var-string]         @& @scheme[string?] or @scheme[bytes?], but see below @//
   @racket['date]               @& @scheme[sql-date?] @//
   @racket['time]               @& @scheme[sql-time?] or @racket[sql-day-time-interval?] @//
-  @racket['datetime]           @& @scheme[sql-timestamp?]
-@;{FIXME: blob types?}
+  @racket['datetime]           @& @scheme[sql-timestamp?] @//
+
+  @racket['blob]               @& @racket[bytes?] @//
+  @racket['tinyblob]           @& @racket[bytes?] @//
+  @racket['mediumblob]         @& @racket[bytes?] @//
+  @racket['longblob]           @& @racket[bytes?] @//
+
+  @racket['bit]                @& @racket[sql-bits?] @//
+  @racket['geometry]           @& @racket[geometry?]
 }
 }
 
@@ -434,7 +442,7 @@ SQL types are represented by the following structures.
                                  [failure any/c (lambda () (error ....))])
          any]{
 
-  If @racket[interval] is a @racket[sql-day-time-interval] that
+  If @racket[interval] is a day-time interval that
   represents a time of day, returns the corresponding
   @racket[sql-time] value. In particular, the following must be true:
   @itemlist[

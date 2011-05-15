@@ -94,26 +94,107 @@ shutting down its ports.
 
 @;{========================================}
 
-@section[#:tag "sql-type-ext"]{Extended SQL types}
+@section[#:tag "geometry"]{Geometric types}
 
-@(my-defmodule util/sql-type-ext)
+@(my-defmodule util/geometry)
 
-The following structures represent PostgreSQL's geometric types.
+The following structures and functions deal with geometric values
+based on the OpenGIS (ISO 19125) model.
 
-@defstruct*[sql-point
-            ([x real?] [y real?])]
+@section-index{PostGIS}
 
-@defstruct*[sql-box
-            ([ne sql-point?] [sw sql-point?])]
+Note: Geometric columns defined using the PostGIS extension to
+PostgreSQL are not directly supported. Instead, data should be
+exchanged in the Well-Known Binary format; conversion of the following
+structures to and from WKB format is supported by the
+@racket[wkb->geometry] and @racket[geometry->wkb] functions.
 
-@defstruct*[sql-lseg
-            ([p1 sql-point?] [p2 sql-point?])]
+@defstruct*[point
+            ([x real?] [y real?])]{
+  Represents an OpenGIS @tt{POINT}.
+}
+@defstruct*[line-string
+            ([points (listof point?)])]{
+  Represents an OpenGIS @tt{LINESTRING}.
+}
+@defstruct*[polygon
+            ([exterior linear-ring?]
+             [interior (listof linear-ring?)])]{
+  Represents an OpenGIS @tt{POLYGON}.
+}
+@defstruct*[multi-point ([elements (listof point?)])]{
+  Represents an OpenGIS @tt{MULTIPOINT}, a collection of points.
+}
+@defstruct*[multi-line-string ([elements (listof line-string?)])]{
+  Represents an OpenGIS @tt{MULTILINESTRING}, a collection of line-strings.
+}
+@defstruct*[multi-polygon ([elements (listof polygon?)])]{
+  Represents an OpenGIS @tt{MULTIPOLYGON}, a collection of polygons.
+}
+@defstruct*[geometry-collection ([elements (listof geometry?)])]{
+  Represents an OpenGIS @tt{GEOMETRYCOLLECTION}, a collection of
+  arbitrary geometric values.
+}
 
-@defstruct*[sql-path
-            ([closed? boolean?] [points (listof sql-point?)])]
+@defproc[(geometry? [x any/c]) boolean?]{
 
-@defstruct*[sql-polygon
-            ([points (listof sql-point?)])]
+  Returns @racket[#t] if @racket[x] is a @racket[point],
+  @racket[line-string], @racket[polygon], @racket[multi-point],
+  @racket[multi-line-string], @racket[multi-polygon], or
+  @racket[geometry-collection]; @racket[#f] othewise.
+}
 
-@defstruct*[sql-circle
-            ([center sql-point?] [radius real?])]
+@defproc[(line? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is a @racket[line-string]
+  consisting of exactly two points, which are distinct; @racket[#f]
+  otherwise.
+}
+
+@defproc[(linear-ring? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is a @racket[line-string] whose
+  first and last points are equal; @racket[#f] otherwise.
+}
+
+@defproc[(geometry->wkb [g geometry?]
+                        [#:big-endian? big-endian? (system-big-endian?)])
+         bytes?]{
+
+  Returns the Well-Known Binary (WKB) encoding of the geometric value
+  @racket[g]. The @racket[big-endian?] argument determines the byte
+  order used, but the WKB format includes byte-order markers, so a
+  robust client should accept either encoding.
+}
+
+@defproc[(wkb->geometry [b bytes?])
+         geometry?]{
+
+  Decodes the Well-Known Binary (WKB) representation of a geometric
+  value.
+}
+
+@;{========================================}
+
+@section[#:tag "postgresql-ext"]{PostgreSQL-specific types}
+
+@(my-defmodule util/postgresql)
+
+The following structures represent certain of PostgreSQL's built-in
+geometric types that have no appropriate analogue in the OpenGIS
+model: @tt{box}, @tt{path}, and @tt{circle}. The @tt{point},
+@tt{lseg}, and @tt{polygon} PostgreSQL built-in types are represented
+using @racket[point], @racket[line-string] (@racket[line?]), and
+@racket[polygon] structures.
+
+Note: PostgreSQL's built-in geometric types are distinct from those
+provided by the PostGIS extension library (see @secref["geometry"]).
+
+@defstruct*[pg-box
+            ([ne point?] [sw point?])]
+
+@defstruct*[pg-path
+            ([closed? boolean?] [points (listof point?)])]
+
+@defstruct*[pg-circle
+            ([center point?] [radius real?])]

@@ -1,7 +1,6 @@
 To do
 =====
 
-- add geometry types for mysql
 - document util/geometry, util/postgresql
 
 - after Racket 5.1.1 release:
@@ -31,7 +30,7 @@ Testing
 Types
 
 - util/postgresql: add inet types
-- util/geometry: add WKB, WKT functions
+- util/geometry: add WKT functions
 
 - mysql geometry types
     - "select Point(1,2)" -> internal error, unsupported type "geometry"

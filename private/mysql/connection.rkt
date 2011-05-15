@@ -256,10 +256,13 @@
       (cond [(statement-binding? stmt)
              (let ([pst (statement-binding-pst stmt)])
                (send pst check-owner fsym this stmt)
+               (for ([typeid (in-list (send pst get-result-typeids))])
+                 (unless (supported-result-typeid? typeid)
+                   (error fsym "unsupported type: ~a" typeid)))
                stmt)]
             [(and (string? stmt) (force-prepare-sql? fsym stmt))
              (let ([pst (prepare1 fsym stmt #t)])
-               (send pst bind fsym null))]
+               (check-statement fsym (send pst bind fsym null)))]
             [else stmt]))
 
     ;; query1:enqueue : statement -> void

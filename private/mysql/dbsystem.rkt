@@ -6,6 +6,7 @@
 (require racket/class
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
+         "../../util/private/geometry.rkt"
          (only-in "message.rkt" field-dvec->typeid))
 (provide dbsystem)
 
@@ -51,7 +52,8 @@
               (sql-time? param)
               (sql-timestamp? param)
               (sql-day-time-interval? param)
-              (sql-bits? param))
+              (sql-bits? param)
+              (geometry? param))
     (error fsym "cannot marshal as MySQL parameter: ~e" param))
   param)
 
@@ -79,6 +81,8 @@
   (tiny-blob   tinyblob    ()    #t)
   (medium-blob mediumblob  ()    #t)
   (long-blob   longblob    ()    #t)
-  (blob        blob        ()    #t))
+  (blob        blob        ()    #t)
+  (bit         bit         ()    #t)
+  (geometry    geometry    ()    #t))
 
 ;; decimal, date typeids not used (?)

@@ -11,7 +11,7 @@ Based on protocol documentation here:
 (require racket/match
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
-         "../../util/geometry.rkt")
+         "../../util/private/geometry.rkt")
 (provide write-packet
          parse-packet
 
@@ -33,6 +33,7 @@ Based on protocol documentation here:
          (struct-out long-data-packet)
          (struct-out execute-packet)
 
+         supported-result-typeid?
          parse-field-dvec
          field-dvec->typeid
          field-dvec->field-info)
@@ -674,9 +675,9 @@ Based on protocol documentation here:
        (make-sql-bits/bytes l bv (- 8 (modulo l 8)))))
 
     ((geometry)
-     (bytes->geometry
-      (io:read-length-coded-bytes in)
-      #:srid? #t))
+     (bytes->geometry 'mysql-bytes->geometry
+                      (io:read-length-coded-bytes in)
+                      #:srid? #t))
 
     ;; FIXME
     ((decimal)
@@ -685,6 +686,15 @@ Based on protocol documentation here:
      (error 'get-result "unimplemented type: ~s" type))
     (else
      (error 'get-result "unknown type: ~s" type))))
+
+(define (supported-result-typeid? typeid)
+  (case typeid
+    ((tiny short int24 long longlong float double) #t)
+    ((varchar var-string blob tiny-blob medium-blob long-blob) #t)
+    ((date datetime timestamp newdate time year) #t)
+    ((newdecimal bit geometry) #t)
+    ((null) #t)
+    (else #f)))
 
 (define (choose-param-type param)
   (cond [(or (string? param)
@@ -705,6 +715,8 @@ Based on protocol documentation here:
          'blob]
         [(sql-bits? param)
          'bit]
+        [(geometry? param)
+         'geometry]
         [else
          (error 'choose-param-type "internal error: bad parameter value: ~e" param)]))
 
@@ -753,7 +765,12 @@ Based on protocol documentation here:
     ((bit)
      (let-values ([(len bv start) (align-sql-bits param 'right)])
        (io:write-length-code out (- (bytes-length bv) start))
-       (write-bytes bv out start)))))
+       (write-bytes bv out start)))
+
+    ((geometry)
+     (io:write-length-coded-bytes
+      out
+      (geometry->bytes 'mysql-geometry->bytes param #:big-endian? #f #:srid? #t)))))
 
 ;; ----
 
@@ -801,6 +818,10 @@ Based on protocol documentation here:
     (#x20000 . multi-results)))
 (define server-flags/encoding
   (invert-alist server-flags/decoding))
+
+(define server-status-flags/decoding
+  '((#x1     . in-transaction)
+    (#x2     . auto-commit)))
 
 (define commands/decoding
   '((#x00 . sleep)
@@ -891,6 +912,9 @@ Based on protocol documentation here:
   (encode-flags flags server-flags/encoding 'encode-server-flags))
 (define (decode-server-flags n)
   (decode-flags n server-flags/decoding 'decode-server-flags))
+
+(define (decode-server-status-flags n)
+  (decode-flags n server-status-flags/decoding 'decode-server-status-flags))
 
 (define (encode-field-flags flags)
   (encode-flags flags field-flags/encoding 'encode-field-flags))

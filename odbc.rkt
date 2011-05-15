@@ -10,8 +10,10 @@
 ;; FIXME: Contracts duplicated at main.rkt
 (provide/contract
  [odbc-connect
-  (->* (#:database string?)
-       (#:user (or/c string? #f)
+  (->* ()
+       (#:dsn (or/c string? #f)
+        #:database (or/c string? #f)
+        #:user (or/c string? #f)
         #:password (or/c string? #f))
        connection?)]
  [odbc-driver-connect

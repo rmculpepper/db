@@ -10,9 +10,7 @@
 (provide database^
          test^
          config^
-         config@
-
-         dummy-c)
+         config@)
 
 (define-signature database^
   (connect
@@ -52,7 +50,7 @@
       ((sqlite3)
        (connect #:database (or dbdb 'memory)))
       ((odbc)
-       (connect #:database (or dbdb (getenv "DBODBC"))))
+       (connect #:dsn (or dbdb (getenv "DBODBC"))))
       (else
        (error 'connect-for-test "unknown database system: ~e" dbsystem))))
 
@@ -92,18 +90,3 @@
   (define (XFAIL config)
     (or (equal? config dbdb)
         (equal? config (dbsystem-name dbsystem)))))
-
-;; ----
-
-(define dummy-connection%
-  (class* object% (connection<%>)
-    (define/public (connected?) (bad))
-    (define/public (disconnect) (bad))
-    (define/public (get-dbsystem) (bad))
-    (define/public (query . _) (bad))
-    (define/public (prepare . _) (bad))
-    (define/public (free-statement . _) (bad))
-    (define/private (bad) (error 'dummy-connection "not implemented"))
-    (super-new)))
-
-(define dummy-c (new dummy-connection%))

@@ -29,7 +29,7 @@
   (sort '(#:user #:database #:password #:server #:port #:socket
           #:allow-cleartext-password? #:ssl #:ssl-encrypt
           #:notice-handler #:notification-handler
-          #:mode)
+          #:mode #:dsn)
         keyword<?))
 
 (define (wrap-kw-fun proc)
@@ -94,8 +94,10 @@
 
  ;; Duplicates contracts at odbc.rkt
  [odbc-connect
-  (->* (#:database string?)
-       (#:user (or/c string? #f)
+  (->* ()
+       (#:dsn (or/c string? #f)
+        #:database (or/c string? #f)
+        #:user (or/c string? #f)
         #:password (or/c string? #f))
        connection?)]
  [odbc-driver-connect

@@ -191,7 +191,8 @@ Connections are made using the following functions.
      (new connection%)])
 }
 
-@defproc[(odbc-connect [#:database database string?]
+@defproc[(odbc-connect [#:dsn dsn (or/c string? #f) #f]
+                       [#:database database (or/c string? #f) #f]
                        [#:user user (or/c string? #f) #f]
                        [#:password password (or/c string? #f) #f]
                        [#:notice-handler notice-handler
@@ -200,12 +201,16 @@ Connections are made using the following functions.
                         void])
          connection?]{
 
-  Creates a connection to the ODBC Data Source named
-  @racket[database]. The @racket[user] and @racket[password] arguments
-  are optional.
+  Creates a connection to the ODBC Data Source named @racket[dsn]. The
+  @racket[user] and @racket[password] arguments are optional, since
+  that information may be incorporated into the data source
+  definition, or it might not be relevant to the data source's driver.
 
   The @racket[notice-handler] argument behaves the same as in
   @racket[postgresql-connect].
+
+  The @racket[database] argument is a deprecated alternative to
+  @racket[dsn]. One or the other must be provided, but not both.
 }
 
 @defproc[(odbc-driver-connect [connection-string string?]
@@ -215,8 +220,11 @@ Connections are made using the following functions.
                                void])
          connection?]{
 
-  Creates a connection using a connection string containing a sequence
-  of keyword and value connection parameters.
+  Creates a connection using an ODBC connection string containing a
+  sequence of keyword and value connection parameters. The syntax of
+  connection strings is described in
+  @hyperlink["http://msdn.microsoft.com/en-us/library/ms715433%28v=VS.85%29.aspx"]{SQLDriverConnect}
+  (see Comments section); supported attributes depend on the driver.
 }
 
 @defproc[(odbc-data-sources)

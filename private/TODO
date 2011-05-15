@@ -1,7 +1,7 @@
 To do
 =====
 
-- document util/geometry, util/postgresql
+- rename geometry? to geometry2d? (SQL/MM defines (PostGIS does) 3d, 4d, etc)
 
 - after Racket 5.1.1 release:
   - set required-core-version to 5.1.1

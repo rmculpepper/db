@@ -32,12 +32,6 @@ Types
 - util/postgresql: add inet types
 - util/geometry: add WKT functions
 
-- mysql geometry types
-    - "select Point(1,2)" -> internal error, unsupported type "geometry"
-    - "select cast(Point(1,2) as character)" -> long-blob
-      grr, doesn't convert to character string at all
-      grr, doesn't even convert to WKB format; use AsBinary for that
-
 - add sql-interval to ODBC (easy as result, complicated as param, I think)
 
 - stricter range checking, etc, of params before entering critical section
@@ -50,7 +44,7 @@ Types
 
 ----
 
-- Racket-specific ODBC-like config format?
+- Racket-specific ODBC-like DSN format?
 
 - add transaction awareness to connections? (eg begin/commit/rollback-tx, in-tx?)
 

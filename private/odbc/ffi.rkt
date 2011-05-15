@@ -123,21 +123,21 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
                         (bytes->string/utf-8 descr-buf #f 0 descr-length)))))
 
 (define-odbc SQLDrivers
-  (_fun (handle direction) ::
+  (_fun (handle direction attrs-buf) ::
         (handle : _sqlhenv)
         (direction : _sqlusmallint)
-        (driver-buf : _bytes = (make-bytes 1024)) ;; FIXME
+        (driver-buf : _bytes = (make-bytes 1024)) ;; FIXME?
         ((bytes-length driver-buf) : _sqlsmallint)
         (driver-length : (_ptr o _sqlsmallint))
-        (attrs-buf : _bytes = #f) ;; FIXME
-        (0 : _sqlsmallint)
+        (attrs-buf : _bytes)
+        ((if attrs-buf (bytes-length attrs-buf) 0) : _sqlsmallint)
         (attrs-length : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)
-        -> (values status
-                   (and (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
-                        (bytes->string/utf-8 driver-buf #f 0 driver-length))
-                   (and (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
-                        #f))))
+        -> (if (or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+               (values status
+                       (bytes->string/utf-8 driver-buf #f 0 driver-length)
+                       attrs-length)
+               (values status #f #f))))
 
 (define-odbc SQLPrepare
   (_fun (handle stmt) ::

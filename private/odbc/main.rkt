@@ -62,14 +62,36 @@
 (define (odbc-drivers)
   (call-with-env 'odbc-drivers
    (lambda (env)
-     (begin0
-         (let loop ()
-           (let-values ([(status name _attrs) (SQLDrivers env SQL_FETCH_NEXT)])
-             (cond [(or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
-                    (cons (list name #f) (loop))]
-                   [else ;; SQL_NO_DATA
-                    null])))
-       (handle-status* 'odbc-drivers (SQLFreeHandle SQL_HANDLE_ENV env))))))
+     (let* ([attrlens
+             (let loop ()
+               (let-values ([(status name attrlen)
+                             (SQLDrivers env SQL_FETCH_NEXT #f)])
+                 (cond [(or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+                        (cons attrlen (loop))]
+                       [else ;; SQL_NO_DATA
+                        null])))]
+            [attr-buf (make-bytes (+ 1 (apply max 0 attrlens)))] ;; +1 for null terminator
+            [result
+             (let loop ()
+               (let-values ([(status name attrlen) ;; & writes to attr-buf
+                             (SQLDrivers env SQL_FETCH_NEXT attr-buf)])
+                 (cond [(or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
+                        (cons (list name (parse-driver-attrs attr-buf attrlen))
+                              (loop))]
+                       [else ;; SQL_NO_DATA
+                        null])))])
+       (handle-status* 'odbc-drivers (SQLFreeHandle SQL_HANDLE_ENV env))
+       result))))
+
+(define (parse-driver-attrs buf len)
+  (let* ([attrs (regexp-split #rx#"\0" buf 0 len)])
+    (for/list ([p (in-list attrs)]
+               #:when (positive? (bytes-length p)))
+      (let* ([s (bytes->string/utf-8 p)]
+             [m (regexp-match-positions #rx"=" s)])
+        (unless m (error 'odbc-drivers "bad attribute syntax: ~e" s))
+        (let ([=-pos (caar m)])
+          (cons (substring s 0 =-pos) (substring s (+ 1 =-pos))))))))
 
 ;; ----
 

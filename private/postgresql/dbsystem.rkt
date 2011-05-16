@@ -90,6 +90,8 @@
   ;; The following types are not supported.
   ;; (But putting their names here yields better not-supported errors.)
 
+  (2249 record   () #t)
+
   (628 line      () #f)
   (142 xml       () #f)
   (702 abstime   () #f)
@@ -180,6 +182,27 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
          [points (append points0 (list (car points0)))])
     (polygon (line-string points)
              null)))
+
+(define (recv-record x)
+  (let ([start 0])
+    (define (get-int signed?)
+      (begin0 (integer-bytes->integer x signed? #t start (+ start 4))
+        (set! start (+ start 4))))
+    (define (get-bytes len)
+      (begin0 (subbytes x start (+ start len))
+        (set! start (+ start len))))
+    (define (recv-col)
+      (let* ([typeid (get-int #t)]
+             [len (get-int #t)])
+        (if (= len -1)
+            sql-null
+            (let* ([bin? (= (typeid->format typeid) 1)] ;; binary reader available
+                   [reader (and bin? (typeid->type-reader 'recv-record typeid))])
+              (if reader
+                  (reader (get-bytes len))
+                  'unreadable)))))
+    (let ([columns (get-int #t)])
+      (build-vector columns (lambda (i) (recv-col))))))
 
 #|
 (define (recv-numeric x)
@@ -345,6 +368,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
     ((1186) c-parse-interval)
     ((1266) c-parse-time-tz)
     ((1700) c-parse-decimal)
+    ((2249) recv-record)
 
     ;; "string" literals have type unknown; just treat as string
     ((705) recv-string)
@@ -388,7 +412,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 (define (typeid->format x)
   (case x
     ((16 17 18 19 20 21 23 25 26 700 701 1042 1043 705) 1)
-    ((600 601 602 603 604 718 1560 1562) 1)
+    ((600 601 602 603 604 718 1560 1562 2249) 1)
     (else 0)))
 
 (define (make-unsupported-writer x t)

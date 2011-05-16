@@ -1,7 +1,6 @@
 To do
 =====
 
-- postgresql record type
 - remove dbsystem from exports, testing (pass symbol on construction)
 
 - after Racket 5.1.1 release:
@@ -30,6 +29,7 @@ Testing
 
 Types
 
+- postgresql record type: docs, send
 - ODBC use binary format for numeric/decimal
 - postgresql domain types, table record types, etc
 

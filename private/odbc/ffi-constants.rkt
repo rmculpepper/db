@@ -8,6 +8,7 @@
 ;; ============================================================
 
 (define SQL_MAX_MESSAGE_LENGTH    512)
+(define SQL_MAX_NUMERIC_LEN       16)
 
 (define SQL_HANDLE_ENV            1)
 (define SQL_HANDLE_DBC            2)

@@ -28,7 +28,6 @@ Testing
 Types
 
 - postgresql record type: docs, send
-- ODBC use binary format for numeric/decimal
 - postgresql domain types, table record types, etc
 
 - util/postgresql: add inet types

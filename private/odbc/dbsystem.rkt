@@ -8,6 +8,7 @@
          ffi/unsafe/atomic
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
+         "../generic/sql-convert.rkt"
          "ffi.rkt")
 (provide dbsystem)
 
@@ -33,12 +34,15 @@
 
 ;; ----
 
-(define-syntax-rule (defchecks get-check (typeid name pred ...) ...)
+(define-syntax-rule
+  (defchecks get-check [(typeid name pred ...) ...] [(*typeid *name *fun) ...])
   (define get-check
-    (let ([name (mk-check typeid (lambda (z) (or (pred z) ...)))] ...)
+    (let ([name (mk-check typeid (lambda (z) (or (pred z) ...)))] ...
+          [*name *fun] ...)
       (lambda (x)
         (case x
           ((typeid) name) ...
+          ((*typeid) *name) ...
           (else #f))))))
 
 (define (mk-check typeid pred)
@@ -47,28 +51,40 @@
       (error fsym "cannot convert to ODBC ~s type: ~e" (typeid->type typeid) param))
     param))
 
+(define (check-numeric fsym index param)
+  (define (bad note) (error fsym "cannot convert to ODBC numeric type~a: ~e" note param))
+  (unless (rational? param) (bad ""))
+  (let ([scaled (exact->scaled-integer (inexact->exact param))])
+    (unless scaled (bad ""))
+    (let ([ma (car scaled)]
+          [ex (cdr scaled)])
+      ;; check (abs ma) fits in 16*8 bits, ex fits in char
+      (unless (<= -128 ex 127) (bad " (scale too large)"))
+      (unless (< (abs ma) (expt 2 (* 16 8))) (bad " (mantissa too long)"))
+      (cons ma ex))))
+
 (defchecks get-check
-  (0  unknown        string? bytes? rational? boolean? sql-date? sql-time? sql-timestamp?)
-  (1  character      string?)
-  (2  numeric        rational?)
-  (3  decimal        rational?)
-  (4  integer        int32?)
-  (5  smallint       int16?)
-  (6  float          real?)
-  (7  real           real?)
-  (8  double         real?)
-  (9  datetime       sql-timestamp?)
-  (12 varchar        string?)
-  (91 date           sql-date?)
-  (92 time           sql-time?)
-  (93 timestamp      sql-timestamp?)
-  (-1 longvarchar    string?)
-  (-2 binary         bytes?)
-  (-3 varbinary      bytes?)
-  (-4 longvarbinary  bytes?)
-  (-5 bigint         int64?)
-  (-6 tinyint        int8?)
-  (-7 bit1           boolean?))
+  [(0  unknown        string? bytes? rational? boolean? sql-date? sql-time? sql-timestamp?)
+   (1  character      string?)
+   (4  integer        int32?)
+   (5  smallint       int16?)
+   (6  float          real?)
+   (7  real           real?)
+   (8  double         real?)
+   (9  datetime       sql-timestamp?)
+   (12 varchar        string?)
+   (91 date           sql-date?)
+   (92 time           sql-time?)
+   (93 timestamp      sql-timestamp?)
+   (-1 longvarchar    string?)
+   (-2 binary         bytes?)
+   (-3 varbinary      bytes?)
+   (-4 longvarbinary  bytes?)
+   (-5 bigint         int64?)
+   (-6 tinyint        int8?)
+   (-7 bit1           boolean?)]
+  [(2  numeric        check-numeric)
+   (3  decimal        check-numeric)])
 
 ;; ----
 

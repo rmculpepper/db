@@ -4,6 +4,8 @@
 
 #lang racket/base
 (require racket/class
+         racket/list
+         racket/math
          ffi/unsafe
          ffi/unsafe/atomic
          "../generic/interfaces.rkt"
@@ -126,6 +128,23 @@
             [(bytes? param)
              (bind SQL_C_BINARY (if unknown-type? SQL_BINARY typeid)
                    (copy-buffer param))]
+            [(pair? param) ;; Represents numeric/decimal decomposed as scaled integer
+             (bind SQL_C_NUMERIC typeid
+                   (copy-buffer
+                    (let ([ma (car param)]
+                          [ex (cdr param)])
+                      (apply bytes-append
+                             ;; ODBC docs claim max precision is 15 ...
+                             (bytes (+ 1 (order-of-magnitude (abs ma))))
+                             (bytes ex)
+                             (bytes (if (negative? ma) 0 1))
+                             ;; 16 bytes of unsigned little-endian data (4 chunks of 4 bytes)
+                             (let loop ([i 0] [ma (abs ma)])
+                               (if (< i 4)
+                                   (let-values ([(q r) (quotient/remainder ma (expt 2 32))])
+                                     (cons (integer->integer-bytes r 4 #f #f)
+                                           (loop (add1 i) q)))
+                                   null))))))]
             [(real? param)
              (cond [(or (= typeid SQL_NUMERIC) (= typeid SQL_DECIMAL))
                     (bind SQL_C_CHAR typeid
@@ -216,6 +235,7 @@
                   [else (let ([in (open-input-bytes buf)])
                           (for/list ([size (in-list sizes)])
                             (case size
+                              ((1) (read-byte in))
                               ((2) (integer-bytes->integer (read-bytes 2 in) #f))
                               ((4) (integer-bytes->integer (read-bytes 4 in) #f))
                               (else (error 'get-int-list
@@ -251,7 +271,19 @@
              (get-string)]
             [(or (= typeid SQL_DECIMAL)
                  (= typeid SQL_NUMERIC))
-             (parse-decimal (get-string))]
+             (let ([fields (get-int-list '(1 1 1 4 4 4 4) SQL_C_NUMERIC)])
+               (cond [(list? fields)
+                      (let* ([precision (first fields)]
+                             [scale (second fields)]
+                             [sign (case (third fields) ((0) -1) ((1) 1))]
+                             [ma (let loop ([lst (cdddr fields)])
+                                   (if (pair? lst)
+                                       (+ (* (loop (cdr lst)) (expt 2 32))
+                                          (car lst))
+                                       0))])
+                        ;; (eprintf "numeric: ~s\n" fields)
+                        (* sign ma (expt 10 (- scale))))]
+                     [(sql-null? fields) sql-null]))]
             [(or (= typeid SQL_SMALLINT)
                  (= typeid SQL_INTEGER)
                  (= typeid SQL_TINYINT))

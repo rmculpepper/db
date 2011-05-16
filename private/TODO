@@ -1,10 +1,8 @@
 To do
 =====
 
+- postgresql record type
 - remove dbsystem from exports, testing (pass symbol on construction)
-
-- rename geometry? to geometry2d? (SQL/MM defines (PostGIS does) 3d, 4d, etc)
-- postgresql domain types, record types, etc
 
 - after Racket 5.1.1 release:
   - set required-core-version to 5.1.1
@@ -31,6 +29,9 @@ Testing
 ----
 
 Types
+
+- ODBC use binary format for numeric/decimal
+- postgresql domain types, table record types, etc
 
 - util/postgresql: add inet types
 - util/geometry: add WKT functions

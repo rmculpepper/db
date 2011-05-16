@@ -5,9 +5,12 @@
 #lang racket/unit
 (require rackunit
          racket/class
+         racket/math
          (prefix-in srfi: srfi/19)
          "../private/generic/main.rkt"
          "../private/generic/sql-convert.rkt"
+         "../util/geometry.rkt"
+         "../util/postgresql.rkt"
          "config.rkt")
 (import config^ database^)
 (export test^)
@@ -31,20 +34,19 @@
 (define (check-string-length c value len)
   (define psql
     (case dbsys
-      ((postgresql)
-       "select length($1)")
-      ((mysql)
-       "select char_length(?)")
-      ((sqlite3)
-       "select length(?)")))
+      ((postgresql) "select length($1)")
+      ((mysql)      "select char_length(?)")
+      ((sqlite3)    "select length(?)")))
   (when (string? psql)
-    (check-equal? (query-value c psql value)
-                  (string-length value))))
+    (check-equal? (query-value c psql value) (string-length value))))
 
 (define (check-timestamptz-equal? a b)
   (check srfi:time=?
          (srfi:date->time-utc (sql-datetime->srfi-date a))
          (srfi:date->time-utc (sql-datetime->srfi-date b))))
+
+(define (check-bits-equal? a b)
+  (check-equal? (sql-bits->string a) (sql-bits->string b)))
 
 (define (supported? option)
   (send dbsystem has-support? option))
@@ -167,6 +169,8 @@
        (lambda (c)
          (check-roundtrip c 12345678901234567890)
          (check-roundtrip c #e1234567890.0987654321)
+         (check-roundtrip c 1/10)
+         (check-roundtrip c 1/400000)
          (when (supported? 'numeric-infinities)
            (check-roundtrip c +nan.0)))))
 
@@ -231,7 +235,67 @@
          (check-roundtrip c (make-sql-timestamp 1980 08 17 12 34 56 100000000 3600)
                           check-timestamptz-equal?)
          (check-roundtrip c (make-sql-timestamp 1980 08 17 12 34 56 000001000 3600)
-                          check-timestamptz-equal?))))))  
+                          check-timestamptz-equal?))))
+
+    (type-test-case '(interval)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (sql-interval 0 0 3 4 5 6 0))
+         (check-roundtrip c (sql-interval 87 1 0 0 0 0 0))
+         (when (memq dbsys '(postgresql))
+           (check-roundtrip c (sql-interval 1 2 3 4 5 6 45000))))))
+
+    (type-test-case '(varbit bit)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (string->sql-bits "1011") check-bits-equal?)
+         (check-roundtrip c (string->sql-bits "000000") check-bits-equal?)
+         (check-roundtrip c (string->sql-bits (make-string 30 #\1)) check-bits-equal?))))
+
+    (type-test-case '(point geometry)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (point 0 0))
+         (check-roundtrip c (point 1 2))
+         (check-roundtrip c (point (exp 1) pi)))))
+
+    (type-test-case '(line-string geometry)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (line-string (list (point 0 0) (point 1 1))))
+         (check-roundtrip c (line-string (list (point 0 0) (point 1 1) (point -5 7)))))))
+    
+    (type-test-case '(lseg geometry)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (line-string (list (point 0 0) (point 1 1)))))))
+
+    (type-test-case '(pg-path)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (pg-path #t (list (point 0 0) (point 1 1) (point -5 7))))
+         (check-roundtrip c (pg-path #f (list (point -1 -1) (point (exp 1) pi)))))))
+
+    (type-test-case '(pg-box)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (pg-box (point 10 10) (point 2 8))))))
+
+    (type-test-case '(polygon geometry)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c
+          (polygon (line-string (list (point 0 0) (point 2 0) (point 1 1) (point 0 0))) '()))
+         (when (memq dbsys '(mysql))
+           (check-roundtrip c
+            (polygon (line-string (list (point 0 0) (point 4 0) (point 2 2) (point 0 0)))
+                     (list (line-string (list (point 1 1) (point 3 1)
+                                              (point 1.5 1.5) (point 1 1))))))))))
+
+    (type-test-case '(pg-circle)
+      (call-with-connection
+       (lambda (c)
+         (check-roundtrip c (pg-circle (point 1 2) 45)))))))
 
 (define test
   (test-suite "SQL types"

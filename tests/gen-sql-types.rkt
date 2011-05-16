@@ -12,6 +12,7 @@
 (provide gen-sql-types:test)
 
 (define gen-sql-types:test
+  (test-suite "SQL support utilities"
   (test-suite "Parsing SQL types"
     (test-case "date"
       (check-equal? (parse-date "1980-08-17")
@@ -54,4 +55,21 @@
       (check-equal? (parse-decimal "12345678901234567890")
                     12345678901234567890)
       (check-equal? (parse-decimal "-12345678901234567890")
-                    -12345678901234567890))))
+                    -12345678901234567890)))
+  (test-suite "Auxiliaries"
+    (test-case "exact->decimal-string"
+      (check-equal? (exact->decimal-string 12) "12")
+      (check-equal? (exact->decimal-string 1000) "1000")
+      (check-equal? (exact->decimal-string 1/2) "0.5")
+      (check-equal? (exact->decimal-string 1/4) "0.25")
+      (check-equal? (exact->decimal-string 1/10) "0.1")
+      (check-equal? (exact->decimal-string 1/20) "0.05")
+      (check-equal? (exact->decimal-string 1/3) #f))
+    (test-case "exact->scaled-integer"
+      (check-equal? (exact->scaled-integer 12) (cons 12 0))
+      ;; (check-equal? (exact->scaled-integer 1000) "1000")
+      (check-equal? (exact->scaled-integer 1/2) (cons 5 1))
+      (check-equal? (exact->scaled-integer 1/4) (cons 25 2))
+      (check-equal? (exact->scaled-integer 1/10) (cons 1 1))
+      (check-equal? (exact->scaled-integer 1/20) (cons 5 2))
+      (check-equal? (exact->scaled-integer 1/3) #f)))))

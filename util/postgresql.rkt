@@ -30,9 +30,6 @@ polygon = #points:int4 (x y : float8)*
         #:guard (lambda (center radius _n)
                   (values center (exact->inexact radius))))
 
-(struct pg-lseg (p1 p2)
-        #:transparent)
-
 (struct pg-path (closed? points)
         #:transparent
         #:guard (lambda (closed? points _n)
@@ -42,5 +39,4 @@ polygon = #points:int4 (x y : float8)*
 (provide/contract
  [struct pg-box ([ne point?] [sw point?])]
  [struct pg-circle ([center point?] [radius (and/c real? (not/c negative?))])]
- [struct pg-lseg ([p1 point?] [p2 point?])]
  [struct pg-path ([closed? any/c] [points (listof point?)])])

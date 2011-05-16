@@ -141,23 +141,26 @@
       (disconnect* #t))
 
     (define/private (disconnect* lock-not-held?)
-      ;; If we don't hold the lock, try to acquire it and disconnect politely.
-      (define politely? lock-not-held?)
-      (define (go)
+      (define (go politely?)
         (when DEBUG-SENT-MESSAGES
           (eprintf "  ** Disconnecting\n"))
-        (when outport
-          (when politely?
-            (fresh-exchange)
-            (send-message (make-command-packet 'quit "")))
-          (close-output-port outport)
-          (set! outport #f))
-        (when inport
-          (close-input-port inport)
-          (set! inport #f)))
-      (cond [politely?
-             (call-with-lock 'disconnect go #:require-connected? #f)]
-            [else (go)]))
+        (let ([outport* outport]
+              [inport* inport])
+          (when outport
+            (when politely?
+              (fresh-exchange)
+              (send-message (make-command-packet 'quit "")))
+            (close-output-port outport)
+            (set! outport #f))
+          (when inport
+            (close-input-port inport)
+            (set! inport #f))))
+      ;; If we don't hold the lock, try to acquire it and disconnect politely.
+      ;; Except, if already disconnected, no need to acquire lock.
+      (cond [(and lock-not-held? (connected?))
+             (call-with-lock 'disconnect (lambda () (go #t))
+                             #:require-connected? #f)]
+            [else (go #f)]))
 
     ;; connected? : -> boolean
     (define/public (connected?)

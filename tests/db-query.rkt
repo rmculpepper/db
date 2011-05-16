@@ -12,19 +12,11 @@
 (import database^ config^)
 (export test^)
 
-(define NOISY? #f)
-
 (define-syntax-rule (with-connection c . body)
   (call-with-connection (lambda (c) . body)))
 
 (define-syntax-rule (check-exn-fail expr)
   (check-exn exn:fail? (lambda () expr)))
-
-(define (sql str)
-  (case dbsys
-    ((postgresql) str)
-    ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
-    (else (error 'sql "bad dbsystem: ~s" dbsys))))
 
 ;; prep-mode:
 ;;   'string = query w/ string
@@ -118,7 +110,31 @@
                       5)
         (check-equal? (Q c query-maybe-value "select N from the_numbers where N > 100")
                       #f)
-        (check-exn-fail (Q c query-maybe-value "select N from the_numbers"))))))
+        (check-exn-fail (Q c query-maybe-value "select N from the_numbers"))))
+
+    (test-case "in-query"
+      (with-connection c
+        (check set-equal?
+               (for/list ([(n d)
+                           (Q c in-query "select N, descr from the_numbers where N < 2")])
+                 (vector n d))
+               '(#(0 "nothing") #(1 "unity")))
+        (check set-equal?
+               (for/list ([(n d)
+                           (Q c in-query "select N, descr from the_numbers where N < $1" 2)])
+                 (vector n d))
+               '(#(0 "nothing") #(1 "unity")))
+        (check-exn-fail
+         (for ([x (Q c in-query "insert into the_numbers values ($1, 'baker')" 13)])
+           (void)))
+        (check-exn-fail
+         (let ([stmt (sql "select N from the_numbers where N < $1")])
+           (case prep-mode
+             ((string) (for ([(x y) (in-query c stmt 2)]) 0))
+             ((prepare) (for ([(x y) (in-query c (prepare c stmt) 2)]) 0))
+             ((bind)
+              (for ([(x y) (in-query c (bind-prepared-statement (prepare c stmt) (list 2)))])
+                0)))))))))
 
 (define (fold-tests)
   (test-suite "query-fold"

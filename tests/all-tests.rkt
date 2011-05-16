@@ -6,11 +6,7 @@
 (require rackunit
          rackunit/gui
          racket/unit
-         "../base.rkt"
-         (only-in "../postgresql.rkt" postgresql-connect)
-         (only-in "../mysql.rkt" mysql-connect)
-         (only-in "../sqlite3.rkt" sqlite3-connect)
-         (only-in "../odbc.rkt" odbc-connect)
+         "../main.rkt"
          "config.rkt"
          "db-connection.rkt"
          "db-query.rkt"
@@ -82,8 +78,8 @@ the user name and password (or not require it):
    (export DB-TEST)
    (link (((DB : database^)) db@)
          (((CONFIG : config^)) config@ DB)
-         (((CONNECT-TEST : test^)) db-connection@ CONFIG)
-         (((QUERY-TEST : test^)) db-query@ DB CONFIG)
+         (((CONNECT-TEST : test^)) db-connection@ CONFIG DB)
+         (((QUERY-TEST : test^)) db-query@ CONFIG DB)
          (((SQL-TYPES-TEST : test^)) db-sql-types@ CONFIG DB)
          (((CONCURRENT-TEST : test^)) db-concurrent@ CONFIG DB)
          (((DB-TEST : test^)) db-test@

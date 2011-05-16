@@ -103,7 +103,7 @@ No conversion may be passed sql-null.
             [nsecs (if fsec
                        (let ([flen (string-length fsec)])
                          (* (string->number (substring fsec 0 (min flen 9)))
-                            (expt 10 (min 0 (- 9 flen)))))
+                            (expt 10 (- 9 (min flen 9)))))
                        0)])
        (sql-interval years months days hours mins secs nsecs))]))
 
@@ -232,6 +232,7 @@ No conversion may be passed sql-null.
      (string-append (tag years "years")
                     (tag months "months")
                     (tag days "days")
+                    (tag hours "hours")
                     (tag minutes "minutes")
                     (tag seconds "seconds")
                     (tag (quotient nanoseconds 1000) "microseconds"))]

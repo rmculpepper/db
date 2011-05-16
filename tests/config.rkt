@@ -30,11 +30,15 @@
         (call-with-connection (lambda (c) . body))]))
    test-data
    set-equal?
+   sql
+   NOISY?
    XFAIL))
 
 (define-unit config@
   (import database^)
   (export config^)
+
+  (define NOISY? #f)
 
   (define (connect-for-test)
     (case dbsys
@@ -86,6 +90,12 @@
       (dynamic-wind void
                     (lambda () (f c))
                     (lambda () (disconnect c)))))
+
+  (define (sql str)
+    (case dbsys
+      ((postgresql) str)
+      ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
+      (else (error 'sql "unsupported dbsystem: ~e" dbsys))))
 
   ;; returns #t if current dbsys/db is config;
   ;; use like (unless (XFAIL 'sqlite3) ...)

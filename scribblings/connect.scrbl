@@ -59,15 +59,14 @@ Connections are made using the following functions.
   the @racket[password] argument is ignored and may be omitted.  A
   connection normally only sends password hashes (using the @tt{md5}
   authentication method). If the server requests a password sent as
-  cleartext (un-hashed), the connection is aborted unless a non-false
-  value was supplied for the optional
-  @racket[allow-cleartext-password?] argument.
+  cleartext (un-hashed), the connection is aborted unless
+  @racket[allow-cleartext-password?] is true.
 
   If the @racket[ssl] argument is either @racket['yes] or
   @racket['optional], the connection attempts to negotiate an SSL
   connection. If the server refuses SSL, the connection raises an
-  error if @racket[ssl] was set to @racket['yes] or continues with an
-  unencrypted connection if @racket[ssl] was set to
+  exception if @racket[ssl] was set to @racket['yes] or continues with
+  an unencrypted connection if @racket[ssl] was set to
   @racket['optional]. SSL may only be used with TCP connections, not
   with local sockets.
 
@@ -113,11 +112,11 @@ Connections are made using the following functions.
          path-string?]{
 
   Attempts to guess the path for the socket based on conventional
-  locations. This function returns the first such conventional path
-  that exists in the filesystem. It does not check that the path is a
-  socket file, nor that the path is connected to a PostgreSQL server.
+  locations. This function returns the first such path that exists in
+  the filesystem. It does not check that the path is a socket file,
+  nor that the path is connected to a PostgreSQL server.
 
-  If the socket file cannot be found, an error is raised.
+  If none of the attempted paths exist, an exception is raised.
 }
 
 @defproc[(mysql-connect [#:user user string?]
@@ -158,11 +157,11 @@ Connections are made using the following functions.
          path-string?]{
 
   Attempts to guess the path for the socket based on conventional
-  locations. This function returns the first such conventional path
-  that exists in the filesystem. It does not check that the path is a
-  socket file, nor that the path is connected to a MySQL server.
+  locations. This function returns the first such path that exists in
+  the filesystem. It does not check that the path is a socket file,
+  nor that the path is connected to a MySQL server.
 
-  If the socket file cannot be found, an error is raised.
+  If none of the attempted paths exist, an exception is raised.
 }
 
 @defproc[(sqlite3-connect
@@ -182,6 +181,8 @@ Connections are made using the following functions.
   filesystem permissions permit). The @racket['create] mode is like
   @racket['read/write], except that if the given file does not exist,
   it is created as a new database.
+
+  If the connection cannot be made, an exception is raised.
 
   @(examples/results
     [(sqlite3-connect #:database "/path/to/my.db")
@@ -209,8 +210,10 @@ Connections are made using the following functions.
   The @racket[notice-handler] argument behaves the same as in
   @racket[postgresql-connect].
 
-  The @racket[database] argument is a deprecated alternative to
+  The @racket[database] argument is a deprecated equivalent of 
   @racket[dsn]. One or the other must be provided, but not both.
+
+  If the connection cannot be made, an exception is raised.
 }
 
 @defproc[(odbc-driver-connect [connection-string string?]
@@ -225,6 +228,8 @@ Connections are made using the following functions.
   connection strings is described in
   @hyperlink["http://msdn.microsoft.com/en-us/library/ms715433%28v=VS.85%29.aspx"]{SQLDriverConnect}
   (see Comments section); supported attributes depend on the driver.
+
+  If the connection cannot be made, an exception is raised.
 }
 
 @defproc[(odbc-data-sources)
@@ -329,7 +334,7 @@ Provides only @racket[mysql-connect] and
 
 Provides only @racket[sqlite3-connect]. In contrast to
 @(my-racketmodname), this module immediately attempts to load the
-SQLite native library when required, and it raises an error if it
+SQLite native library when required, and it raises an exception if it
 cannot be found.
 
 @(my-defmodule/nd odbc)
@@ -337,5 +342,5 @@ cannot be found.
 Provides only @racket[odbc-connect], @racket[odbc-driver-connect],
 @racket[odbc-data-sources], and @racket[odbc-drivers]. In contrast to
 @(my-racketmodname), this module immediately attempts to load the ODBC
-native library when required, and it raises an error if it cannot be
-found.
+native library when required, and it raises an exception if it cannot
+be found.

@@ -24,8 +24,10 @@ errors should never cause a connection to be disconnected:
 @itemize[
 @item{SQL syntax errors, including references to undefined tables,
   columns, or operations, etc}
+@item{SQL runtime errors, including integrity constraint violations}
 @item{violations of a specialized query function's expectations, such
-  as @racket[query-value] getting a recordset with multiple columns}
+  as using @racket[query-value] with a query that returns multiple
+  columns}
 @item{supplying the wrong number or wrong types of parameters to a
   prepared query, executing a prepared query with the wrong
   connection, etc}
@@ -53,7 +55,8 @@ different threads. @emph{Connections are not kill-safe:} killing a
 thread that is using a connection---or shutting down the connection's
 managing custodian---may leave the connection in a damaged state,
 causing future operations to return garbage, raise errors, or block
-indefinitely.
+indefinitely. See @secref["connect-util"] for a way to make kill-safe
+connections.
 
 @section{Statements}
 
@@ -97,6 +100,9 @@ statement given as a string, prepared statement, or statement
 generator can be given ``inline'' parameters; if the statement is a
 statement-binding, no inline parameters are permitted.
 
+The types of parameters and returned fields are described in
+@secref["sql-types"].
+
 @defproc[(query-exec [connection connection?]
                      [stmt statement?]
                      [arg any/c] ...)
@@ -115,7 +121,7 @@ statement-binding, no inline parameters are permitted.
 @defproc[(query-rows [connection connection?]
                      [stmt statement?]
                      [arg any/c] ...)
-         (listof (vectorof _field))]{
+         (listof vector?)]{
 
   Executes a SQL query, which must produce a recordset, and returns the
   list of rows (as vectors) from the query.
@@ -131,7 +137,7 @@ statement-binding, no inline parameters are permitted.
 @defproc[(query-list [connection connection?]
                      [stmt statement?]
                      [arg any/c] ...)
-         (listof _field)]{
+         list?]{
 
   Executes a SQL query, which must produce a recordset of exactly one
   column, and returns the list of values from the query.
@@ -147,7 +153,7 @@ statement-binding, no inline parameters are permitted.
 @defproc[(query-row [connection connection?]
                     [stmt statement?]
                     [arg any/c] ...)
-         (vectorof _field)]{
+         vector?]{
 
   Executes a SQL query, which must produce a recordset of exactly one
   row, and returns its (single) row result as a vector.
@@ -163,7 +169,7 @@ statement-binding, no inline parameters are permitted.
 @defproc[(query-maybe-row [connection connection?]
                           [stmt statement?]
                           [arg any/c] ...)
-         (or/c (vectorof _field) false/c)]{
+         (or/c vector? #f)]{
 
   Like @racket[query-row], but the query may produce zero rows; in
   that case, @racket[#f] is returned.
@@ -179,7 +185,7 @@ statement-binding, no inline parameters are permitted.
 @defproc[(query-value [connection connection?]
                       [stmt statement?]
                       [arg any/c] ...)
-         _field]{
+         any/c]{
 
   Executes a SQL query, which must produce a recordset of exactly one
   column and exactly one row, and returns its single value result.
@@ -195,7 +201,7 @@ statement-binding, no inline parameters are permitted.
 @defproc[(query-maybe-value [connection connection?]
                             [stmt statement?]
                             [arg any/c] ...)
-         (or/c _field false/c)]{
+         (or/c any/c #f)]{
 
   Like @racket[query-value], but the query may produce zero rows; in
   that case, @racket[#f] is returned.
@@ -290,16 +296,16 @@ future version of this library (even new minor versions).
 
   Left fold over the results of the query. The arity of
   @racket[fold-proc] must include a number one greater than the number
-  of columns returned by the query. Inline parameter arguments ae not
-  supported; parameter binding must be done explicitly.
+  of columns returned by the query. Inline parameter arguments are not
+  supported; parameter binding must be done explicitly with
+  @racket[bind-prepared-statement].
+
+  This function is deprecated; use @racket[for/fold] with
+  @racket[in-query] instead.
 }
 
 
 @section{Prepared statements}
-
-This package also includes functions for preparing parameterized
-queries. A parameterized query may be executed any number of times
-with different values for its parameters.
 
 A @deftech{prepared statement} is the result of a call to
 @racket[prepare].
@@ -315,16 +321,22 @@ SQLite:       @&  supports both syntaxes (plus others)
 }
 }
 
+Any server-side or native-library resources associated with a prepared
+statement are released when the prepared statement is
+garbage-collected or when the connection that owns it is closed;
+prepared statements do not need to be (and cannot be) explicitly
+closed.
+
 @defproc[(prepare [connection connection?]
                   [stmt (or/c string? statement-generator?)])
          prepared-statement?]{
 
   Prepares a (possibly parameterized) statement. The resulting
-  @tech{prepared statement}s are tied to the connection that prepared
-  them; it is an error to use them with any other connection. (The
-  prepared statement holds its connection link weakly; a reference to
-  a prepared statement will not keep a connection from being garbage
-  collected.)
+  @tech{prepared statement} is tied to the connection that prepared
+  it; attempting to execute it with another connection will trigger an
+  exception. (The prepared statement holds its connection link weakly;
+  a reference to a prepared statement will not keep a connection from
+  being garbage collected.)
 }
 
 @defproc[(prepared-statement? [x any/c]) boolean?]{
@@ -365,14 +377,15 @@ SQLite:       @&  supports both syntaxes (plus others)
             [params (listof any/c)])
          statement-binding?]{
 
-  Fills in the parameters of a parameterized prepared query. The
-  resulting statement can be executed with @racket[query] or any of
-  the other query functions, but it must be used with the same
-  connection that created it.
+  Creates a statement-binding value pairing @racket[pst] with
+  @racket[params], a list of parameter arguments. The result can be
+  executed with @racket[query] or any of the other query functions,
+  but it must be used with the same connection that created
+  @racket[pst].
 
   @(examples/results
     [(let* ([get-name-pst
-            (prepare pgc "select description from the_numbers where n = $1")]
+            (prepare pgc "select d from the_numbers where n = $1")]
             [get-name2
              (bind-prepared-statement get-name-pst (list 2))]
             [get-name3
@@ -397,9 +410,9 @@ SQLite:       @&  supports both syntaxes (plus others)
          statement-generator?]{
 
   Creates a @deftech{statement generator} @racket[_stmt], which
-  encapsulates a weak hash mapping connections to prepared statement
-  objects. When a query function is called with @racket[_stmt] and a
-  connection, the weak hash is consulted to see if the statement has
+  encapsulates a weak mapping of connections to prepared
+  statements. When a query function is called with @racket[_stmt] and
+  a connection, the weak hash is consulted to see if the statement has
   already been prepared for that connection. If so, the prepared
   statement is used; otherwise, the statement is prepared and stored
   in the table.
@@ -427,6 +440,6 @@ SQLite:       @&  supports both syntaxes (plus others)
 
 @defproc[(statement-generator? [x any/c]) boolean?]{
 
-  Returns @racket[#t] if @racket[x] is a statement generator created
-  by @racket[statement-generator], @racket[#f] otherwise.
+  Returns @racket[#t] if @racket[x] is a @tech{statement generator}
+  created by @racket[statement-generator], @racket[#f] otherwise.
 }

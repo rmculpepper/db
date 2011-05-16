@@ -20,8 +20,8 @@ systems. The following database systems are currently supported:
 @itemlist[
 @item{@bold{PostgreSQL versions 7.4 and later}}
 @item{@bold{MySQL versions 5 and later}}
-@item{@bold{SQLite version 3} --- requires @tt{libsqlite3} library}
-@item{@bold{ODBC} --- experimental, requires @tt{libodbc} library}
+@item{@bold{SQLite version 3} --- requires native library}
+@item{@bold{ODBC} --- requires ODBC installation}
 ]
 Support for PostgreSQL and MySQL does not rely on any
 native client libraries; this package is everything you

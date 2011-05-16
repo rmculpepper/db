@@ -128,7 +128,7 @@
   (+ (* (sql-interval-hours x) 60 60)
      (* (sql-interval-minutes x) 60)
      (sql-interval-seconds x)
-     (/ (sql-interval-nanoseconds x) #e1e9)))
+     (/ (sql-interval-nanoseconds x) #i1e9)))
 
 (define (same-signs? w x y z)
   (define some-pos? (or (positive? w) (positive? x) (positive? y) (positive? z)))

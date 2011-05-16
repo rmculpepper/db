@@ -15,9 +15,9 @@ database systems.
 PostgreSQL and MySQL servers are sometimes configured by default to
 listen only on local sockets (also called ``unix domain
 sockets''). This library provides support for communication over local
-sockets, but only on Linux (x86) and Mac OS X. If local socket
-communication is not available, the server must be reconfigured to
-listen on a TCP port.
+sockets, but only on Linux (x86 and x86-64) and Mac OS X. If local
+socket communication is not available, the server must be reconfigured
+to listen on a TCP port.
 
 The socket file for a PostgreSQL server is located in the directory
 specified by the @tt{unix_socket_directory} variable in the
@@ -97,28 +97,42 @@ configured.
 @section{ODBC}
 
 ODBC support is experimental. This library is compatible only with
-ODBC 3.x drivers. The behavior of ODBC connections can vary widely
-depending on the driver in use and even the configuration of a
+ODBC 3.x Driver Managers. The behavior of ODBC connections can vary
+widely depending on the driver in use and even the configuration of a
 particular data source.
 
-This library has been tested with @tt{unixODBC} on Linux/x86 (32-bit
-and 64-bit) running Ubuntu 11.04 with the drivers listed below.
-
-@bold{PostgreSQL Unicode} (from the @tt{odbc-postgresql} package): I
-have not been able to configure the driver to support
-@tt{SQLDescribeParam}, so all parameter types are set to
-@racket['unknown]. One test fails: no error is reported for multiple
-SQL statements in a string.
-
-@bold{MySQL} (from the @tt{libmyodbc} package): All tests pass.
-
-@bold{SQLite3} (from the @tt{libsqliteodbc} package): This driver
-interprets the declared types of columns strictly, replacing
-nonconforming values in query results with @tt{NULL}. All computed
-columns, even those with explicit @tt{CAST}s, seem to be returned as
-text. Several tests fail because of this behavior.
-
-@bold{DB2} (IBM DB2 Express-C v9.7): With @tt{Driver} set to
-@tt{/home/db2inst1/sqllib/lib32/libdb2.so} this library seems to work
-fine, but the automated test suite cannot be run because it uses an
-incompatible SQL dialect.
+This library is tested with @tt{unixODBC} on Linux/x86 (32-bit
+and 64-bit) running Ubuntu 11.04 with the following drivers:
+@itemlist[
+@item{@bold{PostgreSQL Unicode} (from the @tt{odbc-postgresql} package): Set
+  the following Data Source options to get specific parameter type
+  information: @tt{Protocol = 7.4} and @tt{UserServerSidePrepare =
+  1}. One test fails: no error is reported for multiple SQL statements
+  in a string.}
+@item{@bold{MySQL} (from the @tt{libmyodbc} package): All tests pass.}
+@item{@bold{SQLite3} (from the @tt{libsqliteodbc} package): This
+  driver interprets the declared types of columns strictly, replacing
+  nonconforming values in query results with @tt{NULL}. All computed
+  columns, even those with explicit @tt{CAST}s, seem to be returned as
+  @tt{text}. Several tests fail because of this behavior.}
+]
+In addition, the following configurations have been tried but are not
+thoroughly tested:
+@itemlist[
+@item{@bold{Windows Driver Manager} (32-bit only): The library can
+  list drivers and data sources, but I haven't tried using any drivers
+  yet.}
+@item{@bold{DB2} (IBM DB2 Express-C v9.7 for Linux, 32-bit only):
+  With @tt{Driver} set to @tt{/home/db2inst1/sqllib/lib32/libdb2.so}
+  this library seems to work fine, but the automated test suite cannot
+  be run because it uses an incompatible SQL dialect.}
+@item{@bold{OracleODBC-10g} (Oracle Database 10g Release 2, Express
+  Edition for Linux, 32-bit version only): It seems the
+  @tt{ORACLE_HOME} and @tt{LD_LIBRARY_PATH} environment variables must
+  be set according to the @tt{oracle_env.{csh,sh}} script for the
+  driver to work. Parameterized queries don't seem to work. Beyond
+  that, the automated test suite cannot be run because it uses an
+  incompatible SQL dialect.}
+]
+Reports of success or failure on other platforms or with other drivers
+would be appreciated.

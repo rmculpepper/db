@@ -11,9 +11,9 @@
 
 @(my-declare-exporting)
 
-For most basic SQL types, connections automatically convert query
-results to appropriate Racket types. Likewise, query parameters are
-accepted as Racket values and converted to the appropriate SQL type.
+Connections automatically convert query results to appropriate Racket
+types. Likewise, query parameters are accepted as Racket values and
+converted to the appropriate SQL type.
 
 @examples/results[
 [(query-value pgc "select count(*) from the_numbers") 4]
@@ -22,8 +22,8 @@ accepted as Racket values and converted to the appropriate SQL type.
 ]
 
 If a query result contains a column with a SQL type not supported by
-this library, an error is raised. As a workaround, cast the column to
-a supported type:
+this library, an exception is raised. As a workaround, cast the column
+to a supported type:
 
 @examples/results[
 [(query-value pgc "select inet '127.0.0.1'")
@@ -32,8 +32,8 @@ a supported type:
  "127.0.0.1/32"]
 ]
 
-The error for unsupported types in result columns is raised when the
-query is executed, not when it is prepared; for parameters it is
+The exception for unsupported types in result columns is raised when
+the query is executed, not when it is prepared; for parameters it is
 raised when the parameter values are supplied. Thus even unexecutable
 prepared statements can be inspected using
 @racket[prepared-statement-parameter-types] and
@@ -42,7 +42,7 @@ prepared statements can be inspected using
 
 @section[#:tag "db-types"]{Type correspondences}
 
-This sections describes the correspondences between SQL types and
+This section describes the correspondences between SQL types and
 Racket types for the supported database systems. 
 
 @subsection[#:tag "postgresql-types"]{PostgreSQL}
@@ -107,9 +107,18 @@ The geometric types such as @racket['point] are represented by
 structures defined in the @(my-racketmodname util/geometry) and
 @(my-racketmodname util/postgresql) modules.
 
-PostgreSQL defines many other types, such as network addresses and
-array types. These are currently not supported, but future versions of
-this library may include new type correspondences and conversions.
+PostgreSQL user-defined @emph{domains} are supported in query results
+if the underlying type is supported. Recordset headers and
+@racket[prepared-statement-result-types] report them in terms of the
+underlying type. Parameters with user-defined domain types are not
+currently supported. As a workaround, cast the parameter to the
+underlying type. For example, if the type of @tt{$1} is a domain whose
+underlying type is @tt{integer}, then replace @tt{$1} with
+@tt{($1::integer)}.
+
+PostgreSQL defines many other types, such as network addresses, array
+types, and row types. These are currently not supported, but support
+may be added in future versions of this library.
 
 
 @subsection[#:tag "mysql-types"]{MySQL}
@@ -148,15 +157,19 @@ MySQL does not report specific parameter types for prepared queries,
 instead assigning them the type @tt{var-string}. Consequently,
 conversion of Racket values to @tt{var-string} parameters accepts
 strings, numbers (@racket[rational?]---no infinities or NaN), bytes,
-and SQL date/time structures (@racket[sql-date?], @racket[sql-time?],
-@racket[sql-timestamp?], and @racket[sql-day-time-interval?]).
+SQL date/time structures (@racket[sql-date?], @racket[sql-time?],
+@racket[sql-timestamp?], and @racket[sql-day-time-interval?]), bits
+(@racket[sql-bits?]), and geometric values (@racket[geometry?]).
 
-In MySQL, the @tt{time} type represents time intervals, which may not
+The MySQL @tt{time} type represents time intervals, which may not
 correspond to times of day (for example, the interval may be negative
 or larger than 24 hours). In conversion from MySQL results to Racket
 values, those @tt{time} values that represent times of day are
 converted to @racket[sql-time] values; the rest are represented by
 @racket[sql-interval] values.
+
+The MySQL @tt{enum} and @tt{set} types are not supported. As a
+workaround, cast them to/from either integers or strings.
 
 
 @subsection[#:tag "sqlite-types"]{SQLite}
@@ -237,6 +250,8 @@ structures (@racket[sql-date?], @racket[sql-time?], and
 The ODBC type @racket['bit1] represents a single bit, unlike the
 standard SQL @tt{bit(N)} type.
 
+Interval types are not currently supported on ODBC.
+
 
 @;{----------------------------------------}
 
@@ -249,22 +264,27 @@ that have no existing appropriate counterpart in Racket.
 
 SQL @tt{NULL} is translated into the unique @scheme[sql-null] value.
 
-@defthing[sql-null sql-null?]
-@defproc[(sql-null? [val any/c])
-         boolean?]{
+@defthing[sql-null sql-null?]{
 
-A special value and predicate used to represent @tt{NULL} values in
-query results. The @scheme[sql-null] value may be recognized using
-@scheme[eq?].
+  A special value used to represent @tt{NULL} values in query
+  results. The @scheme[sql-null] value may be recognized using
+  @scheme[eq?].
 
 @(examples/results
   [(query-value c "select NULL")
    sql-null])
 }
 
+@defproc[(sql-null? [x any/c]) boolean?]{
+
+  Returns @racket[#t] if @racket[x] is @racket[sql-null]; @racket[#f]
+  otherwise.
+}
+
 @defproc[(sql-null->false [x any/c]) any/c]{
 
-If @racket[x] is @racket[sql-null], returns @racket[#f], otherwise returns @racket[x].
+  Returns @racket[#f] if @racket[x] is @racket[sql-null]; otherwise
+  returns @racket[x].
 
 @examples[#:eval the-eval
 (sql-null->false "apple")
@@ -275,7 +295,8 @@ If @racket[x] is @racket[sql-null], returns @racket[#f], otherwise returns @rack
 
 @defproc[(false->sql-null [x any/c]) any/c]{
 
-If @racket[x] is @racket[#f], returns @racket[sql-null], otherwise returns @racket[x].
+  Returns @racket[sql-null] if @racket[x] is @racket[#f]; otherwise
+  returns @racket[x].
 
 @examples[#:eval the-eval
 (false->sql-null "apple")
@@ -297,7 +318,8 @@ SQL types are represented by the following structures.
 
   Represents a SQL date.
 
-  MySQL allows @tt{DATE} values with zero components as an extension.
+  Dates with zero-valued @racket[month] or @racket[day] components are
+  a MySQL extension.
 }
 
 @defstruct*[sql-time
@@ -391,17 +413,14 @@ SQL types are represented by the following structures.
              [seconds exact-integer?]
              [nanoseconds exact-integer?])]{
 
-  Represents lengths of time. An interval may contain a mixture of
-  positive and negative fields.
-
-  On construction, intervals are normalized to satisfy the following
-  constraints:
+  Represents lengths of time. Intervals are normalized to satisfy the
+  following constraints:
   @itemlist[
   @item{@racket[years] and @racket[months] have the same sign}
   @item{@racket[months] ranges from @racket[-11] to @racket[11]}
   @item{@racket[days], @racket[hours], @racket[minutes],
     @racket[seconds], and @racket[nanoseconds] all have the same sign}
-  @item{@racket[hours] range from @racket[-23] to @racket[23]}
+  @item{@racket[hours] ranges from @racket[-23] to @racket[23]}
   @item{@racket[minutes] and @racket[seconds] range from @racket[-59]
     to @racket[59]} 
   @item{@racket[nanoseconds] ranges from
@@ -414,8 +433,8 @@ SQL types are represented by the following structures.
   groups. In fact, the SQL standard recognizes those two types of
   intervals separately (see @racket[sql-year-month-interval?] and
   @racket[sql-day-time-interval?], below), and does not permit
-  combining them. Representing intervals such as @tt{1 month 3 days}
-  is a PostgreSQL extension.
+  combining them. Intervals such as @tt{1 month 3 days} are a
+  PostgreSQL extension.
 }
 
 @defproc[(sql-year-month-interval? [x any/c]) boolean?]{
@@ -455,10 +474,6 @@ SQL types are represented by the following structures.
 
   If @racket[interval] is out of range, the @racket[failure] value is
   called, if it is a procedure, or returned, otherwise.
-
-  The @racket[sql-interval->sql-time] function can be used as a
-  predicate for intervals representing times of day by passing
-  @racket[#f] as the @racket[failure] argument.
 }
 
 @defproc[(sql-time->sql-interval [time sql-time?])

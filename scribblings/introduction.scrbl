@@ -8,8 +8,8 @@
 @title[#:tag "introduction"]{Introduction}
 
 The following annotated program demonstrates how to connect to a
-database and perform simple queries. Some of the SQL syntax is
-PostgreSQL-specific, such as the syntax of query parameters.
+database and perform simple queries. Some of the SQL syntax used below
+is PostgreSQL-specific, such as the syntax of query parameters.
 
 @my-interaction[
 [#, @(my-require-form)
@@ -34,16 +34,16 @@ Use @racket[query-exec] method to execute a SQL statement for effect.
 
 @my-interaction[
 [(query-exec pgc
-  "create temporary table the_numbers (n integer, description varchar(80))")
+  "create temporary table the_numbers (n integer, d varchar(20))")
  (void)]
 [(query-exec pgc
-  "insert into the_numbers values (0, 'nothing')")
+   "insert into the_numbers values (0, 'nothing')")
+ (void)]
+[(query-exec pgc 
+   "insert into the_numbers values (1, 'the loneliest number')")
  (void)]
 [(query-exec pgc
-  "insert into the_numbers values (1, 'the loneliest number')")
- (void)]
-[(query-exec pgc
-  "insert into the_numbers values (2, 'company')")
+   "insert into the_numbers values (2, 'company')")
  (void)]
 ]
 
@@ -53,15 +53,13 @@ statement's execution. (But some of that information varies from
 system to system and is subject to change.)
 
 @my-interaction[
-[(query pgc
-  "insert into the_numbers values (3, 'a crowd')")
+[(query pgc "insert into the_numbers values (3, 'a crowd')")
  (simple-result '((command insert 0 1)))]
-[(query pgc
-  "select n, description from the_numbers where n % 2 = 0")
+[(query pgc "select n, d from the_numbers where n % 2 = 0")
  (recordset
   (list
    '((name . "n") (typeid . 23))
-   '((name . "description") (typeid . 1043)))
+   '((name . "d") (typeid . 1043)))
   '(#(0 "nothing") #(2 "company")))]
 ]
 
@@ -70,8 +68,7 @@ descriptions are not needed, it is more convenient to use the
 @racket[query-rows] function.
 
 @my-interaction[
-[(query-rows pgc
-  "select n, description from the_numbers where n % 2 = 0")
+[(query-rows pgc "select n, d from the_numbers where n % 2 = 0")
  '(#(0 "nothing") #(2 "company"))]
 ]
 
@@ -87,29 +84,28 @@ Similarly, use @racket[query-list] for queries that produce a
 recordset of exactly one column.
 
 @my-interaction[
-[(query-list pgc "select description from the_numbers order by n")
+[(query-list pgc "select d from the_numbers order by n")
  (list "nothing" "the loneliest number" "company" "a crowd")]
 ]
 
-When a query is known to return a single value (one row containing one
+When a query is known to return a single value (one row and one
 column), use @racket[query-value].
 
 @my-interaction[
 [(query-value pgc "select count(*) from the_numbers")
  4]
-[(query-value pgc "select description from the_numbers where n = 5")
+[(query-value pgc "select d from the_numbers where n = 5")
  (error 'query-value
         "query returned zero rows: ~s"
-        "select description from the_numbers where n = 5")]
+        "select d from the_numbers where n = 5")]
 ]
 
 When a query may return zero or one rows, as the last example, use
 @racket[query-maybe-row] or @racket[query-maybe-value] instead.
 
 @my-interaction[
-[(query-maybe-value pgc
-  "select description from the_numbers where n = 5")
- #f]
+[(query-maybe-value pgc "select d from the_numbers where n = 5")
+ (values #f)]
 ]
 
 The @racket[in-query] function produces a sequence that can be used
@@ -127,24 +123,24 @@ with Racket's iteration forms:
    (+ sum n))]
 ]
 
-Errors in queries are usually non-fatal.
+Errors in queries generally do not cause the connection to disconnect.
 
 @my-interaction[
 [(begin (with-handlers [(exn:fail?
                          (lambda (e) (printf "~a~n" (exn-message e))))]
           (query-value pgc "select NoSuchField from NoSuchTable"))
         (query-value pgc "select 'okay to proceed!'"))
- (begin (display "query-value: relation \"nosuchtable\" does not exist (SQL code 42P01)")
+ (begin (display "query-value: relation \"nosuchtable\" does not exist (SQLSTATE 42P01)")
         "okay to proceed!")]
 ]
 
 Queries may contain parameters. The easiest way to execute a
-parameterize query is to provide the parameters ``inline'' after the
+parameterized query is to provide the parameters ``inline'' after the
 SQL statement in the query function call.
 
 @my-interaction[
 [(query-value pgc
-  "select description from the_numbers where n = $1" 2)
+  "select d from the_numbers where n = $1" 2)
  "company"]
 [(query-list pgc
   "select n from the_numbers where n > $1 and n < $2" 0 3)
@@ -167,7 +163,7 @@ times with different parameter values.
 
 A prepared statement is tied to the connection used to create it;
 attempting to use it with another connection results in an
-error. Unfortunately, in some scenarios, such as web servlets, the
+error. Unfortunately, in some scenarios such as web servlets, the
 lifetimes of connections are short or difficult to track, making
 prepared statements inconvenient. In such cases, a better tool is the
 @tech{statement generator}, which prepares statements on demand and

@@ -12,8 +12,6 @@ To do
 
 Testing
 
-- test sql-intervals
-
 - test statement-generators
 
 - test kill-safe-connection by creating dummy connection object:

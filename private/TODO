@@ -1,7 +1,11 @@
 To do
 =====
 
+- stricter range checking, etc, of params before entering critical section
+  - proper SQL type predicates, eg integer8?
+- proper ODBC parameter type conversions
 - rename geometry? to geometry2d? (SQL/MM defines (PostGIS does) 3d, 4d, etc)
+- postgresql domain types, record types, etc
 
 - after Racket 5.1.1 release:
   - set required-core-version to 5.1.1
@@ -33,8 +37,6 @@ Types
 - util/geometry: add WKT functions
 
 - add sql-interval to ODBC (easy as result, complicated as param, I think)
-
-- stricter range checking, etc, of params before entering critical section
 
 - permit type annotations for
   - query params (would help mysql, odbc)

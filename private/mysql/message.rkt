@@ -700,8 +700,7 @@ Based on protocol documentation here:
   (cond [(or (string? param)
              (sql-null? param))
          'var-string]
-        [(and (exact-integer? param)
-              (<= (- (expt 2 63)) param (sub1 (expt 2 63))))
+        [(int64? param)
          'longlong]
         [(rational? param)
          'double]

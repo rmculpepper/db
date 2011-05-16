@@ -107,14 +107,20 @@ and 64-bit) running Ubuntu 11.04 with the following drivers:
 @item{@bold{PostgreSQL Unicode} (from the @tt{odbc-postgresql} package): Set
   the following Data Source options to get specific parameter type
   information: @tt{Protocol = 7.4} and @tt{UserServerSidePrepare =
-  1}. One test fails: no error is reported for multiple SQL statements
-  in a string.}
-@item{@bold{MySQL} (from the @tt{libmyodbc} package): All tests pass.}
-@item{@bold{SQLite3} (from the @tt{libsqliteodbc} package): This
-  driver interprets the declared types of columns strictly, replacing
-  nonconforming values in query results with @tt{NULL}. All computed
-  columns, even those with explicit @tt{CAST}s, seem to be returned as
-  @tt{text}. Several tests fail because of this behavior.}
+  1}, and use the @racket[#:strict-parameter-types?] argument to
+  @racket[odbc-connect]. One test fails: no error is reported for
+  multiple SQL statements in a string.}
+@item{@bold{MySQL} (from the @tt{libmyodbc} package): Avoid using the
+  @racket[#:strict-parameter-types?] connection option, as the driver
+  assigns all parameters the type @tt{varchar}. All tests pass.}
+@item{@bold{SQLite3} (from the @tt{libsqliteodbc} package): Avoid
+  using the @racket[#:strict-parameter-types?] connection option, as
+  the driver assigns all parameters the type
+  @tt{longvarchar}. Furthermore, this driver interprets the
+  declared types of columns strictly, replacing nonconforming values
+  in query results with @tt{NULL}. All computed columns, even those
+  with explicit @tt{CAST}s, seem to be returned as @tt{text}. Several
+  tests fail because of this behavior.}
 ]
 In addition, the following configurations have been tried but are not
 thoroughly tested:

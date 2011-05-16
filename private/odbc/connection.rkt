@@ -25,15 +25,17 @@
     (init-private db
                   env
                   notice-handler)
+    (init strict-parameter-types?)
 
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
     (define async-handler-calls null)
 
-    (define has-describe-param?
-      (let-values ([(status supported?) (SQLGetFunctions db SQL_API_SQLDESCRIBEPARAM)])
-        (handle-status 'connect status db)
-        supported?))
+    (define use-describe-param?
+      (and strict-parameter-types?
+           (let-values ([(status supported?) (SQLGetFunctions db SQL_API_SQLDESCRIBEPARAM)])
+             (handle-status 'connect status db)
+             supported?)))
 
     (define-syntax-rule (with-lock . body)
       (call-with-lock (lambda () . body)))
@@ -73,16 +75,17 @@
       (define-values (dvecs rows)
         (with-lock
          (let* ([db (get-db fsym)]
-                [stmt (send pst get-handle)]
-                ;; FIXME: reset/clear
-                [result-dvecs (send pst get-result-dvecs)])
+                [stmt (send pst get-handle)])
+           ;; FIXME: reset/clear first (?)
            (for ([i (in-naturals 1)]
-                 [param (in-list params)])
-             (load-param fsym db stmt i param))
+                 [param (in-list params)]
+                 [param-typeid (in-list (send pst get-param-typeids))])
+             (load-param fsym db stmt i param param-typeid))
            (handle-status fsym (SQLExecute stmt) stmt)
-           (let ([rows
-                  (and (pair? result-dvecs)
-                       (fetch* fsym stmt (map field-dvec->typeid result-dvecs)))])
+           (let* ([result-dvecs (send pst get-result-dvecs)]
+                  [rows
+                   (and (pair? result-dvecs)
+                        (fetch* fsym stmt (map field-dvec->typeid result-dvecs)))])
              (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
              (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
              (values result-dvecs rows)))))
@@ -96,10 +99,10 @@
                              (combine accum row))))]
               [else (simple-result '())])))
 
-    (define/private (load-param fsym db stmt i param)
+    (define/private (load-param fsym db stmt i param typeid)
+      ;; NOTE: param buffers must not move between bind and execute
       ;; FIXME: for now we assume typeid is SQL_UNKNOWN_TYPE, but should
       ;; have paraminfos around in case (also need size, digits, etc?)
-      ;; NOTE: param buffers must not move between bind and execute
       (define (copy-buffer buffer)
         (let* ([buffer (if (string? buffer) (string->bytes/utf-8 buffer) buffer)]
                [n (bytes-length buffer)]
@@ -114,17 +117,33 @@
                 (SQLBindParameter stmt i SQL_PARAM_INPUT ctype sqltype 0 0 buf lenbuf)])
           (handle-status fsym status stmt)
           (if buf (list buf lenbuf) (list lenbuf))))
+      ;; If the typeid is UNKNOWN, then choose appropriate type based on data,
+      ;; but respect typeid if known.
+      (define unknown-type? (= typeid SQL_UNKNOWN_TYPE))
       (cond [(string? param)
-             (bind SQL_C_CHAR SQL_VARCHAR (copy-buffer param))]
+             (bind SQL_C_CHAR (if unknown-type? SQL_VARCHAR typeid)
+                   (copy-buffer param))]
             [(bytes? param)
-             (bind SQL_C_BINARY SQL_BINARY (copy-buffer param))]
-            [(and (exact-integer? param)
-                  (<= (- (expt 2 63)) param (sub1 (expt 2 63))))
-             (bind SQL_C_SBIGINT SQL_BIGINT
-                   (copy-buffer (integer->integer-bytes param 8 #t)))]
-            [(rational? param)
-             (bind SQL_C_DOUBLE SQL_DOUBLE
-                   (copy-buffer (real->floating-point-bytes (exact->inexact param) 8)))]
+             (bind SQL_C_BINARY (if unknown-type? SQL_BINARY typeid)
+                   (copy-buffer param))]
+            [(real? param)
+             (cond [(or (= typeid SQL_NUMERIC) (= typeid SQL_DECIMAL))
+                    (bind SQL_C_CHAR typeid
+                          (copy-buffer (marshal-decimal fsym i param)))]
+                   [(or (and unknown-type? (int64? param))
+                        (= typeid SQL_INTEGER)
+                        (= typeid SQL_SMALLINT)
+                        (= typeid SQL_BIGINT)
+                        (= typeid SQL_TINYINT))
+                    (bind SQL_C_SBIGINT (if unknown-type? SQL_BIGINT typeid)
+                          (copy-buffer (integer->integer-bytes param 8 #t)))]
+                   [else
+                    (bind SQL_C_DOUBLE (if unknown-type? SQL_DOUBLE typeid)
+                          (copy-buffer
+                           (real->floating-point-bytes (exact->inexact param) 8)))])]
+            [(boolean? param)
+             (bind SQL_C_LONG SQL_BIT
+                   (copy-buffer (int->buffer (if param 1 0))))]
             [(sql-date? param)
              (bind SQL_C_TYPE_DATE SQL_TYPE_DATE
                    (copy-buffer
@@ -146,7 +165,8 @@
                                     (integer->integer-bytes m 2 #f)
                                     (integer->integer-bytes s 2 #f)))))]
             [(sql-timestamp? param)
-             (bind SQL_C_TYPE_TIMESTAMP SQL_TYPE_TIMESTAMP
+             (bind SQL_C_TYPE_TIMESTAMP
+                   (if unknown-type? SQL_TYPE_TIMESTAMP typeid)
                    (copy-buffer
                     (let ([x param])
                       (bytes-append
@@ -159,7 +179,7 @@
                        (integer->integer-bytes (sql-timestamp-nanosecond x) 4 #f)))))]
             [(sql-null? param)
              (bind SQL_C_CHAR SQL_VARCHAR #f)]
-            [else (error 'load-param "cannot convert to unknown type: ~e" param)]))
+            [else (error fsym "internal error: convert to typeid ~a: ~e" typeid param)]))
 
     (define/private (fetch* fsym stmt result-typeids)
       (let ([c (fetch fsym stmt result-typeids)])
@@ -298,7 +318,7 @@
            pst))))
 
     (define/private (describe-param fsym stmt i)
-      (cond [has-describe-param?
+      (cond [use-describe-param?
              (let-values ([(status type size digits nullable)
                            (SQLDescribeParam stmt i)])
                (handle-status fsym status stmt)

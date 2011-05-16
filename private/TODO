@@ -1,9 +1,8 @@
 To do
 =====
 
-- stricter range checking, etc, of params before entering critical section
-  - proper SQL type predicates, eg integer8?
-- proper ODBC parameter type conversions
+- remove dbsystem from exports, testing (pass symbol on construction)
+
 - rename geometry? to geometry2d? (SQL/MM defines (PostGIS does) 3d, 4d, etc)
 - postgresql domain types, record types, etc
 

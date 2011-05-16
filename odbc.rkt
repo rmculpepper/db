@@ -14,11 +14,15 @@
        (#:dsn (or/c string? #f)
         #:database (or/c string? #f)
         #:user (or/c string? #f)
-        #:password (or/c string? #f))
+        #:password (or/c string? #f)
+        #:notice-handler (or/c 'output 'error output-port? procedure?)
+        #:strict-parameter-types? boolean?)
        connection?)]
  [odbc-driver-connect
-  (-> string?
-      connection?)]
+  (->* (string?)
+       (#:notice-handler (or/c 'output 'error output-port? procedure?)
+        #:strict-parameter-types? boolean?)
+       connection?)]
  [odbc-data-sources
   (-> (listof (list/c string? string?)))]
  [odbc-drivers

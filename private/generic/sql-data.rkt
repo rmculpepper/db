@@ -355,3 +355,31 @@ byte. (Because that's PostgreSQL's binary format.) For example:
   (-> sql-bits? string?)]
  [string->sql-bits
   (-> string? sql-bits?)])
+
+;; ----------------------------------------
+
+;; Predicates
+
+(define (mkintN? n)
+  (let ([hi  (- (expt 2 (sub1 n)) 1)]
+        [low (- (expt 2 (sub1 n)))])
+    (lambda (x) (and (exact-integer? x) (<= low x hi)))))
+
+(define (mkuintN? n)
+  (let ([hi (- (expt 2 n) 1)])
+    (lambda (x) (and (exact-integer? x) (<= 0 x hi)))))
+
+(define int8?  (mkintN? 8))
+(define int16? (mkintN? 16))
+(define int24? (mkintN? 24))
+(define int32? (mkintN? 32))
+(define int64? (mkintN? 64))
+
+(define uint8?  (mkuintN? 8))
+(define uint16? (mkuintN? 16))
+(define uint24? (mkuintN? 24))
+(define uint32? (mkuintN? 32))
+(define uint64? (mkuintN? 64))
+
+(provide int8? int16? int24? int32? int64?
+         uint8?)

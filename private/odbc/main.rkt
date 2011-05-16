@@ -21,7 +21,8 @@
                       #:database [database #f]
                       #:user [user #f]
                       #:password [auth #f]
-                      #:notice-handler [notice-handler void])
+                      #:notice-handler [notice-handler void]
+                      #:strict-parameter-types? [strict-parameter-types? #f])
   (when (and dsn database)
     (error 'odbc-connect "cannot give both #:dsn and #:database arguments"))
   (unless (or dsn database)
@@ -34,10 +35,15 @@
           (lambda (db)
             (let ([status (SQLConnect db dsn user auth)])
               (handle-status* 'odbc-connect status db)
-              (new connection% (env env) (db db) (notice-handler notice-handler)))))))))
+              (new connection%
+                   (env env)
+                   (db db)
+                   (notice-handler notice-handler)
+                   (strict-parameter-types? strict-parameter-types?)))))))))
 
 (define (odbc-driver-connect connection-string
-                             #:notice-handler [notice-handler void])
+                             #:notice-handler [notice-handler void]
+                             #:strict-parameter-types? [strict-parameter-types? #f])
   (let ([notice-handler (make-handler notice-handler "notice")])
     (call-with-env 'odbc-driver-connect
       (lambda (env)
@@ -45,7 +51,11 @@
           (lambda (db)
             (let ([status (SQLDriverConnect db connection-string SQL_DRIVER_NOPROMPT)])
               (handle-status* 'odbc-driver-connect status db)
-              (new connection% (env env) (db db) (notice-handler notice-handler)))))))))
+              (new connection%
+                   (env env)
+                   (db db)
+                   (notice-handler notice-handler)
+                   (strict-parameter-types? strict-parameter-types?)))))))))
 
 (define (odbc-data-sources)
   (call-with-env 'odbc-data-sources

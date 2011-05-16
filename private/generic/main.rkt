@@ -14,5 +14,7 @@
 
          (except-out (all-from-out "sql-data.rkt")
                      make-sql-bits/bytes
-                     sql-bits-bv)
+                     sql-bits-bv
+                     int8? int16? int24? int32? int64?
+                     uint8?)
          (all-from-out "functions.rkt"))

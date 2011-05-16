@@ -215,7 +215,7 @@ along with their corresponding Racket representations.
 
 @centered{
 @tabbing[#:spacing 8]{
-  @bold{ODBC type}       @& @bold{Racket type} @//
+  @bold{ODBC type}        @& @bold{Racket type} @//
   @racket['character]     @& @scheme[string?] @//
   @racket['varchar]       @& @scheme[string?] @//
   @racket['longvarchar]   @& @scheme[string?] @//
@@ -239,13 +239,19 @@ along with their corresponding Racket representations.
 }
 }
 
-Not all ODBC drivers provide parameter type information for prepared
-queries. In such situations the connection assigns the parameter the
-pseudotype @racket['unknown]. Conversion of Racket values to
-@racket['unknown] parameters accepts strings, bytes, numbers
-(@racket[rational?]---no infinities or NaN) and SQL date/time
-structures (@racket[sql-date?], @racket[sql-time?], and
-@racket[sql-timestamp?]).
+Not all ODBC drivers provide specific parameter type information for
+prepared queries. Some omit parameter type information entirely or,
+worse, assign all parameters a single type such as @tt{varchar}. To
+avoid enforcing irrelevant type constraints in the last case,
+connections only attempt to fetch and enforce parameter types when the
+connection is made using the @racket[#:strict-parameter-type?]
+option. Otherwise, the connection assigns all parameters the type
+@racket['unknown]. (The @racket['unknown] type is also used when
+specific parameter types are requested but are not available.)
+Conversion of Racket values to @racket['unknown] parameters accepts
+strings, bytes, numbers (@racket[rational?]---no infinities or NaN),
+booleans, and SQL date/time structures (@racket[sql-date?],
+@racket[sql-time?], and @racket[sql-timestamp?]).
 
 The ODBC type @racket['bit1] represents a single bit, unlike the
 standard SQL @tt{bit(N)} type.

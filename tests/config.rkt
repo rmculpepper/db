@@ -50,7 +50,9 @@
       ((sqlite3)
        (connect #:database (or dbdb 'memory)))
       ((odbc)
-       (connect #:dsn (or dbdb (getenv "DBODBC"))))
+       (connect #:dsn (or dbdb (getenv "DBODBC"))
+                ;; FIXME: sqlite,mysql report longvarchar/varchar, not unknown, param types
+                #:strict-parameter-types? (equal? dbdb "test-pg")))
       (else
        (error 'connect-for-test "unknown database system: ~e" dbsystem))))
 

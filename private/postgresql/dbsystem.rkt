@@ -242,8 +242,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 
 (define (send-char1 f i x)
   (let ([n (if (char? x) (char->integer x) x)])
-    (unless (and (exact-nonnegative-integer? n) (< n 256))
-      (send-error f i "char1" x))
+    (unless (uint8? n) (send-error f i "char1" x))
     (bytes n)))
 
 (define (send-bytea f i x)
@@ -254,19 +253,17 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
   (unless (string? x) (send-error f i "string" x))
   (string->bytes/utf-8 x))
 
-(define (send-int* f i n type size min max)
-  (unless (and (exact-integer? n) (<= min n max))
-    (send-error f i type n))
-  (integer->integer-bytes n size #t #t))
-
 (define (send-int2 f i n)
-  (send-int* f i n "int2" 2 #x-8000 #x7FFF))
+  (unless (int16? n) (send-error f i "int2" n))
+  (integer->integer-bytes n 2 #t #t))
 
 (define (send-int4 f i n)
-  (send-int* f i n "int4" 4 #x-80000000 #x7FFFFFFF))
+  (unless (int32? n) (send-error f i "int4" n))
+  (integer->integer-bytes n 4 #t #t))
 
 (define (send-int8 f i n)
-  (send-int* f i n "int8" 8 #x-8000000000000000 #x7FFFFFFFFFFFFFFF))
+  (unless (int64? n) (send-error f i "int8" n))
+  (integer->integer-bytes n 8 #t #t))
 
 (define (send-float* f i n type size)
   (unless (real? n) (send-error f i type n))

@@ -29,7 +29,7 @@
   (sort '(#:user #:database #:password #:server #:port #:socket
           #:allow-cleartext-password? #:ssl #:ssl-encrypt
           #:notice-handler #:notification-handler
-          #:mode #:dsn)
+          #:mode #:dsn #:strict-parameter-types?)
         keyword<?))
 
 (define (wrap-kw-fun proc)
@@ -98,11 +98,15 @@
        (#:dsn (or/c string? #f)
         #:database (or/c string? #f)
         #:user (or/c string? #f)
-        #:password (or/c string? #f))
+        #:password (or/c string? #f)
+        #:notice-handler (or/c 'output 'error output-port? procedure?)
+        #:strict-parameter-types? boolean?)
        connection?)]
  [odbc-driver-connect
-  (-> string?
-      connection?)]
+  (->* (string?)
+       (#:notice-handler (or/c 'output 'error output-port? procedure?)
+        #:strict-parameter-types? boolean?)
+       connection?)]
  [odbc-data-sources
   (-> (listof (list/c string? string?)))]
  [odbc-drivers

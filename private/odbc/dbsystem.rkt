@@ -18,10 +18,7 @@
     (define/public (has-support? x) #f)
 
     (define/public (get-parameter-handlers param-typeids)
-      (map (lambda (param-typeid)
-             ;; FIXME: do parameter checks! (for drivers that give param types)
-             check-param)
-           param-typeids))
+      (map get-check param-typeids))
 
     (define/public (field-dvecs->typeids dvecs)
       (map (lambda (dvec) (vector-ref dvec 1)) dvecs))
@@ -36,16 +33,42 @@
 
 ;; ----
 
-(define (check-param fsym index param)
-  (unless (or (string? param)
-              (bytes? param)
-              (rational? param)
-              (sql-date? param)
-              (sql-time? param)
-              (sql-timestamp? param))
-    ;; FIXME: need fsym propagation
-    (error fsym "cannot convert to ODBC unknown type: ~e" param))
-  param)
+(define-syntax-rule (defchecks get-check (typeid name pred ...) ...)
+  (define get-check
+    (let ([name (mk-check typeid (lambda (z) (or (pred z) ...)))] ...)
+      (lambda (x)
+        (case x
+          ((typeid) name) ...
+          (else #f))))))
+
+(define (mk-check typeid pred)
+  (lambda (fsym index param)
+    (unless (pred param)
+      (error fsym "cannot convert to ODBC ~s type: ~e" (typeid->type typeid) param))
+    param))
+
+(defchecks get-check
+  (0  unknown        string? bytes? rational? boolean? sql-date? sql-time? sql-timestamp?)
+  (1  character      string?)
+  (2  numeric        rational?)
+  (3  decimal        rational?)
+  (4  integer        int32?)
+  (5  smallint       int16?)
+  (6  float          real?)
+  (7  real           real?)
+  (8  double         real?)
+  (9  datetime       sql-timestamp?)
+  (12 varchar        string?)
+  (91 date           sql-date?)
+  (92 time           sql-time?)
+  (93 timestamp      sql-timestamp?)
+  (-1 longvarchar    string?)
+  (-2 binary         bytes?)
+  (-3 varbinary      bytes?)
+  (-4 longvarbinary  bytes?)
+  (-5 bigint         int64?)
+  (-6 tinyint        int8?)
+  (-7 bit1           boolean?))
 
 ;; ----
 

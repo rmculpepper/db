@@ -85,7 +85,7 @@
     (define/private (load-param fsym db stmt i param)
       (handle-status
        fsym
-       (cond [(integer64? param)
+       (cond [(int64? param)
               (sqlite3_bind_int64 stmt i param)]
              [(real? param) ;; includes >64-bit exact integers
               (sqlite3_bind_double stmt i (exact->inexact param))]
@@ -241,11 +241,3 @@
                     [,SQLITE_FORMAT . "Auxiliary database format error"]
                     [,SQLITE_RANGE . "2nd parameter to sqlite3_bind out of range"]
                     [,SQLITE_NOTADB . "File opened that is not a database file"])))))
-
-(define integer64?
-  (let ([min-64 (- 0 (expt 2 63))]
-        [max-64 (- (expt 2 63) 1)])
-    (lambda (x)
-      (and (exact-integer? x)
-           (>= x min-64)
-           (<= x max-64)))))

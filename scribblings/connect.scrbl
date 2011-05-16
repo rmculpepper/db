@@ -199,7 +199,8 @@ Connections are made using the following functions.
                        [#:notice-handler notice-handler
                         (or/c output-port? 'output 'error 
                               (-> string? string? any))
-                        void])
+                        void]
+                       [#:strict-parameter-types? strict-parameter-types? #f])
          connection?]{
 
   Creates a connection to the ODBC Data Source named @racket[dsn]. The
@@ -209,6 +210,10 @@ Connections are made using the following functions.
 
   The @racket[notice-handler] argument behaves the same as in
   @racket[postgresql-connect].
+
+  If @racket[strict-parameter-types?] is true, then the connection
+  attempts to fetch and enforce specific types for query
+  parameters. See @secref["odbc-types"] for more details.
 
   The @racket[database] argument is a deprecated equivalent of 
   @racket[dsn]. One or the other must be provided, but not both.
@@ -220,7 +225,8 @@ Connections are made using the following functions.
                               [#:notice-handler notice-handler
                                (or/c output-port? 'output 'error
                                      (-> string? string? any))
-                               void])
+                               void]
+                              [#:strict-parameter-types? strict-parameter-types? #f])
          connection?]{
 
   Creates a connection using an ODBC connection string containing a

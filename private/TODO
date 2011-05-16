@@ -12,7 +12,7 @@ To do
 
 Testing
 
-- test statement-generators
+- test connection-generators
 
 - test kill-safe-connection by creating dummy connection object:
   - query method acquires lock, sleeps, releases lock, returns

@@ -31,6 +31,7 @@
     ((string) (apply function obj stmt args))
     ((prepare) (apply function obj (prepare obj stmt) args))
     ((bind) (function obj (bind-prepared-statement (prepare obj stmt) args)))
+    ((gen) (apply function obj (statement-generator stmt) args))
     (else 'Q* "bad prep-mode: ~e" prep-mode)))
 
 (define (simple-tests prep-mode)
@@ -134,7 +135,9 @@
              ((prepare) (for ([(x y) (in-query c (prepare c stmt) 2)]) 0))
              ((bind)
               (for ([(x y) (in-query c (bind-prepared-statement (prepare c stmt) (list 2)))])
-                0)))))))))
+                0))
+             ((gen)
+              (for ([(x y) (in-query c (statement-generator stmt) 2)]) 0)))))))))
 
 (define (fold-tests)
   (test-suite "query-fold"
@@ -296,6 +299,7 @@
     (simple-tests 'string)
     (simple-tests 'prepare)
     (simple-tests 'bind)
+    (simple-tests 'gen)
     (fold-tests)
     low-level-tests
     misc-tests

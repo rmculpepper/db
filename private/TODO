@@ -12,6 +12,10 @@ To do
 
 Testing
 
+- run ODBC tests on Windows (and Mac?)
+
+- change SQL to allow tests to run on DB2 over ODBC
+
 - test connection-generators
 
 - test kill-safe-connection by creating dummy connection object:
@@ -19,11 +23,16 @@ Testing
     maybe bumps external semaphre before sleeping
     kill calling thread while sleeping to test kill-safe proxy
 
-- change SQL to allow tests to run on DB2 over ODBC
-
 ----
 
 Types
+
+- type annotations
+  - two modes: mandatory and opportunistic
+  - on result fields (eg sqlite, convert to date)
+  - on parameters ???
+  - per query or per connection? (or both?)
+  - either only well-known conversions, or must apply outside of lock
 
 - postgresql record type: docs, send
 - postgresql domain types, table record types, etc
@@ -31,22 +40,9 @@ Types
 - util/postgresql: add inet types
 - util/geometry: add WKT functions
 
-- add sql-interval to ODBC (easy as result, complicated as param, I think)
-
-- permit type annotations for
-  - query params (would help mysql, odbc)
-  - extra conversions on result fields (eg sqlite, specify date field)
-
-- sqlite: opportunistic conversions based on decltype (eg date, time)
+- add support for ODBC intervals (no point w/o driver to test with)
 
 ----
-
-- Racket-specific ODBC-like DSN format?
-
-- add transaction awareness to connections? (eg begin/commit/rollback-tx, in-tx?)
-
-- doc: enumerate errors
-- document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 
 - figure out ODBC and unicode (need to use WCHAR?)
 
@@ -54,7 +50,11 @@ Types
   eg retry n times, retry forever, retry w/ timeout, fail
   (is db locked only for write or for whole transaction?)
 
-- some parts of docs are Linux-centric, especially ODBC part; broaden
+- add transaction awareness to connections? (eg begin/commit/rollback-tx, in-tx?)
 
-- disconnect should always work, even on damaged connections
-  (eg kill-thread, custodian shutdown)
+- doc: enumerate errors
+- document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
+
+- connected?, disconnect should always work, even on thread-damaged connections
+
+- Racket-specific ODBC-like DSN format?

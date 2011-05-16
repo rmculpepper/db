@@ -12,6 +12,8 @@
 (import config^ database^)
 (export test^)
 
+(define dbsystem #f) ;; hack, set within test suite
+
 (define current-type (make-parameter #f))
 
 (define-syntax-rule (type-test-case types . body)
@@ -28,7 +30,7 @@
 
 (define (check-string-length c value len)
   (define psql
-    (case (send dbsystem get-short-name)
+    (case dbsys
       ((postgresql)
        "select length($1)")
       ((mysql)
@@ -233,5 +235,7 @@
 
 (define test
   (test-suite "SQL types"
+    (call-with-connection (lambda (c) (set! dbsystem (connection-dbsystem c))))
     string-tests
-    roundtrip-tests))
+    roundtrip-tests
+    (set! dbsystem #f)))

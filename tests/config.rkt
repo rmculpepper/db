@@ -14,7 +14,7 @@
 
 (define-signature database^
   (connect
-   dbsystem
+   dbsys
    dbuser
    dbdb
    dbpassword))
@@ -37,7 +37,7 @@
   (export config^)
 
   (define (connect-for-test)
-    (case (dbsystem-name dbsystem)
+    (case dbsys
       ((postgresql)
        (connect #:user (or dbuser (getenv "DBUSER"))
                 #:database (or dbdb (getenv "DBDB"))
@@ -54,7 +54,7 @@
                 ;; FIXME: sqlite,mysql report longvarchar/varchar, not unknown, param types
                 #:strict-parameter-types? (equal? dbdb "test-pg")))
       (else
-       (error 'connect-for-test "unknown database system: ~e" dbsystem))))
+       (error 'connect-for-test "unknown database system: ~e" dbsys))))
 
   (define test-data
     '((0 "nothing")
@@ -91,4 +91,4 @@
   ;; use like (unless (XFAIL 'sqlite3) ...)
   (define (XFAIL config)
     (or (equal? config dbdb)
-        (equal? config (dbsystem-name dbsystem)))))
+        (equal? config dbsys))))

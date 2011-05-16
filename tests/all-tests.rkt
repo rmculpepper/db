@@ -8,13 +8,9 @@
          racket/unit
          "../base.rkt"
          (only-in "../postgresql.rkt" postgresql-connect)
-         (only-in "../private/postgresql/main.rkt" postgresql-dbsystem)
          (only-in "../mysql.rkt" mysql-connect)
-         (only-in "../private/mysql/main.rkt" mysql-dbsystem)
          (only-in "../sqlite3.rkt" sqlite3-connect)
-         (only-in "../private/sqlite3/main.rkt" sqlite3-dbsystem)
          (only-in "../odbc.rkt" odbc-connect)
-         (only-in "../private/odbc/main.rkt" odbc-dbsystem)
          "config.rkt"
          "db-connection.rkt"
          "db-query.rkt"
@@ -51,18 +47,18 @@ the user name and password (or not require it):
 
 ;; ----
 
-(define (db-unit connect dbsystem [dbdb #f])
+(define (db-unit connect dbsys [dbdb #f])
   (let ([dbuser #f] [dbpassword #f])
     (unit-from-context database^)))
 
-(define postgresql@ (db-unit postgresql-connect postgresql-dbsystem))
-(define mysql@ (db-unit mysql-connect mysql-dbsystem))
-(define sqlite3@ (db-unit sqlite3-connect sqlite3-dbsystem))
-(define odbc@ (db-unit odbc-connect odbc-dbsystem))
+(define postgresql@ (db-unit postgresql-connect 'postgresql))
+(define mysql@ (db-unit mysql-connect 'mysql))
+(define sqlite3@ (db-unit sqlite3-connect 'sqlite3))
+(define odbc@ (db-unit odbc-connect 'odbc))
 
-(define odbc-pg@ (db-unit odbc-connect odbc-dbsystem "test-pg"))
-(define odbc-my@ (db-unit odbc-connect odbc-dbsystem "test-my"))
-(define odbc-sl@ (db-unit odbc-connect odbc-dbsystem "test-sl"))
+(define odbc-pg@ (db-unit odbc-connect 'odbc "test-pg"))
+(define odbc-my@ (db-unit odbc-connect 'odbc "test-my"))
+(define odbc-sl@ (db-unit odbc-connect 'odbc "test-sl"))
 
 (define-unit db-test@
   (import database^
@@ -74,9 +70,7 @@ the user name and password (or not require it):
 
   (define test
     (make-test-suite
-     (format "~a~a tests"
-             (dbsystem-name dbsystem)
-             (if dbdb (format " (~a)" dbdb) ""))
+     (format "~a~a tests" dbsys (if dbdb (format " (~a)" dbdb) ""))
      (list connect:test
            query:test
            sql-types:test

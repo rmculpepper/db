@@ -21,10 +21,10 @@
   (check-exn exn:fail? (lambda () expr)))
 
 (define (sql str)
-  (case (dbsystem-name dbsystem)
+  (case dbsys
     ((postgresql) str)
     ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
-    (else (error 'sql "bad dbsystem: ~s" (dbsystem-name dbsystem)))))
+    (else (error 'sql "bad dbsystem: ~s" dbsys))))
 
 ;; prep-mode:
 ;;   'string = query w/ string
@@ -154,21 +154,21 @@
         (let ([pst (prepare c "select n, descr from the_numbers")])
           (check-equal? (prepared-statement-parameter-types pst) '())
           (check-equal? (map cadr (prepared-statement-result-types pst))
-                        (case (dbsystem-name dbsystem)
+                        (case dbsys
                           ((postgresql) '(integer varchar))
                           ((mysql) '(integer var-string))
                           ((sqlite3) '(any any))
                           ((odbc) '(integer varchar)))))
         (let* ([pst (prepare c (sql "select n from the_numbers where n = $1"))]
                [param-types (map cadr (prepared-statement-parameter-types pst))])
-          (case (dbsystem-name dbsystem)
+          (case dbsys
             ((postgresql) (check-equal? param-types '(integer)))
             ((mysql) (check-equal? param-types '(var-string)))
             ((sqlite3) (check-equal? param-types '(any)))
             ((odbc) (check-equal? (length param-types) 1)))) ;; actual types may vary
         (let* ([pst (prepare c (sql "insert into the_numbers values ($1, $2)"))]
                [param-types (map cadr (prepared-statement-parameter-types pst))])
-          (case (dbsystem-name dbsystem)
+          (case dbsys
             ((postgresql) (check-equal? param-types '(integer varchar)))
             ((mysql) (check-equal? param-types '(var-string var-string)))
             ((sqlite3) (check-equal? param-types '(any any)))
@@ -233,7 +233,7 @@
           ;; raw NULL has PostgreSQL type "unknown", not allowed
           (define (clean . strs)
             (regexp-replace* #rx"NULL" (apply string-append strs)
-                             (case (dbsystem-name dbsystem)
+                             (case dbsys
                                ((postgresql) "cast(NULL as integer)")
                                (else "NULL"))))
           (check-equal? (query-row c (clean "select NULL, 1, NULL"))

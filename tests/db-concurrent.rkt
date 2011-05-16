@@ -14,10 +14,10 @@
 (define NOISY? #f)
 
 (define (sql str)
-  (case (dbsystem-name dbsystem)
+  (case dbsys
     ((postgresql) str)
     ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
-    (else (error 'sql "unsupported dbsystem: ~e" (dbsystem-name dbsystem)))))
+    (else (error 'sql "unsupported dbsystem: ~e" dbsys))))
 
 (define (test-concurrency workers)
   (test-case (format "lots of threads (~s)" workers)

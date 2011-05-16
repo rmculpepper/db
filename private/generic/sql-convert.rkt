@@ -130,7 +130,10 @@ No conversion may be passed sql-null.
          marshal-time-tz
          marshal-timestamp
          marshal-timestamp-tz
-         marshal-interval)
+         marshal-interval
+
+         exact->decimal-string
+         exact->scaled-integer)
 
 (define (marshal-decimal f i n)
   (cond [(not (real? n))
@@ -143,31 +146,56 @@ No conversion may be passed sql-null.
          (number->string n)]
         [(exact? n)
          ;; Bleah.
-         (or (number->exact-decimal n)
+         (or (exact->decimal-string n)
              (number->string (exact->inexact n)))]))
 
-(define (number->exact-decimal n)
-  (define (factor-out n factor fpower)
-    (let-values ([(q r) (quotient/remainder n factor)])
-      (if (zero? r)
-          (factor-out q factor (add1 fpower))
-          (values n fpower))))
+;; exact->decimal-string : exact -> string or #f
+;; always includes decimal point
+(define (exact->decimal-string n)
   (let* ([whole-part (truncate n)]
          [fractional-part (- (abs n) (abs whole-part))]
-         [num (numerator fractional-part)]
+         [scaled (exact->scaled-integer fractional-part)])
+    (and scaled
+         (let* ([ma (car scaled)]
+                [ex (cdr scaled)]
+                [ma-str (number->string ma)])
+           (if (zero? ex)
+               (number->string whole-part)
+               (string-append (number->string whole-part)
+                              "."
+                              (make-string (- ex (string-length ma-str)) #\0)
+                              ma-str))))))
+
+;; exact->scaled-integer : rational -> (cons int nat) or #f
+;; Given x, returns (cons M E) s.t. x = (M * 10^-E)
+(define (exact->scaled-integer n)
+  (let* ([whole-part (truncate n)]
+         [fractional-part (- (abs n) (abs whole-part))]
          [den (denominator fractional-part)])
-    (let*-values ([(den* fives) (factor-out den 5 0)]
-                  [(den** twos) (factor-out den* 2 0)])
+    (let*-values ([(den* fives) (factor-out den 5)]
+                  [(den** twos) (factor-out den* 2)])
       (and (= 1 den**)
-           (let* ([tens (max fives twos 1)]
-                  [new-den (expt 10 tens)]
-                  [new-num (* num (quotient new-den den))]
-                  [num-str (number->string new-num)])
-             (string-append (number->string whole-part)
-                            "."
-                            (make-string (- tens (string-length num-str))
-                                         #\0)
-                            num-str))))))
+           (let ([tens (max fives twos)])
+             (cons (* n (expt 10 tens)) tens))))))
+
+(define (factor-out-v1 n factor)
+  (define (loop n acc)
+    (let-values ([(q r) (quotient/remainder n factor)])
+      (if (zero? r)
+          (loop q (add1 acc))
+          (values n acc))))
+  (loop n 0))
+
+(define (factor-out n factor)
+  (define (loop n factor)
+    (if (<= factor n)
+        (let*-values ([(q n) (loop n (* factor factor))]
+                      [(q* r) (quotient/remainder q factor)])
+          (if (zero? r)
+              (values q* (+ n n 1))
+              (values q  (+ n n))))
+        (values n 0)))
+  (loop n factor))
 
 (define (marshal-date f i d)
   (unless (sql-date? d)

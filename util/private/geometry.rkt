@@ -64,7 +64,7 @@ same as above, but with coordinate variants: eg pointm = (x, y, m)
 (struct geometry-collection (elements)
         #:transparent)
 
-(define (geometry? x)
+(define (geometry2d? x)
   (or (point? x)
       (line-string? x)
       (polygon? x)

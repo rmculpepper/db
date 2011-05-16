@@ -714,7 +714,7 @@ Based on protocol documentation here:
          'blob]
         [(sql-bits? param)
          'bit]
-        [(geometry? param)
+        [(geometry2d? param)
          'geometry]
         [else
          (error 'choose-param-type "internal error: bad parameter value: ~e" param)]))

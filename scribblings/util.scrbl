@@ -131,12 +131,12 @@ structures to and from WKB format is supported by the
 @defstruct*[multi-polygon ([elements (listof polygon?)])]{
   Represents an OpenGIS @tt{MultiPolygon}, a collection of polygons.
 }
-@defstruct*[geometry-collection ([elements (listof geometry?)])]{
+@defstruct*[geometry-collection ([elements (listof geometry2d?)])]{
   Represents an OpenGIS @tt{GeometryCollection}, a collection of
   arbitrary geometric values.
 }
 
-@defproc[(geometry? [x any/c]) boolean?]{
+@defproc[(geometry2d? [x any/c]) boolean?]{
 
   Returns @racket[#t] if @racket[x] is a @racket[point],
   @racket[line-string], @racket[polygon], @racket[multi-point],
@@ -158,7 +158,7 @@ structures to and from WKB format is supported by the
   @racket[#f] otherwise.
 }
 
-@defproc[(geometry->wkb [g geometry?]
+@defproc[(geometry->wkb [g geometry2d?]
                         [#:big-endian? big-endian? (system-big-endian?)])
          bytes?]{
 
@@ -169,7 +169,7 @@ structures to and from WKB format is supported by the
 }
 
 @defproc[(wkb->geometry [b bytes?])
-         geometry?]{
+         geometry2d?]{
 
   Decodes the Well-Known Binary (WKB) representation of a geometric
   value.

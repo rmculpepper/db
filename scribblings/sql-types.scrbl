@@ -149,7 +149,7 @@ with their corresponding Racket representations.
   @racket['longblob]           @& @racket[bytes?] @//
 
   @racket['bit]                @& @racket[sql-bits?] @//
-  @racket['geometry]           @& @racket[geometry?]
+  @racket['geometry]           @& @racket[geometry2d?]
 }
 }
 
@@ -159,7 +159,7 @@ conversion of Racket values to @tt{var-string} parameters accepts
 strings, numbers (@racket[rational?]---no infinities or NaN), bytes,
 SQL date/time structures (@racket[sql-date?], @racket[sql-time?],
 @racket[sql-timestamp?], and @racket[sql-day-time-interval?]), bits
-(@racket[sql-bits?]), and geometric values (@racket[geometry?]).
+(@racket[sql-bits?]), and geometric values (@racket[geometry2d?]).
 
 The MySQL @tt{time} type represents time intervals, which may not
 correspond to times of day (for example, the interval may be negative

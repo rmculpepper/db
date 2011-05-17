@@ -247,6 +247,9 @@
       (define (get-varbuf ctype ntlen convert)
         ;; ntlen is null-terminator length (1 for char data, 0 for binary, ??? for wchar)
 
+        ;; ODBC spec says len-or-ind is character count, not byte count,
+        ;; but unixodbc doesn't seem to think so.
+
         ;; It would be nice if we could call w/ empty buffer, get total length, then
         ;; call again with appropriate buffer. But can't use NULL (works on unixodbc, but
         ;; ODBC spec says illegal and Win32 ODBC rejects). Seems unsafe to use 0-length
@@ -260,34 +263,43 @@
           (let-values ([(status len-or-ind) (SQLGetData stmt i ctype buf)])
             (handle-status fsym status stmt #:ignore-ok/info? #t)
             (cond [(= len-or-ind SQL_NULL_DATA) sql-null]
-                  [(<= 0 len-or-ind (- (bytes-length buf) ntlen))
-                   ;; fit in buf
-                   (cond [(pair? rchunks)
-                          (let* ([last-chunk (subbytes buf 0 len-or-ind)]
-                                 [complete
-                                  (apply bytes-append
-                                         (append (reverse rchunks) (list last-chunk)))])
-                            (convert complete (bytes-length complete) #t))]
-                         [else
-                          (convert buf len-or-ind #f)])]
                   [(= len-or-ind SQL_NO_TOTAL)
                    ;; didn't fit in buf, and we have no idea how much more there is
                    (let* ([len-got (- (bytes-length buf) ntlen)])
                      (loop buf
                            (cons (subbytes buf 0 len-got) rchunks)))]
                   [else
-                   ;; didn't fit in buf, but we know how much more there is
-                   (let* ([len-got (- (bytes-length buf) ntlen)]
-                          [len-left (- len-or-ind len-got)])
-                     (loop (make-bytes (+ len-left ntlen))
-                           (cons (subbytes buf 0 len-got) rchunks)))])))
+                   (let ([len len-or-ind])
+                     (cond [(<= 0 len (- (bytes-length buf) ntlen))
+                            ;; fit in buf
+                            (cond [(pair? rchunks)
+                                   (let* ([chunk (subbytes buf 0 len)]
+                                          [chunks (append (reverse rchunks) (list chunk))]
+                                          [complete (apply bytes-append chunks)])
+                                     (convert complete (bytes-length complete) #t))]
+                                  [else
+                                   (convert buf len #f)])]
+                           [else
+                            ;; didn't fit in buf, but we know how much more there is
+                            (let* ([len-got (- (bytes-length buf) ntlen)]
+                                   [len-left (- len len-got)])
+                              (loop (make-bytes (+ len-left ntlen))
+                                    (cons (subbytes buf 0 len-got) rchunks)))]))])))
         (loop scratchbuf null))
 
-      (define (get-string)
-        ;; FIXME: use "wide chars" for unicode support?
+      (define (get-string/latin-1)
         (get-varbuf SQL_C_CHAR 1
                     (lambda (buf len _fresh?)
                       (bytes->string/latin-1 buf #f 0 len))))
+
+      (define (get-string)
+        (define (mkstr2 buf len fresh?)
+          (let-values ([(chars clen) (scheme_utf16_to_ucs4 buf 0 (quotient len 2))])
+            (scheme_make_sized_char_string chars clen #f)))
+        (define (mkstr4 buf len fresh?)
+          (scheme_make_sized_char_string buf (quotient len 4) (not fresh?)))
+        (get-varbuf SQL_C_WCHAR WCHAR-SIZE (case WCHAR-SIZE ((2) mkstr2) ((4) mkstr4))))
+
       (define (get-bytes)
         (get-varbuf SQL_C_BINARY 0
                     (lambda (buf len fresh?)
@@ -297,8 +309,10 @@
                           (subbytes buf 0 len)))))
       (cond [(or (= typeid SQL_CHAR)
                  (= typeid SQL_VARCHAR)
-                 (= typeid SQL_LONGVARCHAR))
-             ;; FIXME: WCHAR, WVARCHAR, WLONGVARCHAR
+                 (= typeid SQL_LONGVARCHAR)
+                 (= typeid SQL_WCHAR)
+                 (= typeid SQL_WVARCHAR)
+                 (= typeid SQL_WLONGVARCHAR))
              (get-string)]
             [(or (= typeid SQL_DECIMAL)
                  (= typeid SQL_NUMERIC))

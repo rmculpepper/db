@@ -68,6 +68,9 @@
 (define SQL_TINYINT              -6)
 (define SQL_BIT                  -7)
 
+(define SQL_WCHAR                -8)
+(define SQL_WVARCHAR             -9)
+(define SQL_WLONGVARCHAR        -10)
 
 (define SQL_CODE_YEAR             1)
 (define SQL_CODE_MONTH            2)
@@ -145,6 +148,8 @@
 (define SQL_C_USHORT              (+ SQL_C_SHORT SQL_UNSIGNED_OFFSET))
 (define SQL_C_UTINYINT            (+ SQL_TINYINT SQL_UNSIGNED_OFFSET))
 |#
+
+(define SQL_C_WCHAR               SQL_WCHAR)
 
 (define SQL_SIGNED_OFFSET         -20)
 (define SQL_UNSIGNED_OFFSET       -22)

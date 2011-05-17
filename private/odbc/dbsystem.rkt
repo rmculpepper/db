@@ -82,7 +82,10 @@
    (-4 longvarbinary  bytes?)
    (-5 bigint         int64?)
    (-6 tinyint        int8?)
-   (-7 bit1           boolean?)]
+   (-7 bit1           boolean?)
+   (-8 wcharacter     string?)
+   (-9 wvarchar       string?)
+   (-10 wlongvarchar  string?)]
   [(2  numeric        check-numeric)
    (3  decimal        check-numeric)])
 
@@ -115,6 +118,9 @@
   (-5 bigint         ()           #t)
   (-6 tinyint        ()           #t)
   (-7 bit1           ()           #t) ;; not bit(n), always single bit
+  (-8 wchar          ()           #t)
+  (-9 wvarchar       ()           #t)
+  (-10 wlongvarchar  ()           #t)
 
   ;; Unsupported types
 

@@ -27,6 +27,31 @@
 (define _sqluinteger _uint)
 (define _sqlreturn _sqlsmallint)
 
+;; Windows ODBC defines wchar_t, thus WCHAR, as 16-bit
+;; unixodbc defines WCHAR as 16-bit for compat w/ Windows
+;; (even though Linux wchar_t is 32-bit)
+(define WCHAR-SIZE 2)
+
+(define-ffi-definer define-mz #f)
+
+(define-mz scheme_utf16_to_ucs4
+  (_fun (src srcstart srcend) ::
+        (src : _bytes)
+        (srcstart : _intptr)
+        (srcend : _intptr)
+        (#f : _pointer)   ;; No buffer so it'll allocate for us.
+        (0 : _intptr)
+        (clen : (_ptr o _intptr))
+        (0 : _intptr)
+        -> (out : _gcpointer)
+        -> (values out clen)))
+
+(define-mz scheme_make_sized_char_string
+  (_fun (chars clen copy?) ::
+        (chars : _gcpointer)
+        (clen  : _intptr)
+        (copy? : _bool)
+        -> _racket))
 
 #|
 Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx

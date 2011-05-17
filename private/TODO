@@ -44,6 +44,7 @@ Types
 
 ----
 
+- ODBC: reuse more buffers when possible
 - figure out ODBC and unicode (need to use WCHAR?)
 
 - sqlite: allow configurable behavior on SQLITE_BUSY

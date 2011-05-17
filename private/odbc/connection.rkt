@@ -201,10 +201,13 @@
             [else (error fsym "internal error: convert to typeid ~a: ~e" typeid param)]))
 
     (define/private (fetch* fsym stmt result-typeids)
-      (let ([c (fetch fsym stmt result-typeids)])
-        (if c (cons c (fetch* fsym stmt result-typeids)) null)))
+      ;; NOTE: must be at least as large as any int/float type (see get-num below)
+      (let ([scratchbuf (make-bytes 1000)]) 
+        (let loop ()
+          (let ([c (fetch fsym stmt result-typeids scratchbuf)])
+            (if c (cons c (loop)) null)))))
 
-    (define/private (fetch fsym stmt result-typeids)
+    (define/private (fetch fsym stmt result-typeids scratchbuf)
       (let ([s (SQLFetch stmt)])
         (cond [(= s SQL_NO_DATA) #f]
               [(= s SQL_SUCCESS)
@@ -212,23 +215,23 @@
                       [vec (make-vector column-count)])
                  (for ([i (in-range column-count)]
                        [typeid (in-list result-typeids)])
-                   (vector-set! vec i (get-column fsym stmt (add1 i) typeid)))
+                   (vector-set! vec i (get-column fsym stmt (add1 i) typeid scratchbuf)))
                  vec)]
               [else (handle-status fsym s stmt)])))
 
-    (define/private (get-column fsym stmt i typeid)
+    (define/private (get-column fsym stmt i typeid scratchbuf)
       (define-syntax-rule (get-num size ctype convert convert-arg ...)
-        (let ([buf (make-bytes size)])
-          (let-values ([(status ind) (SQLGetData stmt i ctype buf)])
-            (handle-status fsym status stmt)
-            (cond [(= ind SQL_NULL_DATA) sql-null]
-                  [else (convert buf convert-arg ...)]))))
+        (let-values ([(status ind) (SQLGetData stmt i ctype scratchbuf)])
+          (handle-status fsym status stmt)
+          (cond [(= ind SQL_NULL_DATA) sql-null]
+                [else (convert scratchbuf convert-arg ... 0 size)])))
       (define (get-int size ctype)
-        (get-num size ctype integer-bytes->integer #t))
+        (get-num size ctype integer-bytes->integer     #t (system-big-endian?)))
       (define (get-real ctype)
-        (get-num 8 ctype floating-point-bytes->real))
+        (get-num 8    ctype floating-point-bytes->real (system-big-endian?)))
       (define (get-int-list sizes ctype)
-        (let ([buf (make-bytes (apply + sizes))])
+        (let* ([buflen (apply + sizes)]
+               [buf (if (<= buflen (bytes-length scratchbuf)) scratchbuf (make-bytes buflen))])
           (let-values ([(status ind) (SQLGetData stmt i ctype buf)])
             (handle-status fsym status stmt)
             (cond [(= ind SQL_NULL_DATA) sql-null]
@@ -240,33 +243,61 @@
                               ((4) (integer-bytes->integer (read-bytes 4 in) #f))
                               (else (error 'get-int-list
                                            "internal error: bad size: ~e" size)))))]))))
+
+      (define (get-varbuf ctype ntlen convert)
+        ;; ntlen is null-terminator length (1 for char data, 0 for binary, ??? for wchar)
+
+        ;; It would be nice if we could call w/ empty buffer, get total length, then
+        ;; call again with appropriate buffer. But can't use NULL (works on unixodbc, but
+        ;; ODBC spec says illegal and Win32 ODBC rejects). Seems unsafe to use 0-length
+        ;; buffer (spec is unclear, DB2 docs say len>0...???).
+
+        ;; loop : bytes (listof bytes) -> any
+        ;; rchunks is reversed list of previous chunks (for data longer than scratchbuf)
+        ;; Small data done in one iteration; most long data done in two. Only long data
+        ;; without known size (???) should take more than two iterations.
+        (define (loop buf rchunks)
+          (let-values ([(status len-or-ind) (SQLGetData stmt i ctype buf)])
+            (handle-status fsym status stmt #:ignore-ok/info? #t)
+            (cond [(= len-or-ind SQL_NULL_DATA) sql-null]
+                  [(<= 0 len-or-ind (- (bytes-length buf) ntlen))
+                   ;; fit in buf
+                   (cond [(pair? rchunks)
+                          (let* ([last-chunk (subbytes buf 0 len-or-ind)]
+                                 [complete
+                                  (apply bytes-append
+                                         (append (reverse rchunks) (list last-chunk)))])
+                            (convert complete (bytes-length complete) #t))]
+                         [else
+                          (convert buf len-or-ind #f)])]
+                  [(= len-or-ind SQL_NO_TOTAL)
+                   ;; didn't fit in buf, and we have no idea how much more there is
+                   (let* ([len-got (- (bytes-length buf) ntlen)])
+                     (loop buf
+                           (cons (subbytes buf 0 len-got) rchunks)))]
+                  [else
+                   ;; didn't fit in buf, but we know how much more there is
+                   (let* ([len-got (- (bytes-length buf) ntlen)]
+                          [len-left (- len-or-ind len-got)])
+                     (loop (make-bytes (+ len-left ntlen))
+                           (cons (subbytes buf 0 len-got) rchunks)))])))
+        (loop scratchbuf null))
+
       (define (get-string)
         ;; FIXME: use "wide chars" for unicode support?
-        (let-values ([(status len-or-ind) (SQLGetData stmt i SQL_C_CHAR #f)])
-          (handle-status fsym status stmt #:ignore-ok/info? #t)
-          (cond [(= len-or-ind SQL_NULL_DATA) sql-null]
-                [(= len-or-ind SQL_NO_TOTAL)
-                 (error 'get-column "internal error: SQL_NO_TOTAL")]
-                [else
-                 (let ([buf (make-bytes (add1 len-or-ind))]) ;; +1 for nul-terminated string
-                   (let-values ([(status _li) (SQLGetData stmt i SQL_C_CHAR buf)])
-                     (handle-status fsym status stmt)
-                     (bytes->string/latin-1 buf #f 0 len-or-ind)))])))
+        (get-varbuf SQL_C_CHAR 1
+                    (lambda (buf len _fresh?)
+                      (bytes->string/latin-1 buf #f 0 len))))
       (define (get-bytes)
-        ;; FIXME: use "wide chars" for unicode support?
-        (let-values ([(status len-or-ind) (SQLGetData stmt i SQL_C_BINARY #f)])
-          (handle-status fsym status stmt #:ignore-ok/info? #t)
-          (cond [(= len-or-ind SQL_NULL_DATA) sql-null]
-                [(= len-or-ind SQL_NO_TOTAL)
-                 (error 'get-column "internal error: SQL_NO_TOTAL")]
-                [else
-                 (let ([buf (make-bytes len-or-ind)])
-                   (let-values ([(status _li) (SQLGetData stmt i SQL_C_BINARY buf)])
-                     (handle-status fsym status stmt)
-                     buf))])))
+        (get-varbuf SQL_C_BINARY 0
+                    (lambda (buf len fresh?)
+                      ;; avoid copying long data twice:
+                      (if (and fresh? (= len (bytes-length buf)))
+                          buf
+                          (subbytes buf 0 len)))))
       (cond [(or (= typeid SQL_CHAR)
                  (= typeid SQL_VARCHAR)
-                 (= typeid SQL_LONGVARCHAR)) ;; long date might need repeated gets (?)
+                 (= typeid SQL_LONGVARCHAR))
              ;; FIXME: WCHAR, WVARCHAR, WLONGVARCHAR
              (get-string)]
             [(or (= typeid SQL_DECIMAL)

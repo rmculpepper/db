@@ -12,7 +12,7 @@ To do
 
 Testing
 
-- run ODBC tests on Windows (and Mac?)
+- run ODBC tests on Mac
 
 - change SQL to allow tests to run on DB2 over ODBC
 
@@ -45,7 +45,6 @@ Types
 ----
 
 - ODBC: reuse more buffers when possible
-- figure out ODBC and unicode (need to use WCHAR?)
 
 - sqlite: allow configurable behavior on SQLITE_BUSY
   eg retry n times, retry forever, retry w/ timeout, fail

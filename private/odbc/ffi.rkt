@@ -42,9 +42,10 @@
         (#f : _pointer)   ;; No buffer so it'll allocate for us.
         (0 : _intptr)
         (clen : (_ptr o _intptr))
-        (0 : _intptr)
+        (1 : _intptr)
         -> (out : _gcpointer)
-        -> (values out clen)))
+        -> (begin (ptr-set! out _int32 clen 0)
+                  (values out clen))))
 
 (define-mz scheme_make_sized_char_string
   (_fun (chars clen copy?) ::

@@ -27,8 +27,8 @@
     (prepare c (sql "insert into play_numbers (n) values ($1)")))
   (define (insert x) (query-exec c insert-pst x))
   (define (add-to-max n)
-    (let* ([m (query-value c "select max(n) from play_numbers")]
-           [m (if (equal? dbdb "test-sl") (string->number m) m)])
+    (let* ([m0 (query-value c "select max(n) from play_numbers")]
+           [m (if (string? m0) (string->number m0) m0)])
       (insert (+ n m))))
   (for-each insert (build-list iterations add1))
   (for-each add-to-max (build-list iterations add1))

@@ -101,19 +101,22 @@ ODBC 3.x Driver Managers. The behavior of ODBC connections can vary
 widely depending on the driver in use and even the configuration of a
 particular data source.
 
-This library is tested with @tt{unixODBC} on Linux/x86 (32-bit
-and 64-bit) running Ubuntu 11.04 with the following drivers:
+This library is tested with the following configurations, where
+@bold{win32} means Windows Vista on a 32-bit processor and
+@bold{linux} means Ubuntu 11.04 and unixODBC on both x86 (32-bit) and
+x86-64 processors unless otherwise specified.
 @itemlist[
-@item{@bold{PostgreSQL Unicode} (from the @tt{odbc-postgresql} package): Set
-  the following Data Source options to get specific parameter type
-  information: @tt{Protocol = 7.4} and @tt{UserServerSidePrepare =
-  1}, and use the @racket[#:strict-parameter-types?] argument to
-  @racket[odbc-connect]. One test fails: no error is reported for
-  multiple SQL statements in a string.}
-@item{@bold{MySQL} (from the @tt{libmyodbc} package): Avoid using the
+@item{@bold{PostgreSQL Unicode} on @bold{win32} and
+  @bold{linux}: Set the following Data Source options to get specific
+  parameter type information: @tt{Protocol = 7.4} and
+  @tt{UserServerSidePrepare = 1}, and use the
+  @racket[#:strict-parameter-types?] connection option. One test
+  fails: no error is reported for multiple SQL statements in a
+  string.}
+@item{@bold{MySQL} on @bold{win32} and @bold{linux}: Avoid using the
   @racket[#:strict-parameter-types?] connection option, as the driver
   assigns all parameters the type @tt{varchar}. All tests pass.}
-@item{@bold{SQLite3} (from the @tt{libsqliteodbc} package): Avoid
+@item{@bold{SQLite3} on @bold{linux}: Avoid
   using the @racket[#:strict-parameter-types?] connection option, as
   the driver assigns all parameters the type
   @tt{longvarchar}. Furthermore, this driver interprets the
@@ -125,15 +128,12 @@ and 64-bit) running Ubuntu 11.04 with the following drivers:
 In addition, the following configurations have been tried but are not
 thoroughly tested:
 @itemlist[
-@item{@bold{Windows Driver Manager} (32-bit only): The library can
-  list drivers and data sources, but I haven't tried using any drivers
-  yet.}
-@item{@bold{DB2} (IBM DB2 Express-C v9.7 for Linux, 32-bit only):
+@item{@bold{DB2} (IBM DB2 Express-C v9.7) on @bold{linux} (32-bit only):
   With @tt{Driver} set to @tt{/home/db2inst1/sqllib/lib32/libdb2.so}
   this library seems to work fine, but the automated test suite cannot
   be run because it uses an incompatible SQL dialect.}
-@item{@bold{OracleODBC-10g} (Oracle Database 10g Release 2, Express
-  Edition for Linux, 32-bit version only): It seems the
+@item{@bold{Oracle} (Oracle Database 10g Release 2, Express
+  Edition) on @bold{linux} (32-bit version only): It seems the
   @tt{ORACLE_HOME} and @tt{LD_LIBRARY_PATH} environment variables must
   be set according to the @tt{oracle_env.{csh,sh}} script for the
   driver to work. Parameterized queries don't seem to work. Beyond

@@ -154,8 +154,14 @@
                         (= typeid SQL_SMALLINT)
                         (= typeid SQL_BIGINT)
                         (= typeid SQL_TINYINT))
-                    (bind SQL_C_SBIGINT (if unknown-type? SQL_BIGINT typeid)
-                          (copy-buffer (integer->integer-bytes param 8 #t)))]
+                    ;; Oracle errors without diagnostic record (!!) on BIGINT param
+                    ;; -> http://stackoverflow.com/questions/338609
+                    ;; FIXME: find a better solution, eg check driver for BIGINT support (?)
+                    (if (int32? param)
+                        (bind SQL_C_LONG (if unknown-type? SQL_INTEGER typeid)
+                              (copy-buffer (integer->integer-bytes param 4 #t)))
+                        (bind SQL_C_SBIGINT (if unknown-type? SQL_BIGINT typeid)
+                              (copy-buffer (integer->integer-bytes param 8 #t))))]
                    [else
                     (bind SQL_C_DOUBLE (if unknown-type? SQL_DOUBLE typeid)
                           (copy-buffer
@@ -201,8 +207,12 @@
             [else (error fsym "internal error: convert to typeid ~a: ~e" typeid param)]))
 
     (define/private (fetch* fsym stmt result-typeids)
-      ;; NOTE: must be at least as large as any int/float type (see get-num below)
-      (let ([scratchbuf (make-bytes 1000)]) 
+      ;; scratchbuf: create a single buffer here to try to reduce garbage
+      ;; Don't make too big; otherwise bad for queries with only small data.
+      ;; Doesn't need to be large, since get-varbuf already smart for long data.
+      ;; MUST be at least as large as any int/float type (see get-num)
+      ;; SHOULD be at least as large as any structures (see uses of get-int-list)
+      (let ([scratchbuf (make-bytes 50)]) 
         (let loop ()
           (let ([c (fetch fsym stmt result-typeids scratchbuf)])
             (if c (cons c (loop)) null)))))
@@ -247,8 +257,14 @@
       (define (get-varbuf ctype ntlen convert)
         ;; ntlen is null-terminator length (1 for char data, 0 for binary, ??? for wchar)
 
-        ;; ODBC spec says len-or-ind is character count, not byte count,
-        ;; but unixodbc doesn't seem to think so.
+        ;; null-terminator, there are 3 modes: binary, wchar=2, wchar=4
+        ;; - binary: all done in racket, no worries
+        ;; - wchar=4: passed to make_sized_char_string, so must explicitly leave ntlen \0 bytes
+        ;; - wchar=2: passed to utf16_to_ucs4 (which must add \0 space, see ffi.rkt)
+        ;; So for simplicity, add ntlen \0 bytes to buf (but do *not* add to data len)
+
+        ;; ODBC docs say len-or-ind is character count for char data, but wrong:
+        ;; always a byte count.
 
         ;; It would be nice if we could call w/ empty buffer, get total length, then
         ;; call again with appropriate buffer. But can't use NULL (works on unixodbc, but
@@ -273,11 +289,14 @@
                      (cond [(<= 0 len (- (bytes-length buf) ntlen))
                             ;; fit in buf
                             (cond [(pair? rchunks)
-                                   (let* ([chunk (subbytes buf 0 len)]
+                                   ;; add ntlen bytes for null-terminator...
+                                   (let* ([chunk (subbytes buf 0 (+ len ntlen))]
                                           [chunks (append (reverse rchunks) (list chunk))]
                                           [complete (apply bytes-append chunks)])
-                                     (convert complete (bytes-length complete) #t))]
+                                     ;; ... but compensate so len is correct
+                                     (convert complete (- (bytes-length complete) ntlen) #t))]
                                   [else
+                                   ;; buf already null-terminated, len correct
                                    (convert buf len #f)])]
                            [else
                             ;; didn't fit in buf, but we know how much more there is

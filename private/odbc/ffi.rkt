@@ -54,6 +54,10 @@
         (copy? : _bool)
         -> _racket))
 
+;; Used in connection.rkt; silly hack to keep optimizer from eliminating ref to
+;; things that shouldn't be GC'd. Depends on no cross-module inlining.
+(define (strong-void x) (void))
+
 #|
 Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
 |#
@@ -233,12 +237,12 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         -> _sqlreturn))
 
 (define-odbc SQLGetData
-  (_fun (handle column target-type buffer) ::
+  (_fun (handle column target-type buffer start) ::
         (handle : _sqlhstmt)
         (column : _sqlusmallint)
         (target-type : _sqlsmallint)
-        (buffer : _bytes) ;; may be null (#f) to get length
-        ((if buffer (bytes-length buffer) 0) : _sqllen)
+        ((ptr-add buffer start) : _gcpointer)
+        ((- (bytes-length buffer) start) : _sqllen)
         (len-or-ind : (_ptr o _sqllen))
         -> (status : _sqlreturn)
         -> (values status len-or-ind)))

@@ -77,13 +77,16 @@
       (define-values (dvecs rows)
         (with-lock
          (let* ([db (get-db fsym)]
-                [stmt (send pst get-handle)])
-           ;; FIXME: reset/clear first (?)
-           (for ([i (in-naturals 1)]
-                 [param (in-list params)]
-                 [param-typeid (in-list (send pst get-param-typeids))])
-             (load-param fsym db stmt i param param-typeid))
+                [stmt (send pst get-handle)]
+                ;; FIXME: reset/clear first (?)
+                [param-bufs
+                 ;; Need to keep references to all bufs until after SQLExecute.
+                 (for/list ([i (in-naturals 1)]
+                            [param (in-list params)]
+                            [param-typeid (in-list (send pst get-param-typeids))])
+                   (load-param fsym db stmt i param param-typeid))])
            (handle-status fsym (SQLExecute stmt) stmt)
+           (strong-void param-bufs)
            (let* ([result-dvecs (send pst get-result-dvecs)]
                   [rows
                    (and (pair? result-dvecs)
@@ -108,17 +111,22 @@
       (define (copy-buffer buffer)
         (let* ([buffer (if (string? buffer) (string->bytes/utf-8 buffer) buffer)]
                [n (bytes-length buffer)]
-               [copy (make-sized-byte-string (malloc n 'atomic-interior) n)])
+               ;; +1 for null-terminator (?)
+               [copy (make-sized-byte-string (malloc (add1 n) 'atomic-interior) (add1 n))])
           (memcpy copy buffer n)
+          (bytes-set! copy n 0) ;; null-terminator
           copy))
-      (define (int->buffer n) (copy-buffer (integer->integer-bytes n 4 #t)))
+      (define (int->buffer n)
+        (let ([copy (make-sized-byte-string (malloc 4 'atomic-interior) 4)])
+          (integer->integer-bytes n 4 #t (system-big-endian?) copy 0)
+          copy))
       (define (bind ctype sqltype buf)
         (let* ([lenbuf
                 (int->buffer (if buf (bytes-length buf) SQL_NULL_DATA))]
                [status
                 (SQLBindParameter stmt i SQL_PARAM_INPUT ctype sqltype 0 0 buf lenbuf)])
           (handle-status fsym status stmt)
-          (if buf (list buf lenbuf) (list lenbuf))))
+          (if buf (cons buf lenbuf) lenbuf)))
       ;; If the typeid is UNKNOWN, then choose appropriate type based on data,
       ;; but respect typeid if known.
       (define unknown-type? (= typeid SQL_UNKNOWN_TYPE))
@@ -135,9 +143,9 @@
                           [ex (cdr param)])
                       (apply bytes-append
                              ;; ODBC docs claim max precision is 15 ...
-                             (bytes (+ 1 (order-of-magnitude (abs ma))))
-                             (bytes ex)
-                             (bytes (if (negative? ma) 0 1))
+                             (bytes (+ 1 (order-of-magnitude (abs ma)))
+                                    ex
+                                    (if (negative? ma) 0 1))
                              ;; 16 bytes of unsigned little-endian data (4 chunks of 4 bytes)
                              (let loop ([i 0] [ma (abs ma)])
                                (if (< i 4)
@@ -231,7 +239,7 @@
 
     (define/private (get-column fsym stmt i typeid scratchbuf)
       (define-syntax-rule (get-num size ctype convert convert-arg ...)
-        (let-values ([(status ind) (SQLGetData stmt i ctype scratchbuf)])
+        (let-values ([(status ind) (SQLGetData stmt i ctype scratchbuf 0)])
           (handle-status fsym status stmt)
           (cond [(= ind SQL_NULL_DATA) sql-null]
                 [else (convert scratchbuf convert-arg ... 0 size)])))
@@ -242,7 +250,7 @@
       (define (get-int-list sizes ctype)
         (let* ([buflen (apply + sizes)]
                [buf (if (<= buflen (bytes-length scratchbuf)) scratchbuf (make-bytes buflen))])
-          (let-values ([(status ind) (SQLGetData stmt i ctype buf)])
+          (let-values ([(status ind) (SQLGetData stmt i ctype buf 0)])
             (handle-status fsym status stmt)
             (cond [(= ind SQL_NULL_DATA) sql-null]
                   [else (let ([in (open-input-bytes buf)])
@@ -271,21 +279,23 @@
         ;; ODBC spec says illegal and Win32 ODBC rejects). Seems unsafe to use 0-length
         ;; buffer (spec is unclear, DB2 docs say len>0...???).
 
-        ;; loop : bytes (listof bytes) -> any
+        ;; loop : bytes nat (listof bytes) -> any
+        ;; start is next place to write, but data starts at 0
         ;; rchunks is reversed list of previous chunks (for data longer than scratchbuf)
         ;; Small data done in one iteration; most long data done in two. Only long data
         ;; without known size (???) should take more than two iterations.
-        (define (loop buf rchunks)
-          (let-values ([(status len-or-ind) (SQLGetData stmt i ctype buf)])
+        (define (loop buf start rchunks)
+          (let-values ([(status len-or-ind) (SQLGetData stmt i ctype buf start)])
             (handle-status fsym status stmt #:ignore-ok/info? #t)
             (cond [(= len-or-ind SQL_NULL_DATA) sql-null]
                   [(= len-or-ind SQL_NO_TOTAL)
                    ;; didn't fit in buf, and we have no idea how much more there is
-                   (let* ([len-got (- (bytes-length buf) ntlen)])
-                     (loop buf
-                           (cons (subbytes buf 0 len-got) rchunks)))]
+                   ;; start = 0
+                   (let* ([data-end (- (bytes-length buf) ntlen)])
+                     ;; FIXME: maybe in this case we want a bigger buffer (?)
+                     (loop buf 0 (cons (subbytes buf 0 data-end) rchunks)))]
                   [else
-                   (let ([len len-or-ind])
+                   (let ([len (+ start len-or-ind)])
                      (cond [(<= 0 len (- (bytes-length buf) ntlen))
                             ;; fit in buf
                             (cond [(pair? rchunks)
@@ -301,10 +311,10 @@
                            [else
                             ;; didn't fit in buf, but we know how much more there is
                             (let* ([len-got (- (bytes-length buf) ntlen)]
-                                   [len-left (- len len-got)])
-                              (loop (make-bytes (+ len-left ntlen))
-                                    (cons (subbytes buf 0 len-got) rchunks)))]))])))
-        (loop scratchbuf null))
+                                   [newbuf (make-bytes (+ len ntlen))])
+                              (bytes-copy! newbuf 0 buf start len-got)
+                              (loop newbuf len-got rchunks))]))])))
+        (loop scratchbuf 0 null))
 
       (define (get-string/latin-1)
         (get-varbuf SQL_C_CHAR 1

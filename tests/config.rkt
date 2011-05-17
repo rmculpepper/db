@@ -13,11 +13,10 @@
          config@)
 
 (define-signature database^
-  (connect
+  (dbtestname
+   connect
    dbsys
-   dbuser
-   dbdb
-   dbpassword))
+   dbflags))
 
 (define-signature test^ (test))
 (define-signature config^
@@ -32,7 +31,8 @@
    set-equal?
    sql
    NOISY?
-   XFAIL))
+   TESTCONF
+   TESTFLAG))
 
 (define-unit config@
   (import database^)
@@ -41,24 +41,7 @@
   (define NOISY? #f)
 
   (define (connect-for-test)
-    (case dbsys
-      ((postgresql)
-       (connect #:user (or dbuser (getenv "DBUSER"))
-                #:database (or dbdb (getenv "DBDB"))
-                #:password (or dbpassword (getenv "DBPASSWORD"))
-                #:notice-handler void))
-      ((mysql)
-       (connect #:user (or dbuser (getenv "DBUSER"))
-                #:database (or dbdb (getenv "DBDB"))
-                #:password (or dbpassword (getenv "DBPASSWORD"))))
-      ((sqlite3)
-       (connect #:database (or dbdb 'memory)))
-      ((odbc)
-       (connect #:dsn (or dbdb (getenv "DBODBC"))
-                ;; FIXME: sqlite,mysql report longvarchar/varchar, not unknown, param types
-                #:strict-parameter-types? (equal? dbdb "test-pg")))
-      (else
-       (error 'connect-for-test "unknown database system: ~e" dbsys))))
+    (connect))
 
   (define test-data
     '((0 "nothing")
@@ -99,6 +82,11 @@
 
   ;; returns #t if current dbsys/db is config;
   ;; use like (unless (XFAIL 'sqlite3) ...)
-  (define (XFAIL config)
-    (or (equal? config dbdb)
-        (equal? config dbsys))))
+  (define (TESTCONF config)
+    (or (equal? config dbtestname)
+        (equal? config dbsys)))
+
+  (define (TESTFLAG . xs)
+    (for/and ([x xs])
+      (or (equal? x dbsys)
+          (and (member x dbflags) #t)))))

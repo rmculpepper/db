@@ -3,8 +3,11 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require rackunit
-         rackunit/gui
+(require racket/match
+         racket/cmdline
+         racket/file
+         rackunit
+         rackunit/text-ui
          racket/unit
          "../main.rkt"
          "config.rkt"
@@ -21,40 +24,99 @@
 RUNNING THE TESTS
 -----------------
 
-The following environment variables must be defined, and must be valid
-for both PostgreSQL and MySQL:
+Prefs file maps symbol => <conf>
 
-  DBDB
-  DBUSER
-  DBPASSWORD
+<conf> ::= (profile <conf> ...)
+         | (db <string> <connector> <flags> <args>)
+         | (ref <symbol>)
 
-The following ODBC Data Sources must exist and must already contain
-the user name and password (or not require it):
+<connector> ::= postgresql | mysql | sqlite3 | odbc
+<flags> ::= (<datum> ...)
+<args> ::= (<arg> ...)
+<arg>  ::= <datum> | { <kw> <datum> }
 
-  test-pg      (driver = PostgreSQL Unicode)
-  test-my      (driver = MySQL)
-  test-sl      (driver = SQLite3)
+Profiles are flattened, not hierarchical.
+Flags are useful for, eg, indicating SQL dialect.
 
 |#
 
-(for ([var (in-list '("DBDB" "DBUSER" "DBPASSWORD"))])
-  (unless (getenv var)
-    (eprintf "warning: ~a environment variable not set\n" var)))
+;; ----------------------------------------
+
+(define pref-file
+  (make-parameter (build-path (find-system-path 'pref-dir) "ryanc-db-test.rktd")))
+
+(define (get-dbconf name)
+  (parse-dbconf
+   (get-preference name
+                   (lambda () (error 'get-dbconf "no such dbconf: ~e" name))
+                   'timestamp
+                   (pref-file))))
+
+(define (put-dbconf name dbconf)
+  (put-preferences (list name)
+                   (list (dbconf->sexpr dbconf))
+                   (lambda () (error 'put-dbconf "locked"))
+                   (pref-file)))
+
+(struct dbconf (name connector flags args) #:transparent)
+
+(define (dbconf->sexpr x)
+  (match x
+    [(dbconf name connector flags args)
+     `(db ,name ,connector ,flags
+          ,(let ([pargs (car args)] [kwargs (cadr args)])
+             (append pargs (apply append kwargs))))]))
+
+(define-syntax-rule (expect name pred)
+  (unless (pred name) (error 'parse "bad ~a: ~e" 'name name)))
+
+;; parse-dbconf : sexpr -> (listof dbconf?)
+(define (parse-dbconf x)
+  (match x
+    [(list 'profile dbconfs ...)
+     (apply append (map parse-dbconf dbconfs))]
+    [(list 'db name connector flags args)
+     (expect name string?)
+     (expect connector connector?)
+     (expect flags list?)
+     (expect args list?)
+     (list (dbconf name connector flags (parse-args args)))]
+    [(list 'ref conf-name)
+     (expect conf-name symbol?)
+     (get-dbconf conf-name)]))
+
+(define (connector? x)
+  (memq x '(postgresql mysql sqlite3 odbc)))
+
+(define (parse-args x)
+  (let loop ([x x] [pargs null] [kwargs null])
+    (cond [(null? x)
+           (list (reverse pargs)
+                 (sort kwargs keyword<? #:key car))]
+          [(keyword? (car x))
+           (unless (pair? (cdr x)) (error 'parse "keyword without argument: ~a" (car x)))
+           (loop (cddr x) pargs (cons (list (car x) (cadr x)) kwargs))]
+          [else (loop (cdr x) (cons (car x) pargs) kwargs)])))
 
 ;; ----
 
-(define (db-unit connect dbsys [dbdb #f])
-  (let ([dbuser #f] [dbpassword #f])
-    (unit-from-context database^)))
+(define (dbconf->unit x)
+  (match x
+    [(dbconf dbtestname dbsys dbflags dbargs)
+     (let* ([pargs (car dbargs)]
+            [kwargs (cadr dbargs)]
+            [connector
+             (case dbsys
+               ((postgresql) postgresql-connect)
+               ((mysql) mysql-connect)
+               ((sqlite3) sqlite3-connect)
+               ((odbc) odbc-connect))]
+            [connect
+             (lambda ()
+               (keyword-apply connector (map car kwargs) (map cadr kwargs) pargs))])
+       (unit-from-context database^))]))
 
-(define postgresql@ (db-unit postgresql-connect 'postgresql))
-(define mysql@ (db-unit mysql-connect 'mysql))
-(define sqlite3@ (db-unit sqlite3-connect 'sqlite3))
-(define odbc@ (db-unit odbc-connect 'odbc))
-
-(define odbc-pg@ (db-unit odbc-connect 'odbc "test-pg"))
-(define odbc-my@ (db-unit odbc-connect 'odbc "test-my"))
-(define odbc-sl@ (db-unit odbc-connect 'odbc "test-sl"))
+;; ----
 
 (define-unit db-test@
   (import database^
@@ -63,10 +125,9 @@ the user name and password (or not require it):
           (tag sql-types (prefix sql-types: test^))
           (tag concurrent (prefix concurrent: test^)))
   (export test^)
-
   (define test
     (make-test-suite
-     (format "~a~a tests" dbsys (if dbdb (format " (~a)" dbdb) ""))
+     (format "~a tests" dbtestname)
      (list connect:test
            query:test
            sql-types:test
@@ -93,26 +154,20 @@ the user name and password (or not require it):
   (define-values/invoke-unit (specialize-test@ db@) (import) (export test^))
   test)
 
-(define postgresql:test (specialize-test postgresql@))
-(define mysql:test (specialize-test mysql@))
-(define sqlite3:test (specialize-test sqlite3@))
-(define odbc:test (specialize-test odbc@))
+(define (odbc-test dsn [flags null])
+  (specialize-test (dbconf->unit (dbconf dsn 'odbc flags `(() ((#:dsn ,dsn)))))))
+
+(define generic-tests
+  (make-test-suite "Generic tests (no db)"
+    (list gen-sql-types:test)))
 
 ;; ----
 
-(define all-tests
-  (let ([opg:test (specialize-test odbc-pg@)]
-        [omy:test (specialize-test odbc-my@)]
-        [osl:test (specialize-test odbc-sl@)])
-    (make-test-suite "All tests"
-      (list (make-test-suite "Generic tests (no db)"
-              (list gen-sql-types:test))
-            postgresql:test
-            mysql:test
-            sqlite3:test
-            opg:test
-            omy:test
-            osl:test))))
+(define (make-all-tests dbconfs generic?)
+  (make-test-suite "All tests"
+    (append (if generic? (list generic-tests) null)
+            (for/list ([dbconf (in-list dbconfs)])
+              (specialize-test (dbconf->unit dbconf))))))
 
 ;; ----
 
@@ -120,3 +175,16 @@ the user name and password (or not require it):
   (begin (define-values/invoke-unit db@ (import) (export database^))
          (define-values/invoke-unit config@ (import database^) (export config^))
          (define c (connect-and-setup))))
+
+;; ----------------------------------------
+
+(define include-generic? #t)
+
+(command-line
+ #:once-each
+ [("--no-generic") "Disable generic tests" (set! include-generic? #f)]
+ [("-f" "--config-file") file  "Use configuration file" (pref-file file)]
+ #:args labels
+ (run-tests
+  (make-all-tests (apply append (map get-dbconf (map string->symbol labels)))
+                  include-generic?)))

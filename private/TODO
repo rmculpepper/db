@@ -56,5 +56,3 @@ Types
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 
 - connected?, disconnect should always work, even on thread-damaged connections
-
-- Racket-specific ODBC-like DSN format?

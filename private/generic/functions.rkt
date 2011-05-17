@@ -134,7 +134,7 @@
     (case fields
       ((0) (error fsym "query returned 0 columns (expected 1): ~e " sql))
       ((1) 'ok)
-      (else (error 'fsym "query returned ~a columns (expected 1): ~e" fields sql)))
+      (else (error fsym "query returned ~a columns (expected 1): ~e" fields sql)))
     (values null
             (lambda (b av) (cons (vector-ref av 0) b))
             (if ordered? reverse values)

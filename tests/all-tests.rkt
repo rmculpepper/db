@@ -10,12 +10,12 @@
          rackunit/text-ui
          racket/unit
          "../main.rkt"
+         "../private/radsn.rkt"
          "config.rkt"
          "db-connection.rkt"
          "db-query.rkt"
          "db-sql-types.rkt"
          "db-concurrent.rkt"
-
          "gen-sql-types.rkt")
 (provide (all-defined-out))
 
@@ -27,16 +27,10 @@ RUNNING THE TESTS
 Prefs file maps symbol => <conf>
 
 <conf> ::= (profile <conf> ...)
-         | (db <string> <connector> <flags> <args>)
+         | (radsn <symbol>)
          | (ref <symbol>)
 
-<connector> ::= postgresql | mysql | sqlite3 | odbc
-<flags> ::= (<datum> ...)
-<args> ::= (<arg> ...)
-<arg>  ::= <datum> | { <kw> <datum> }
-
 Profiles are flattened, not hierarchical.
-Flags are useful for, eg, indicating SQL dialect.
 
 |#
 
@@ -46,26 +40,15 @@ Flags are useful for, eg, indicating SQL dialect.
   (make-parameter (build-path (find-system-path 'pref-dir) "ryanc-db-test.rktd")))
 
 (define (get-dbconf name)
-  (parse-dbconf
-   (get-preference name
-                   (lambda () (error 'get-dbconf "no such dbconf: ~e" name))
-                   'timestamp
-                   (pref-file))))
+  (let ([conf (get-preference name (lambda () #f) 'timestamp (pref-file))])
+    (if conf
+        (parse-dbconf)
+        (let ([r (get-radsn name)])
+          (if r
+              (list (dbconf name r))
+              (error 'get-dbconf "no such dbconf: ~e" name))))))
 
-(define (put-dbconf name dbconf)
-  (put-preferences (list name)
-                   (list (dbconf->sexpr dbconf))
-                   (lambda () (error 'put-dbconf "locked"))
-                   (pref-file)))
-
-(struct dbconf (name connector flags args) #:transparent)
-
-(define (dbconf->sexpr x)
-  (match x
-    [(dbconf name connector flags args)
-     `(db ,name ,connector ,flags
-          ,(let ([pargs (car args)] [kwargs (cadr args)])
-             (append pargs (apply append kwargs))))]))
+(struct dbconf (name radsn) #:transparent)
 
 (define-syntax-rule (expect name pred)
   (unless (pred name) (error 'parse "bad ~a: ~e" 'name name)))
@@ -75,46 +58,27 @@ Flags are useful for, eg, indicating SQL dialect.
   (match x
     [(list 'profile dbconfs ...)
      (apply append (map parse-dbconf dbconfs))]
-    [(list 'db name connector flags args)
-     (expect name string?)
-     (expect connector connector?)
-     (expect flags list?)
-     (expect args list?)
-     (list (dbconf name connector flags (parse-args args)))]
     [(list 'ref conf-name)
      (expect conf-name symbol?)
-     (get-dbconf conf-name)]))
-
-(define (connector? x)
-  (memq x '(postgresql mysql sqlite3 odbc)))
-
-(define (parse-args x)
-  (let loop ([x x] [pargs null] [kwargs null])
-    (cond [(null? x)
-           (list (reverse pargs)
-                 (sort kwargs keyword<? #:key car))]
-          [(keyword? (car x))
-           (unless (pair? (cdr x)) (error 'parse "keyword without argument: ~a" (car x)))
-           (loop (cddr x) pargs (cons (list (car x) (cadr x)) kwargs))]
-          [else (loop (cdr x) (cons (car x) pargs) kwargs)])))
+     (get-dbconf conf-name)]
+    [(list 'radsn radsn-name)
+     (expect radsn-name symbol?)
+     (list (dbconf radsn-name (get-radsn radsn-name)))]))
 
 ;; ----
 
 (define (dbconf->unit x)
   (match x
-    [(dbconf dbtestname dbsys dbflags dbargs)
-     (let* ([pargs (car dbargs)]
-            [kwargs (cadr dbargs)]
-            [connector
-             (case dbsys
-               ((postgresql) postgresql-connect)
-               ((mysql) mysql-connect)
-               ((sqlite3) sqlite3-connect)
-               ((odbc) odbc-connect))]
-            [connect
-             (lambda ()
-               (keyword-apply connector (map car kwargs) (map cadr kwargs) pargs))])
+    [(dbconf dbtestname (and r (radsn connector _args exts)))
+     (let* ([connect (lambda () (radsn-connect r))]
+            [dbsys (case connector ((odbc-driver) 'odbc) (else connector))]
+            [dbflags (cond [(assq 'db:test exts) => cadr]
+                           [else '()])])
        (unit-from-context database^))]))
+
+(define (odbc-unit dbtestname dbflags dbargs)
+  (dbconf->unit
+   (dbconf dbtestname (radsn 'odbc dbargs `((db:test ,dbflags))))))
 
 ;; ----
 
@@ -155,7 +119,7 @@ Flags are useful for, eg, indicating SQL dialect.
   test)
 
 (define (odbc-test dsn [flags null])
-  (specialize-test (dbconf->unit (dbconf dsn 'odbc flags `(() ((#:dsn ,dsn)))))))
+  (specialize-test (odbc-unit dsn flags `(#:dsn ,dsn))))
 
 (define generic-tests
   (make-test-suite "Generic tests (no db)"

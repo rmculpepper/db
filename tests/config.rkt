@@ -30,6 +30,7 @@
    test-data
    set-equal?
    sql
+   select-val
    NOISY?
    TESTFLAGS
    ANYFLAGS))
@@ -53,13 +54,16 @@
 
   (define (connect-and-setup)
     (let [(cx (connect-for-test))]
-      (query-exec cx
-         "create temporary table the_numbers (N integer primary key, descr varchar(80))")
-      (for-each (lambda (p)
-                  (query-exec cx
-                              (format "insert into the_numbers values (~a, '~a')"
-                                      (car p) (cadr p))))
-                test-data)
+
+      ;; For now, we just assume Oracle, DB2 dbs are already set up.
+      (unless (ANYFLAGS 'isora 'isdb2)
+        (query-exec cx
+          "create temporary table the_numbers (N integer primary key, descr varchar(80))")
+        (for-each (lambda (p)
+                    (query-exec cx
+                                (format "insert into the_numbers values (~a, '~a')"
+                                        (car p) (cadr p))))
+                  test-data))
       cx))
 
   ;; set-equal? : ('a list) ('a list) -> boolean
@@ -79,6 +83,13 @@
       ((postgresql) str)
       ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
       (else (error 'sql "unsupported dbsystem: ~e" dbsys))))
+
+  (define (select-val str)
+    (cond [(TESTFLAGS 'isora)
+           (sql (string-append "select " str " from DUAL"))]
+          [(TESTFLAGS 'isdb2)
+           (sql (string-append "values (" str ")"))]
+          [else (sql (string-append "select " str))]))
 
   ;; Flags = dbflags U dbsys
 

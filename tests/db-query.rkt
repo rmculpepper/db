@@ -42,16 +42,17 @@
   (test-suite (format "simple (~a)" prep-mode)
 
     (test-case "query-exec"
-      (with-connection c
-        (check-pred void? (Q c query-exec "insert into the_numbers values(-1, 'mysterious')"))
-        (check-equal? (Q c query-value "select descr from the_numbers where N = -1")
-                      "mysterious"))
-      (with-connection c
-        (check-pred void? (Q c query-exec "delete from the_numbers where N <> $1" 0))
-        (check-equal? (Q c query-value "select count(*) from the_numbers")
-                      (if (TESTFLAGS 'odbc 'issl) "1" 1))
-        (check-equal? (Q c query-list "select N from the_numbers")
-                      (list 0))))
+      (unless (ANYFLAGS 'isora 'isdb2) ;; table isn't temp, so don't tamper with it
+        (with-connection c
+          (check-pred void? (Q c query-exec "insert into the_numbers values(-1, 'mysterious')"))
+          (check-equal? (Q c query-value "select descr from the_numbers where N = -1")
+                        "mysterious"))
+        (with-connection c
+          (check-pred void? (Q c query-exec "delete from the_numbers where N <> $1" 0))
+          (check-equal? (Q c query-value "select count(*) from the_numbers")
+                        (if (TESTFLAGS 'odbc 'issl) "1" 1))
+          (check-equal? (Q c query-list "select N from the_numbers")
+                        (list 0)))))
 
     (test-case "query-rows"
       (with-connection c
@@ -61,8 +62,9 @@
         (check set-equal?
                (Q c query-rows "select N, descr from the_numbers where N < $1" 2)
                '(#(0 "nothing") #(1 "unity")))
-        (check-exn-fail
-         (Q c query-rows "insert into the_numbers values (13, 'baker')"))))
+        (unless (ANYFLAGS 'isora 'isdb2)
+          (check-exn-fail
+           (Q c query-rows "insert into the_numbers values (13, 'baker')")))))
 
     (test-case "query-list"
       (with-connection c
@@ -125,9 +127,10 @@
                            (Q c in-query "select N, descr from the_numbers where N < $1" 2)])
                  (vector n d))
                '(#(0 "nothing") #(1 "unity")))
-        (check-exn-fail
-         (for ([x (Q c in-query "insert into the_numbers values ($1, 'baker')" 13)])
-           (void)))
+        (unless (ANYFLAGS 'isora 'isdb2)
+          (check-exn-fail
+           (for ([x (Q c in-query "insert into the_numbers values ($1, 'baker')" 13)])
+             (void))))
         (check-exn-fail
          (let ([stmt (sql "select N from the_numbers where N < $1")])
            (case prep-mode
@@ -162,12 +165,14 @@
       (with-connection c
         (let [(q (query c "select N from the_numbers"))]
           (check-pred recordset? q)
-          (check-true (set-equal? (map vector (map car test-data))
-                                  (recordset-rows q))))))
+          (check set-equal?
+                 (map vector (map car test-data))
+                 (recordset-rows q)))))
     (test-case "query - update"
-      (with-connection c
-        (let [(q (query c "update the_numbers set N = -1 where N = 1"))]
-          (check-pred simple-result? q))))
+      (unless (ANYFLAGS 'isora 'isdb2)
+        (with-connection c
+          (let [(q (query c "update the_numbers set N = -1 where N = 1"))]
+            (check-pred simple-result? q)))))
     (test-case "prepared-stmt inspection"
       (with-connection c
         (let ([pst (prepare c "select n, descr from the_numbers")])
@@ -251,18 +256,19 @@
         (with-connection c
           ;; raw NULL has PostgreSQL type "unknown", not allowed
           (define (clean . strs)
-            (regexp-replace* #rx"NULL" (apply string-append strs)
-                             (case dbsys
-                               ((postgresql) "cast(NULL as integer)")
-                               (else "NULL"))))
-          (check-equal? (query-row c (clean "select NULL, 1, NULL"))
+            (select-val
+             (regexp-replace* #rx"NULL" (apply string-append strs)
+                              (case dbsys
+                                ((postgresql) "cast(NULL as integer)")
+                                (else "NULL")))))
+          (check-equal? (query-row c (clean "NULL, 1, NULL"))
                         (vector sql-null 1 sql-null))
-          (check-equal? (query-row c (clean "select 1, NULL"))
+          (check-equal? (query-row c (clean "1, NULL"))
                         (vector 1 sql-null))
-          (check-equal? (query-row c (clean "select NULL, 1"))
+          (check-equal? (query-row c (clean "NULL, 1"))
                         (vector sql-null 1))
           (check-equal?
-           (query-row c (clean "select 1, 2, 3, 4, NULL, 6, NULL, "
+           (query-row c (clean "1, 2, 3, 4, NULL, 6, NULL, "
                                "8, 9, 10, 11, 12, NULL, 14, 15, NULL, "
                                "NULL, 18, 19, 20, NULL, "
                                "NULL, " "NULL, " "NULL, " "NULL, " "NULL, "
@@ -277,19 +283,22 @@
       (with-connection c
         (check-exn exn:fail? (lambda () (query c 5)))))
     (test-case "query - multiple statements in string"
-      (unless (TESTFLAGS 'odbc 'ispg)
+      (unless (or (TESTFLAGS 'odbc 'ispg) (ANYFLAGS 'isdb2))
         (with-connection c
-          (check-exn exn:fail? (lambda () (query c "select 3; select 4;"))))))
+          (check-exn exn:fail?
+                     (lambda ()
+                       (query c (string-append (select-val "3") ";"
+                                               (select-val "4") ";")))))))
     (test-case "query - unowned prepared stmt"
       (with-connection c1 
         (with-connection c
-          (let ([pst (prepare c1 "select 5")])
+          (let ([pst (prepare c1 (select-val "5"))])
             (let ([stmt (bind-prepared-statement pst null)])
               (check-exn exn:fail? (lambda () (query c stmt))))))))
     (test-case "query errors - nonfatal"
       (with-connection c
-        (check-exn exn:fail? (lambda () (query-value c "select nonsuch")))
-        (check-equal? (query-value c "select 17")
+        (check-exn exn:fail? (lambda () (query-value c "select nonsuch from notthere")))
+        (check-equal? (query-value c (select-val "17"))
                       (if (TESTFLAGS 'odbc 'issl) "17" 17))))))
 
 (define test

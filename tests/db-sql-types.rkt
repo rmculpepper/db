@@ -66,7 +66,38 @@
            (when stmt
              (check-equal? (query-value c stmt value) value)))]
         [(eq? dbsys 'sqlite3) ;; no ODBC-sqlite3, too painful
-         (check-equal? (query-value c "select ?" value) value)]))
+         (check-equal? (query-value c "select ?" value) value)]
+        [(ANYFLAGS 'isora 'isdb2)
+         (let ([stmt
+                (case (current-type)
+                  ((varchar)
+                   (cond [(ANYFLAGS 'isdb2)
+                          "cast(? as varchar(200) ccsid unicode)"]
+                         [(ANYFLAGS 'isora)
+                          "cast(? as varchar2(200))"]))
+                  ((blob) "cast(? as binary)") ;; ???
+                  ((integer) "cast(? as integer)")
+                  ((real) #f)
+                  ((numeric)
+                   (cond [(ANYFLAGS 'isdb2)
+                          "cast(? as decimal)"]
+                         [(ANYFLAGS 'isora)
+                          "cast(? as decimal(20,10))"]))
+                  ((date)
+                   (cond [(ANYFLAGS 'isdb2)
+                          "cast(? as date)"]
+                         [(ANYFLAGS 'isora)
+                          #f]))
+                  ((time)
+                   (cond [(ANYFLAGS 'isdb2)
+                          "cast(? as time)"]
+                         [(ANYFLAGS 'isora) ;; FIXME: bug?
+                          #f]))
+                  ((datetime) "cast(? as datetime)")
+                  ;; FIXME: more types
+                  (else #f))])
+           (when stmt
+             (check-equal? (query-value c (select-val stmt) value) value)))]))
 
 (define-check (check-roundtrip c value)
   (check-roundtrip* c value check-equal?))
@@ -179,24 +210,26 @@
            (check-roundtrip c +nan.0)))))
 
     (type-test-case '(numeric decimal)
-      (call-with-connection
-       (lambda (c)
-         (check-roundtrip c 0)
-         (check-roundtrip c 10)
-         (check-roundtrip c -5)
-         (check-roundtrip c 1/2)
-         (check-roundtrip c 1/40)
-         (check-roundtrip c #e1234567890.0987654321)
-         (check-roundtrip c 1/10)
-         (check-roundtrip c 1/400000)
-         (check-roundtrip c 12345678901234567890)
-         (when (supported? 'numeric-infinities)
-           (check-roundtrip c +nan.0)))))
+      (unless (ANYFLAGS 'isdb2) ;; "Driver not capable"
+        (call-with-connection
+         (lambda (c)
+           (check-roundtrip c 0)
+           (check-roundtrip c 10)
+           (check-roundtrip c -5)
+           (check-roundtrip c 1/2)
+           (check-roundtrip c 1/40)
+           (check-roundtrip c #e1234567890.0987654321)
+           (check-roundtrip c 1/10)
+           (check-roundtrip c 1/400000)
+           (check-roundtrip c 12345678901234567890)
+           (when (supported? 'numeric-infinities)
+             (check-roundtrip c +nan.0))))))
 
     (type-test-case '(varchar)
       (call-with-connection
        (lambda (c)
-         (check-varchar c "")
+         (unless (ANYFLAGS 'isora) ;; Oracle treats empty string as NULL (?!)
+           (check-varchar c ""))
          (check-varchar c "Az0")
          (check-varchar c (string #\\))
          (check-varchar c (string #\\ #\\))
@@ -207,7 +240,8 @@
          (check-varchar c (string #\'))
          (check-varchar c (string #\\ #\'))
          (check-varchar c "λ the ultimate")
-         (check-varchar c (make-string 800 #\a))
+         (unless (ANYFLAGS 'isora 'isdb2)
+           (check-varchar c (make-string 800 #\a)))
          (let ([strs '("αβψδεφγηιξκλμνοπρστθωςχυζ"
                        "अब्च्देघिज्क्ल्म्नोप्र्स्तुव्य्"
                        "شﻻؤيثبلاهتنمةىخحضقسفعرصءغئ"
@@ -217,13 +251,16 @@
              (check-varchar c s)
              ;; and do the extra one-char checks:
              (check-varchar c (string (string-ref s 0))))
-           (check-varchar c (apply string-append strs)))
+           (unless (ANYFLAGS 'isora 'isdb2) ;; too long
+             (check-varchar c (apply string-append strs))))
          ;; one-char checks
          (check-varchar c (string #\λ))
          (check-varchar c (make-string 1 #\u2200))
-         (check-varchar c (make-string 100 #\u2200))
+         (check-varchar c (make-string 20 #\u2200))
+         (unless (ANYFLAGS 'isora 'isdb2) ;; too long (???)
+           (check-varchar c (make-string 100 #\u2200)))
          ;; Following might not produce valid string (??)
-         (when #t
+         (unless (ANYFLAGS 'isora 'isdb2)
            (check-varchar c
                           (list->string
                            (build-list 800

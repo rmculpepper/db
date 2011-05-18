@@ -125,20 +125,16 @@ x86-64 processors unless otherwise specified.
   in query results with @tt{NULL}. All computed columns, even those
   with explicit @tt{CAST}s, seem to be returned as @tt{text}. Several
   tests fail because of this behavior.}
-]
-In addition, the following configurations have been tried but are not
-thoroughly tested:
-@itemlist[
 @item{@bold{DB2} (IBM DB2 Express-C v9.7) on @bold{linux} (32-bit only):
-  With @tt{Driver} set to @tt{/home/db2inst1/sqllib/lib32/libdb2.so}
-  basic interactions work fine, but the automated test suite cannot
-  be run because it uses an incompatible SQL dialect.}
+  With @tt{Driver} set to @tt{/home/db2inst1/sqllib/lib32/libdb2.so},
+  all tests pass.}
 @item{@bold{Oracle} (Oracle Database 10g Release 2, Express
   Edition) on @bold{linux} (32-bit version only): It seems the
   @tt{ORACLE_HOME} and @tt{LD_LIBRARY_PATH} environment variables must
   be set according to the @tt{oracle_env.{csh,sh}} script for the
-  driver to work. Basic interactions work fine, but the automated test
-  suite cannot be run because it uses an incompatible SQL dialect.}
+  driver to work. Most tests pass; a few fail because of differences
+  in Oracle's handling of types. The Driver seems to return corrupt
+  data for @tt{TIME} results.}
 ]
 Reports of success or failure on other platforms or with other drivers
 would be appreciated.

@@ -13,14 +13,15 @@
 
 (define (test-concurrency workers)
   (test-case (format "lots of threads (~s)" workers)
-    (call-with-connection
-     (lambda (c)
-       (query-exec c "create temporary table play_numbers (n integer)")
-       ;; transaction speeds up test by a factor of 6 on postgresql
-       (query-exec c "begin")
-       (for-each thread-wait
-                 (map thread
-                      (map (mk-worker c 100) (build-list workers add1))))))))
+    (unless (ANYFLAGS 'isora 'isdb2)
+      (call-with-connection
+       (lambda (c)
+         (query-exec c "create temporary table play_numbers (n integer)")
+         ;; transaction speeds up test by a factor of 6 on postgresql
+         (query-exec c "begin")
+         (for-each thread-wait
+                   (map thread
+                        (map (mk-worker c 100) (build-list workers add1)))))))))
 
 (define (((mk-worker c iterations) tid))
   (define insert-pst
@@ -39,17 +40,18 @@
 
 (define (kill-safe-test proxy?)
   (test-case (format "kill-safe test~a" (if proxy? " (proxy)" ""))
+    (unless (ANYFLAGS 'isora 'isdb2)
     (call-with-connection
      (lambda (c0)
        (let ([c (if proxy?
                     (kill-safe-connection c0)
                     c0)])
-         (query-exec c "delete from the_numbers")
+         (query-exec c "create temporary table ks_numbers (n integer))")
          (for ([i (in-range 1000)])
-           (query-exec c (sql "insert into the_numbers (n) values ($1)") i))
+           (query-exec c (sql "insert into ks_numbers (n) values ($1)") i))
          (define (do-interactions)
            (for ([i (in-range 10)])
-             (query-list c "select n from the_numbers")))
+             (query-list c "select n from ks_numbers")))
          (define threads (make-hasheq))
 
          (for ([i (in-range 20)])
@@ -57,7 +59,7 @@
              (hash-set! threads (thread do-interactions) #t)
              (kill-thread t)))
          (for ([t (in-hash-keys threads)])
-           (sync t)))))))
+           (sync t))))))))
 
 (define test
   (test-suite "Concurrency"

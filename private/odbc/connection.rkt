@@ -75,19 +75,24 @@
                (query1/p fsym pst params collector))]))
 
     (define/private (query1/p fsym pst params collector)
+      (let ([result-dvecs (send pst get-result-dvecs)])
+        (for ([dvec (in-list result-dvecs)])
+          (let ([typeid (field-dvec->typeid dvec)])
+            (unless (supported-typeid? typeid)
+              (unsupported-type fsym typeid)))))
       (define-values (dvecs rows)
         (with-lock
          (let* ([db (get-db fsym)]
-                [stmt (send pst get-handle)]
-                ;; FIXME: reset/clear first (?)
-                [param-bufs
-                 ;; Need to keep references to all bufs until after SQLExecute.
-                 (for/list ([i (in-naturals 1)]
-                            [param (in-list params)]
-                            [param-typeid (in-list (send pst get-param-typeids))])
-                   (load-param fsym db stmt i param param-typeid))])
-           (handle-status fsym (SQLExecute stmt) stmt)
-           (strong-void param-bufs)
+                [stmt (send pst get-handle)])
+           (let* (;; FIXME: reset/clear first (?)
+                  [param-bufs
+                   ;; Need to keep references to all bufs until after SQLExecute.
+                   (for/list ([i (in-naturals 1)]
+                              [param (in-list params)]
+                              [param-typeid (in-list (send pst get-param-typeids))])
+                     (load-param fsym db stmt i param param-typeid))])
+             (handle-status fsym (SQLExecute stmt) stmt)
+             (strong-void param-bufs))
            (let* ([result-dvecs (send pst get-result-dvecs)]
                   [rows
                    (and (pair? result-dvecs)

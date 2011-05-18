@@ -10,7 +10,9 @@
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
          "ffi.rkt")
-(provide dbsystem)
+(provide dbsystem
+         supported-typeid?
+         unsupported-type)
 
 (define odbc-dbsystem%
   (class* object% (dbsystem<%>)
@@ -43,7 +45,9 @@
         (case x
           ((typeid) name) ...
           ((*typeid) *name) ...
-          (else #f))))))
+          (else
+           (lambda (fsym index param)
+             (unsupported-type fsym x))))))))
 
 (define (mk-check typeid pred)
   (lambda (fsym index param)
@@ -137,3 +141,11 @@
   (111 interval-hour-minute   () #f)
   (112 interval-hour-second   () #f)
   (113 interval-minute-second () #f))
+
+(define (supported-typeid? x)
+  (case x
+    ((0 1 2 3 4 5 6 7 8 9 12 91 92 93 -1 -2 -3 -4 -5 -6 -7 -8 -9 -10) #t)
+    (else #f)))
+
+(define (unsupported-type fsym typeid)
+  (error fsym "unsupported type: (typeid ~s)" typeid))

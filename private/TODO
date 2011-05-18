@@ -1,8 +1,6 @@
 To do
 =====
 
-- change SQL to allow tests to run on DB2 over ODBC
-
 - after Racket 5.1.1 release:
   - set required-core-version to 5.1.1
   - drop private/generic/check-access.rkt

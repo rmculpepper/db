@@ -44,12 +44,12 @@
   (send dbsystem has-support? option))
 
 (define (check-roundtrip* c value check-equal?)
-  (cond [(or (eq? dbsys 'postgresql) (TESTFLAG 'odbc 'ispg))
+  (cond [(ANYFLAGS 'postgresql 'ispg)
          (let* ([tname (if (eq? (current-type) 'double) "float8" (current-type))]
                 [q (sql (format "select $1::~a" tname))])
            (check-equal? (query-value c q value)
                          value))]
-        [(or (eq? dbsys 'my) (TESTFLAG 'odbc 'ismy))
+        [(ANYFLAGS 'mysql 'ismy)
          ;; FIXME: can do better once prepare supports types
          (let ([stmt
                 (case (current-type)
@@ -79,8 +79,8 @@
   (let ([len-fun (case dbsys
                    ((postgresql sqlite3) "length")
                    ((mysql) "char_length")
-                   ((odbc) (cond [(TESTFLAG 'ispg) "length"]
-                                 [(TESTFLAG 'ismy) "char_length"])))])
+                   ((odbc) (cond [(TESTFLAGS 'ispg) "length"]
+                                 [(TESTFLAGS 'ismy) "char_length"])))])
     (when (string? len-fun)
       (check-equal? (query-value c (sql (format "select ~a($1)" len-fun)) str)
                     (string-length str)
@@ -90,7 +90,7 @@
     (let ([ci-fun (case dbsys
                     ((postgresql) "ascii") ;; yes, returns unicode code point too (if utf8)
                     ((mysql sqlite3) #f) ;; ???
-                    ((odbc) (cond [(TESTFLAG 'ispg) "ascii"])))])
+                    ((odbc) (cond [(TESTFLAGS 'ispg) "ascii"])))])
       (when (string? ci-fun)
         (check-equal? (query-value c (sql (format "select ~a($1)" ci-fun)) str)
                       (char->integer (string-ref str 0))
@@ -100,12 +100,12 @@
                     ((postgresql) "select chr(~a)")
                     ((mysql) "select char(~a using utf8)")
                     ((sqlite3) #f)
-                    ((odbc) (cond [(TESTFLAG 'ispg) "select chr(~a)"]
-                                  [(TESTFLAG 'ismy) "select char(~a using utf8)"])))])
+                    ((odbc) (cond [(TESTFLAGS 'ispg) "select chr(~a)"]
+                                  [(TESTFLAGS 'ismy) "select char(~a using utf8)"])))])
       (when (string? ic-fmt)
         (check-equal? (query-value c
                         (format ic-fmt
-                                (if (or (eq? dbsys 'mysql) (TESTFLAG 'ismy))
+                                (if (ANYFLAGS 'mysql 'ismy)
                                     (string-join
                                      (map number->string
                                           (bytes->list (string->bytes/utf-8 str)))

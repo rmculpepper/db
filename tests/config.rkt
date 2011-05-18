@@ -31,8 +31,8 @@
    set-equal?
    sql
    NOISY?
-   TESTCONF
-   TESTFLAG))
+   TESTFLAGS
+   ANYFLAGS))
 
 (define-unit config@
   (import database^)
@@ -80,13 +80,16 @@
       ((mysql sqlite3 odbc) (regexp-replace* #rx"\\$[0-9]" str "?"))
       (else (error 'sql "unsupported dbsystem: ~e" dbsys))))
 
-  ;; returns #t if current dbsys/db is config;
-  ;; use like (unless (XFAIL 'sqlite3) ...)
-  (define (TESTCONF config)
-    (or (equal? config dbtestname)
-        (equal? config dbsys)))
+  ;; Flags = dbflags U dbsys
 
-  (define (TESTFLAG . xs)
+  ;; Returns #t if all are set.
+  (define (TESTFLAGS . xs)
     (for/and ([x xs])
-      (or (equal? x dbsys)
+      (or (eq? x dbsys)
+          (and (member x dbflags) #t))))
+
+  ;; Returns #t if any are set.
+  (define (ANYFLAGS . xs)
+    (for/or ([x xs])
+      (or (eq? x dbsys)
           (and (member x dbflags) #t)))))

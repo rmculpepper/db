@@ -42,7 +42,7 @@ Profiles are flattened, not hierarchical.
 (define (get-dbconf name)
   (let ([conf (get-preference name (lambda () #f) 'timestamp (pref-file))])
     (if conf
-        (parse-dbconf)
+        (parse-dbconf conf)
         (let ([r (get-radsn name)])
           (if r
               (list (dbconf name r))

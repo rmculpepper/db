@@ -49,7 +49,7 @@
       (with-connection c
         (check-pred void? (Q c query-exec "delete from the_numbers where N <> $1" 0))
         (check-equal? (Q c query-value "select count(*) from the_numbers")
-                      (if (TESTFLAG 'odbc 'issl) "1" 1))
+                      (if (TESTFLAGS 'odbc 'issl) "1" 1))
         (check-equal? (Q c query-list "select N from the_numbers")
                       (list 0))))
 
@@ -247,7 +247,7 @@
     ;; Added 18 May 2003: Corrected a bug which incorrectly interleaved
     ;; nulls with returned fields.
     (test-case "nulls arrive in correct order"
-      (unless (TESTFLAG 'odbc 'issl)
+      (unless (TESTFLAGS 'odbc 'issl)
         (with-connection c
           ;; raw NULL has PostgreSQL type "unknown", not allowed
           (define (clean . strs)
@@ -277,7 +277,7 @@
       (with-connection c
         (check-exn exn:fail? (lambda () (query c 5)))))
     (test-case "query - multiple statements in string"
-      (unless (TESTFLAG 'odbc 'ispg)
+      (unless (TESTFLAGS 'odbc 'ispg)
         (with-connection c
           (check-exn exn:fail? (lambda () (query c "select 3; select 4;"))))))
     (test-case "query - unowned prepared stmt"
@@ -290,7 +290,7 @@
       (with-connection c
         (check-exn exn:fail? (lambda () (query-value c "select nonsuch")))
         (check-equal? (query-value c "select 17")
-                      (if (TESTFLAG 'odbc 'issl) "17" 17))))))
+                      (if (TESTFLAGS 'odbc 'issl) "17" 17))))))
 
 (define test
   (test-suite "query API"

@@ -131,15 +131,14 @@ thoroughly tested:
 @itemlist[
 @item{@bold{DB2} (IBM DB2 Express-C v9.7) on @bold{linux} (32-bit only):
   With @tt{Driver} set to @tt{/home/db2inst1/sqllib/lib32/libdb2.so}
-  this library seems to work fine, but the automated test suite cannot
+  basic interactions work fine, but the automated test suite cannot
   be run because it uses an incompatible SQL dialect.}
 @item{@bold{Oracle} (Oracle Database 10g Release 2, Express
   Edition) on @bold{linux} (32-bit version only): It seems the
   @tt{ORACLE_HOME} and @tt{LD_LIBRARY_PATH} environment variables must
   be set according to the @tt{oracle_env.{csh,sh}} script for the
-  driver to work. Parameterized queries don't seem to work. Beyond
-  that, the automated test suite cannot be run because it uses an
-  incompatible SQL dialect.}
+  driver to work. Basic interactions work fine, but the automated test
+  suite cannot be run because it uses an incompatible SQL dialect.}
 ]
 Reports of success or failure on other platforms or with other drivers
 would be appreciated.

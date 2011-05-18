@@ -62,11 +62,14 @@
                    (char-mode char-mode)))))))))
 
 (define (odbc-data-sources)
+  (define server-buf (make-bytes 1024))
+  (define descr-buf (make-bytes 1024))
   (call-with-env 'odbc-data-sources
     (lambda (env)
       (begin0
           (let loop ()
-            (let-values ([(status name description) (SQLDataSources env SQL_FETCH_NEXT)])
+            (let-values ([(status name description)
+                          (SQLDataSources env SQL_FETCH_NEXT server-buf descr-buf)])
               (cond [(or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
                      (cons (list name description) (loop))]
                     [else ;; SQL_NO_DATA
@@ -74,26 +77,25 @@
         (handle-status* 'odbc-data-sources (SQLFreeHandle SQL_HANDLE_ENV env))))))
 
 (define (odbc-drivers)
+  (define driver-buf (make-bytes 1024))
   (call-with-env 'odbc-drivers
    (lambda (env)
      (let* ([attrlens
              (let loop ()
                (let-values ([(status name attrlen)
-                             (SQLDrivers env SQL_FETCH_NEXT #f)])
+                             (SQLDrivers env SQL_FETCH_NEXT driver-buf #f)])
                  (cond [(or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
                         (cons attrlen (loop))]
-                       [else ;; SQL_NO_DATA
-                        null])))]
+                       [else null])))]  ;; SQL_NO_DATA
             [attr-buf (make-bytes (+ 1 (apply max 0 attrlens)))] ;; +1 for null terminator
             [result
              (let loop ()
                (let-values ([(status name attrlen) ;; & writes to attr-buf
-                             (SQLDrivers env SQL_FETCH_NEXT attr-buf)])
+                             (SQLDrivers env SQL_FETCH_NEXT driver-buf attr-buf)])
                  (cond [(or (= status SQL_SUCCESS) (= status SQL_SUCCESS_WITH_INFO))
                         (cons (list name (parse-driver-attrs attr-buf attrlen))
                               (loop))]
-                       [else ;; SQL_NO_DATA
-                        null])))])
+                       [else null])))])  ;; SQL_NO_DATA
        (handle-status* 'odbc-drivers (SQLFreeHandle SQL_HANDLE_ENV env))
        result))))
 

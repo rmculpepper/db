@@ -10,8 +10,6 @@
 (provide (all-from-out "ffi-constants.rkt"))
 (provide (all-defined-out))
 
-;; turn into unit, param'd by odbc lib
-
 (define-cpointer-type _sqlhandle)
 
 (define-cpointer-type _sqlhenv)
@@ -110,9 +108,6 @@
 (define (mkstr4 buf len fresh?)
   (scheme_make_sized_char_string buf (quotient len 4) (not fresh?)))
 
-
-
-
 ;; ========================================
 
 ;; Used in connection.rkt; silly hack to keep optimizer from eliminating ref to
@@ -136,13 +131,14 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (handle : (_ptr o _sqlhandle/null))
         -> (status : _sqlreturn)
         -> (values status
-                   (begin (when handle
-                            (cpointer-push-tag! handle
-                                                (cond [(= type SQL_HANDLE_ENV) sqlhenv-tag]
-                                                      [(= type SQL_HANDLE_DBC) sqlhdbc-tag]
-                                                      [(= type SQL_HANDLE_STMT) sqlhstmt-tag]
-                                                      [else sqlhandle-tag])))
-                          handle))))
+                   (cond [handle
+                          (cpointer-push-tag! handle
+                                              (cond [(= type SQL_HANDLE_ENV) sqlhenv-tag]
+                                                    [(= type SQL_HANDLE_DBC) sqlhdbc-tag]
+                                                    [(= type SQL_HANDLE_STMT) sqlhstmt-tag]
+                                                    [else sqlhandle-tag]))
+                          handle]
+                         [else handle]))))
 
 ;; SQLSetEnvAttr
 ;; must set odbc version env attr before making connection
@@ -199,13 +195,13 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
                         (bytes->string/utf-8 out-buf #f 0 out-len)))))
 
 (define-odbc SQLDataSources
-  (_fun (handle direction) ::
+  (_fun (handle direction server-buf descr-buf) ::
         (handle : _sqlhenv)
         (direction : _sqlusmallint)
-        (server-buf : _bytes = (make-bytes 1024)) ;; FIXME: get proper size
+        (server-buf : _bytes)
         ((bytes-length server-buf) : _sqlsmallint)
         (server-length : (_ptr o _sqlsmallint))
-        (descr-buf : _bytes = (make-bytes 1024)) ;; FIXME
+        (descr-buf : _bytes)
         ((bytes-length descr-buf) : _sqlsmallint)
         (descr-length : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)
@@ -216,10 +212,10 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
                         (bytes->string/utf-8 descr-buf #f 0 descr-length)))))
 
 (define-odbc SQLDrivers
-  (_fun (handle direction attrs-buf) ::
+  (_fun (handle direction driver-buf attrs-buf) ::
         (handle : _sqlhenv)
         (direction : _sqlusmallint)
-        (driver-buf : _bytes = (make-bytes 1024)) ;; FIXME?
+        (driver-buf : _bytes)
         ((bytes-length driver-buf) : _sqlsmallint)
         (driver-length : (_ptr o _sqlsmallint))
         (attrs-buf : _bytes)
@@ -280,10 +276,10 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         -> (values status count)))
 
 (define-odbc SQLDescribeCol
-  (_fun (handle column) ::
+  (_fun (handle column column-buf) ::
         (handle : _sqlhstmt)
         (column : _sqlusmallint)
-        (column-buf : _bytes = (make-bytes 1024)) ;; FIXME
+        (column-buf : _bytes)
         ((bytes-length column-buf) : _sqlsmallint)
         (column-len : (_ptr o _sqlsmallint))
         (data-type : (_ptr o _sqlsmallint))

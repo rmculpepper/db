@@ -46,7 +46,7 @@
        (let ([c (if proxy?
                     (kill-safe-connection c0)
                     c0)])
-         (query-exec c "create temporary table ks_numbers (n integer))")
+         (query-exec c "create temporary table ks_numbers (n integer)")
          (for ([i (in-range 1000)])
            (query-exec c (sql "insert into ks_numbers (n) values ($1)") i))
          (define (do-interactions)

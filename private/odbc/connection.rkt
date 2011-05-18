@@ -417,10 +417,11 @@
                  (for/list ([i (in-range 1 (add1 param-count))])
                    (describe-param fsym stmt i)))]
               [result-dvecs
-               (let-values ([(status result-count) (SQLNumResultCols stmt)])
+               (let-values ([(status result-count) (SQLNumResultCols stmt)]
+                            [(scratchbuf) (make-bytes 100)])
                  (handle-status fsym status stmt)
                  (for/list ([i (in-range 1 (add1 result-count))])
-                   (describe-result-column fsym stmt i)))])
+                   (describe-result-column fsym stmt i scratchbuf)))])
          (let ([pst (new prepared-statement%
                          (handle stmt)
                          (close-on-exec? close-on-exec?)
@@ -438,9 +439,9 @@
                type)]
             [else SQL_UNKNOWN_TYPE]))
 
-    (define/private (describe-result-column fsym stmt i)
+    (define/private (describe-result-column fsym stmt i scratchbuf)
       (let-values ([(status name type size digits nullable)
-                    (SQLDescribeCol stmt i)])
+                    (SQLDescribeCol stmt i scratchbuf)])
         (handle-status fsym status stmt)
         (vector name type size digits)))
 

@@ -46,6 +46,8 @@ Types
 
 - ODBC: reuse more buffers when possible
 
+- ODBC: add option to choose how character data send/received (?)
+
 - sqlite: allow configurable behavior on SQLITE_BUSY
   eg retry n times, retry forever, retry w/ timeout, fail
   (is db locked only for write or for whole transaction?)

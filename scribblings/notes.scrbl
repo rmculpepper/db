@@ -106,13 +106,14 @@ This library is tested with the following configurations, where
 @bold{linux} means Ubuntu 11.04 and unixODBC on both x86 (32-bit) and
 x86-64 processors unless otherwise specified.
 @itemlist[
-@item{@bold{PostgreSQL Unicode} on @bold{win32} and
+@item{@bold{PostgreSQL Unicode} (version 09.00.0300) on @bold{win32} and
   @bold{linux}: Set the following Data Source options to get specific
   parameter type information: @tt{Protocol = 7.4} and
   @tt{UserServerSidePrepare = 1}, and use the
   @racket[#:strict-parameter-types?] connection option. One test
   fails: no error is reported for multiple SQL statements in a
-  string.}
+  string. Older versions of the driver have a bug in @tt{WCHAR}
+  conversion; use @racket[#:character-mode 'utf-8] as a workaround.}
 @item{@bold{MySQL} on @bold{win32} and @bold{linux}: Avoid using the
   @racket[#:strict-parameter-types?] connection option, as the driver
   assigns all parameters the type @tt{varchar}. All tests pass.}

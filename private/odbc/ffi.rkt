@@ -47,6 +47,19 @@
         -> (begin (ptr-set! out _int32 clen 0)
                   (values out clen))))
 
+(define-mz scheme_ucs4_to_utf16
+  (_fun (src srcstart srcend) ::
+        (src : _string/ucs-4)
+        (srcstart : _intptr)
+        (srcend : _intptr)
+        (#f : _pointer)   ;; No buffer so it'll allocate for us.
+        (0 : _intptr)
+        (clen : (_ptr o _intptr))
+        (1 : _intptr)
+        -> (out : _gcpointer)
+        -> (begin (ptr-set! out _int16 clen 0)
+                  (values out clen))))
+
 (define-mz scheme_make_sized_char_string
   (_fun (chars clen copy?) ::
         (chars : _gcpointer)
@@ -54,9 +67,59 @@
         (copy? : _bool)
         -> _racket))
 
+(define scheme_make_sized_byte_string/string
+  (get-ffi-obj 'scheme_make_sized_byte_string #f
+               (_fun (buf len) ::
+                     (buf : _string/ucs-4)
+                     (len  : _intptr)
+                     (#t : _bool)
+                     -> _racket)))
+
+;; For dealing with param buffers, which must not be moved by GC
+
+(define (copy-buffer buffer)
+  (let* ([buffer (if (string? buffer) (string->bytes/utf-8 buffer) buffer)]
+         [n (bytes-length buffer)]
+         [rawcopy (malloc (add1 n) 'atomic-interior)]
+         [copy (make-sized-byte-string rawcopy n)])
+    (memcpy copy buffer n)
+    (ptr-set! rawcopy _byte n 0)
+    copy))
+
+(define (int->buffer n)
+  (let ([copy (make-sized-byte-string (malloc 4 'atomic-interior) 4)])
+    (integer->integer-bytes n 4 #t (system-big-endian?) copy 0)
+    copy))
+
+(define (cpstr2 str)
+  (let-values ([(shorts slen) (scheme_ucs4_to_utf16 str 0 (string-length str))])
+    (let* ([n (* slen 2)] ;; FIXME: assumes short is 2 bytes
+           [rawcopy (malloc (add1 n) 'atomic-interior)]
+           [copy (make-sized-byte-string rawcopy n)])
+      (memcpy copy shorts n)
+      (ptr-set! rawcopy _byte n 0)
+      copy)))
+
+(define (cpstr4 str)
+  (copy-buffer (scheme_make_sized_byte_string/string str (* (string-length str) 4))))
+
+(define (mkstr2 buf len fresh?)
+  (let-values ([(chars clen) (scheme_utf16_to_ucs4 buf 0 (quotient len 2))])
+    (scheme_make_sized_char_string chars clen #f)))
+
+(define (mkstr4 buf len fresh?)
+  (scheme_make_sized_char_string buf (quotient len 4) (not fresh?)))
+
+
+
+
+;; ========================================
+
 ;; Used in connection.rkt; silly hack to keep optimizer from eliminating ref to
 ;; things that shouldn't be GC'd. Depends on no cross-module inlining.
 (define (strong-void x) (void))
+
+;; ========================================
 
 #|
 Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx

@@ -6,6 +6,7 @@
 (require rackunit
          racket/class
          racket/math
+         racket/string
          (prefix-in srfi: srfi/19)
          "../private/generic/main.rkt"
          "../private/generic/sql-convert.rkt"
@@ -31,15 +32,6 @@
           (parameterize ((current-type type)) (proc)))
         (test-case (format "unsupported: ~s" types) (void)))))
 
-(define (check-string-length c value len)
-  (define psql
-    (case dbsys
-      ((postgresql) "select length($1)")
-      ((mysql)      "select char_length(?)")
-      ((sqlite3)    "select length(?)")))
-  (when (string? psql)
-    (check-equal? (query-value c psql value) (string-length value))))
-
 (define (check-timestamptz-equal? a b)
   (check srfi:time=?
          (srfi:date->time-utc (sql-datetime->srfi-date a))
@@ -51,62 +43,84 @@
 (define (supported? option)
   (send dbsystem has-support? option))
 
-(define-syntax check-roundtrip
-  (syntax-rules ()
-    [(check-roundtrip c expr)
-     (check-roundtrip c expr check-equal?)]
-    [(check-roundtrip c expr check)
-     (begin
-       (let ([value expr])
-         (case (send dbsystem get-short-name)
-           ((postgresql)
-            ;; only valid Postgreql syntax!
-            (check (let ([q (format "select $1::~a"
-                                    (let ([t (current-type)])
-                                      (case t
-                                        ((double) "float8")
-                                        (else t))))])
-                     (query-value c q value))
-                   value))
-           ((mysql)
-            ;; FIXME: can do better once prepare supports types
-            (let ([stmt
-                   (case (current-type)
-                     ((varchar) "select cast(? as char)")
-                     ;;((blob) "select cast(? as binary)")
-                     ((integer) "select cast(? as signed integer)")
-                     ((real) #f)
-                     ((numeric) "select cast(? as decimal)")
-                     ((date) "select cast(? as date)")
-                     ((time) "select cast(? as time)")
-                     ((datetime) "select cast(? as datetime)")
-                     (else #f))])
-              (when stmt
-                (check (query-value c stmt value)
-                       value)))))))]))
+(define (check-roundtrip* c value check-equal?)
+  (cond [(or (eq? dbsys 'postgresql) (TESTFLAG 'odbc 'ispg))
+         (let* ([tname (if (eq? (current-type) 'double) "float8" (current-type))]
+                [q (sql (format "select $1::~a" tname))])
+           (check-equal? (query-value c q value)
+                         value))]
+        [(or (eq? dbsys 'my) (TESTFLAG 'odbc 'ismy))
+         ;; FIXME: can do better once prepare supports types
+         (let ([stmt
+                (case (current-type)
+                  ((varchar) "select ?") ;;  "select cast(? as char)" gives ODBC problems
+                  ((blob) "select cast(? as binary)") ;; ???
+                  ((integer) "select cast(? as signed integer)")
+                  ((real) "select (? * 1.0)")
+                  ((numeric) "select cast(? as decimal)")
+                  ((date) "select cast(? as date)")
+                  ((time) "select cast(? as time)")
+                  ((datetime) "select cast(? as datetime)")
+                  ;; FIXME: more types
+                  (else #f))])
+           (when stmt
+             (check-equal? (query-value c stmt value) value)))]
+        [(eq? dbsys 'sqlite3) ;; no ODBC-sqlite3, too painful
+         (check-equal? (query-value c "select ?" value) value)]))
 
-(define string-tests
-  (test-suite "String escaping"
-    (test-case "tricky varchar"
-      (parameterize ((current-type 'varchar))
-        (call-with-connection
-         (lambda (c)
-           (check-roundtrip c (string #\\))
-           (check-roundtrip c (string #\\ #\\))
-           (check-roundtrip c (string #\\ #\'))))))
-    (test-case "tricky varchar by length"
-      (parameterize ((current-type 'varchar))
-        (call-with-connection
-         (lambda (c)
-           ;; backslash = 92
-           ;; apostrophe = 39
-           (check-string-length c (string #\\) 1)
-           (check-string-length c (string #\\ #\\) 2)
-           (check-string-length c (string #\') 1)
-           (check-string-length c (string #\λ) 1)))))))
+(define-check (check-roundtrip c value)
+  (check-roundtrip* c value check-equal?))
 
-(define roundtrip-tests
-  (test-suite "Roundtrip"
+(define-check (check-varchar c str)
+  ;; Check roundtrip (only checks same when arrives back at client)
+  (check-roundtrip c str)
+  ;; Also must check correct on server side, so...
+  ;;  - check the string has the right length
+  (let ([len-fun (case dbsys
+                   ((postgresql sqlite3) "length")
+                   ((mysql) "char_length")
+                   ((odbc) (cond [(TESTFLAG 'ispg) "length"]
+                                 [(TESTFLAG 'ismy) "char_length"])))])
+    (when (string? len-fun)
+      (check-equal? (query-value c (sql (format "select ~a($1)" len-fun)) str)
+                    (string-length str)
+                    "check server-side length")))
+  (when (= (string-length str) 1)
+    ;;  - if one char, check server-side char->int
+    (let ([ci-fun (case dbsys
+                    ((postgresql) "ascii") ;; yes, returns unicode code point too (if utf8)
+                    ((mysql sqlite3) #f) ;; ???
+                    ((odbc) (cond [(TESTFLAG 'ispg) "ascii"])))])
+      (when (string? ci-fun)
+        (check-equal? (query-value c (sql (format "select ~a($1)" ci-fun)) str)
+                      (char->integer (string-ref str 0))
+                      "check server-side char->int")))
+    ;;  - if one char, check server-side int->char
+    (let ([ic-fmt (case dbsys
+                    ((postgresql) "select chr(~a)")
+                    ((mysql) "select char(~a using utf8)")
+                    ((sqlite3) #f)
+                    ((odbc) (cond [(TESTFLAG 'ispg) "select chr(~a)"]
+                                  [(TESTFLAG 'ismy) "select char(~a using utf8)"])))])
+      (when (string? ic-fmt)
+        (check-equal? (query-value c
+                        (format ic-fmt
+                                (if (or (eq? dbsys 'mysql) (TESTFLAG 'ismy))
+                                    (string-join
+                                     (map number->string
+                                          (bytes->list (string->bytes/utf-8 str)))
+                                     ", ")
+                                    (char->integer (string-ref str 0)))))
+                      str
+                      "check server-side int->char")))))
+
+(define test
+  (test-suite "SQL types (roundtrip, etc)"
+    #:before (lambda ()
+               (call-with-connection
+                (lambda (c) (set! dbsystem (connection-dbsystem c)))))
+    #:after (lambda () (set! dbsystem #f))
+
     (type-test-case '(bool boolean)
       (call-with-connection
        (lambda (c)
@@ -167,36 +181,54 @@
     (type-test-case '(numeric decimal)
       (call-with-connection
        (lambda (c)
-         (check-roundtrip c 12345678901234567890)
+         (check-roundtrip c 0)
+         (check-roundtrip c 10)
+         (check-roundtrip c -5)
+         (check-roundtrip c 1/2)
+         (check-roundtrip c 1/40)
          (check-roundtrip c #e1234567890.0987654321)
          (check-roundtrip c 1/10)
          (check-roundtrip c 1/400000)
+         (check-roundtrip c 12345678901234567890)
          (when (supported? 'numeric-infinities)
            (check-roundtrip c +nan.0)))))
 
     (type-test-case '(varchar)
       (call-with-connection
        (lambda (c)
-         (check-roundtrip c "this is the time to remember")
-         (check-roundtrip c "that's the way it is")
-         (check-roundtrip c (string #\\))
-         (check-roundtrip c (string #\'))
-         (check-roundtrip c (string #\\ #\'))
-         (check-roundtrip c "λ the ultimate")
-         (check-roundtrip c (make-string 800 #\a))
-         (check-roundtrip c
-          (string-append "αβψδεφγηιξκλμνοπρστθωςχυζ"
-                         "अब्च्देघिज्क्ल्म्नोप्र्स्तुव्य्"
-                         "شﻻؤيثبلاهتنمةىخحضقسفعرصءغئ"
-                         "阿あでいおうわぁ"
-                         "абцдефгхиклмнопљрстувњџзѕЋч"))
+         (check-varchar c "")
+         (check-varchar c "Az0")
+         (check-varchar c (string #\\))
+         (check-varchar c (string #\\ #\\))
+         (check-varchar c (string #\'))
+         (check-varchar c "this is the time to remember")
+         (check-varchar c "it's like that (and that's the way it is)")
+         (check-varchar c (string #\\))
+         (check-varchar c (string #\'))
+         (check-varchar c (string #\\ #\'))
+         (check-varchar c "λ the ultimate")
+         (check-varchar c (make-string 800 #\a))
+         (let ([strs '("αβψδεφγηιξκλμνοπρστθωςχυζ"
+                       "अब्च्देघिज्क्ल्म्नोप्र्स्तुव्य्"
+                       "شﻻؤيثبلاهتنمةىخحضقسفعرصءغئ"
+                       "阿あでいおうわぁ"
+                       "абцдефгхиклмнопљрстувњџзѕЋч")])
+           (for ([s strs])
+             (check-varchar c s)
+             ;; and do the extra one-char checks:
+             (check-varchar c (string (string-ref s 0))))
+           (check-varchar c (apply string-append strs)))
+         ;; one-char checks
+         (check-varchar c (string #\λ))
+         (check-varchar c (make-string 1 #\u2200))
+         (check-varchar c (make-string 100 #\u2200))
          ;; Following might not produce valid string (??)
          (when #t
-           (check-roundtrip c
-                            (list->string
-                             (build-list 800
-                                         (lambda (n)
-                                           (integer->char (add1 n))))))))))
+           (check-varchar c
+                          (list->string
+                           (build-list 800
+                                       (lambda (n)
+                                         (integer->char (add1 n))))))))))
 
     (type-test-case '(date)
       (call-with-connection
@@ -206,9 +238,10 @@
       (call-with-connection
        (lambda (c)
          (check-roundtrip c (make-sql-time 12 34 56 0 #f))
-         (check-roundtrip c (make-sql-time 12 34 56 123456000 #f))
-         (check-roundtrip c (make-sql-time 12 34 56 100000000 #f))
-         (check-roundtrip c (make-sql-time 12 34 56 000001000 #f)))))
+         (unless (eq? dbsys 'odbc) ;; ODBC time has no fractional part
+           (check-roundtrip c (make-sql-time 12 34 56 123456000 #f))
+           (check-roundtrip c (make-sql-time 12 34 56 100000000 #f))
+           (check-roundtrip c (make-sql-time 12 34 56 000001000 #f))))))
     (type-test-case '(timetz)
       (call-with-connection
        (lambda (c)
@@ -228,14 +261,14 @@
     (type-test-case '(timestamptz)
       (call-with-connection
        (lambda (c)
-         (check-roundtrip c (make-sql-timestamp 1980 08 17 12 34 56 0 3600)
-                          check-timestamptz-equal?)
-         (check-roundtrip c (make-sql-timestamp 1980 08 17 12 34 56 123456000 3600)
-                          check-timestamptz-equal?)
-         (check-roundtrip c (make-sql-timestamp 1980 08 17 12 34 56 100000000 3600)
-                          check-timestamptz-equal?)
-         (check-roundtrip c (make-sql-timestamp 1980 08 17 12 34 56 000001000 3600)
-                          check-timestamptz-equal?))))
+         (check-roundtrip* c (make-sql-timestamp 1980 08 17 12 34 56 0 3600)
+                           check-timestamptz-equal?)
+         (check-roundtrip* c (make-sql-timestamp 1980 08 17 12 34 56 123456000 3600)
+                           check-timestamptz-equal?)
+         (check-roundtrip* c (make-sql-timestamp 1980 08 17 12 34 56 100000000 3600)
+                           check-timestamptz-equal?)
+         (check-roundtrip* c (make-sql-timestamp 1980 08 17 12 34 56 000001000 3600)
+                           check-timestamptz-equal?))))
 
     (type-test-case '(interval)
       (call-with-connection
@@ -248,9 +281,9 @@
     (type-test-case '(varbit bit)
       (call-with-connection
        (lambda (c)
-         (check-roundtrip c (string->sql-bits "1011") check-bits-equal?)
-         (check-roundtrip c (string->sql-bits "000000") check-bits-equal?)
-         (check-roundtrip c (string->sql-bits (make-string 30 #\1)) check-bits-equal?))))
+         (check-roundtrip* c (string->sql-bits "1011") check-bits-equal?)
+         (check-roundtrip* c (string->sql-bits "000000") check-bits-equal?)
+         (check-roundtrip* c (string->sql-bits (make-string 30 #\1)) check-bits-equal?))))
 
     (type-test-case '(point geometry)
       (call-with-connection
@@ -296,10 +329,3 @@
       (call-with-connection
        (lambda (c)
          (check-roundtrip c (pg-circle (point 1 2) 45)))))))
-
-(define test
-  (test-suite "SQL types"
-    (call-with-connection (lambda (c) (set! dbsystem (connection-dbsystem c))))
-    string-tests
-    roundtrip-tests
-    (set! dbsystem #f)))

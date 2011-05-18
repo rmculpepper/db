@@ -26,7 +26,8 @@
   (class* object% (connection<%>)
     (init-private db
                   env
-                  notice-handler)
+                  notice-handler
+                  char-mode)
     (init strict-parameter-types?)
 
     (define statement-table (make-weak-hasheq))
@@ -106,20 +107,7 @@
 
     (define/private (load-param fsym db stmt i param typeid)
       ;; NOTE: param buffers must not move between bind and execute
-      ;; FIXME: for now we assume typeid is SQL_UNKNOWN_TYPE, but should
-      ;; have paraminfos around in case (also need size, digits, etc?)
-      (define (copy-buffer buffer)
-        (let* ([buffer (if (string? buffer) (string->bytes/utf-8 buffer) buffer)]
-               [n (bytes-length buffer)]
-               ;; +1 for null-terminator (?)
-               [copy (make-sized-byte-string (malloc (add1 n) 'atomic-interior) (add1 n))])
-          (memcpy copy buffer n)
-          (bytes-set! copy n 0) ;; null-terminator
-          copy))
-      (define (int->buffer n)
-        (let ([copy (make-sized-byte-string (malloc 4 'atomic-interior) 4)])
-          (integer->integer-bytes n 4 #t (system-big-endian?) copy 0)
-          copy))
+      ;; So use buffer utils from ffi.rkt (copy-buffer, etc)
       (define (bind ctype sqltype buf)
         (let* ([lenbuf
                 (int->buffer (if buf (bytes-length buf) SQL_NULL_DATA))]
@@ -131,8 +119,18 @@
       ;; but respect typeid if known.
       (define unknown-type? (= typeid SQL_UNKNOWN_TYPE))
       (cond [(string? param)
-             (bind SQL_C_CHAR (if unknown-type? SQL_VARCHAR typeid)
-                   (copy-buffer param))]
+             (case char-mode
+               ((wchar)
+                (bind SQL_C_WCHAR (if unknown-type? SQL_WVARCHAR typeid)
+                      (case WCHAR-SIZE
+                        ((2) (cpstr2 param))
+                        ((4) (cpstr4 param)))))
+               ((utf-8)
+                (bind SQL_C_CHAR (if unknown-type? SQL_VARCHAR typeid)
+                      (copy-buffer (string->bytes/utf-8 param))))
+               ((latin-1)
+                (bind SQL_C_CHAR (if unknown-type? SQL_VARCHAR typeid)
+                      (copy-buffer (string->bytes/latin-1 param (char->integer #\?))))))]
             [(bytes? param)
              (bind SQL_C_BINARY (if unknown-type? SQL_BINARY typeid)
                    (copy-buffer param))]
@@ -143,7 +141,7 @@
                           [ex (cdr param)])
                       (apply bytes-append
                              ;; ODBC docs claim max precision is 15 ...
-                             (bytes (+ 1 (order-of-magnitude (abs ma)))
+                             (bytes (if (zero? ma) 1 (+ 1 (order-of-magnitude (abs ma))))
                                     ex
                                     (if (negative? ma) 0 1))
                              ;; 16 bytes of unsigned little-endian data (4 chunks of 4 bytes)
@@ -157,7 +155,7 @@
              (cond [(or (= typeid SQL_NUMERIC) (= typeid SQL_DECIMAL))
                     (bind SQL_C_CHAR typeid
                           (copy-buffer (marshal-decimal fsym i param)))]
-                   [(or (and unknown-type? (int64? param))
+                   [(or (and unknown-type? (int32? param))
                         (= typeid SQL_INTEGER)
                         (= typeid SQL_SMALLINT)
                         (= typeid SQL_BIGINT)
@@ -165,11 +163,11 @@
                     ;; Oracle errors without diagnostic record (!!) on BIGINT param
                     ;; -> http://stackoverflow.com/questions/338609
                     ;; FIXME: find a better solution, eg check driver for BIGINT support (?)
-                    (if (int32? param)
+                    (if (= typeid SQL_BIGINT)
+                        (bind SQL_C_SBIGINT SQL_BIGINT
+                              (copy-buffer (integer->integer-bytes param 8 #t)))
                         (bind SQL_C_LONG (if unknown-type? SQL_INTEGER typeid)
-                              (copy-buffer (integer->integer-bytes param 4 #t)))
-                        (bind SQL_C_SBIGINT (if unknown-type? SQL_BIGINT typeid)
-                              (copy-buffer (integer->integer-bytes param 8 #t))))]
+                              (copy-buffer (integer->integer-bytes param 4 #t))))]
                    [else
                     (bind SQL_C_DOUBLE (if unknown-type? SQL_DOUBLE typeid)
                           (copy-buffer
@@ -320,15 +318,18 @@
         (get-varbuf SQL_C_CHAR 1
                     (lambda (buf len _fresh?)
                       (bytes->string/latin-1 buf #f 0 len))))
-
+      (define (get-string/utf-8)
+        (get-varbuf SQL_C_CHAR 1
+                    (lambda (buf len _fresh?)
+                      (bytes->string/utf-8 buf #f 0 len))))
       (define (get-string)
-        (define (mkstr2 buf len fresh?)
-          (let-values ([(chars clen) (scheme_utf16_to_ucs4 buf 0 (quotient len 2))])
-            (scheme_make_sized_char_string chars clen #f)))
-        (define (mkstr4 buf len fresh?)
-          (scheme_make_sized_char_string buf (quotient len 4) (not fresh?)))
-        (get-varbuf SQL_C_WCHAR WCHAR-SIZE (case WCHAR-SIZE ((2) mkstr2) ((4) mkstr4))))
-
+        (case char-mode
+          ((wchar)
+           (get-varbuf SQL_C_WCHAR WCHAR-SIZE (case WCHAR-SIZE ((2) mkstr2) ((4) mkstr4))))
+          ((utf-8)
+           (get-string/utf-8))
+          ((latin-1)
+           (get-string/latin-1))))
       (define (get-bytes)
         (get-varbuf SQL_C_BINARY 0
                     (lambda (buf len fresh?)
@@ -336,6 +337,7 @@
                       (if (and fresh? (= len (bytes-length buf)))
                           buf
                           (subbytes buf 0 len)))))
+
       (cond [(or (= typeid SQL_CHAR)
                  (= typeid SQL_VARCHAR)
                  (= typeid SQL_LONGVARCHAR)

@@ -16,12 +16,14 @@
         #:user (or/c string? #f)
         #:password (or/c string? #f)
         #:notice-handler (or/c 'output 'error output-port? procedure?)
-        #:strict-parameter-types? boolean?)
+        #:strict-parameter-types? boolean?
+        #:character-mode (or/c 'wchar 'utf-8 'latin-1))
        connection?)]
  [odbc-driver-connect
   (->* (string?)
        (#:notice-handler (or/c 'output 'error output-port? procedure?)
-        #:strict-parameter-types? boolean?)
+        #:strict-parameter-types? boolean?
+        #:character-mode (or/c 'wchar 'utf-8 'latin-1))
        connection?)]
  [odbc-data-sources
   (-> (listof (list/c string? string?)))]

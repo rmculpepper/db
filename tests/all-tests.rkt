@@ -163,11 +163,10 @@ Flags are useful for, eg, indicating SQL dialect.
 
 ;; ----
 
-(define (make-all-tests dbconfs generic?)
-  (make-test-suite "All tests"
-    (append (if generic? (list generic-tests) null)
-            (for/list ([dbconf (in-list dbconfs)])
-              (specialize-test (dbconf->unit dbconf))))))
+(define (make-all-tests label dbconfs)
+  (make-test-suite (format "All ~s tests" label)
+    (for/list ([dbconf (in-list dbconfs)])
+      (specialize-test (dbconf->unit dbconf)))))
 
 ;; ----
 
@@ -178,13 +177,33 @@ Flags are useful for, eg, indicating SQL dialect.
 
 ;; ----------------------------------------
 
-(define include-generic? #t)
+(define gui? #f)
+(define include-generic? #f)
+
+(require racket/gui)
 
 (command-line
  #:once-each
- [("--no-generic") "Disable generic tests" (set! include-generic? #f)]
+ [("--gui") "Run tests in RackUnit GUI" (set! gui? #t)]
+ [("-g" "--generic") "Run generic tests" (set! include-generic? #t)]
  [("-f" "--config-file") file  "Use configuration file" (pref-file file)]
  #:args labels
- (run-tests
-  (make-all-tests (apply append (map get-dbconf (map string->symbol labels)))
-                  include-generic?)))
+ (cond [gui?
+        (let* ([dbtests (for/list ([label labels])
+                          (make-all-tests label (get-dbconf (string->symbol label))))]
+               [tests (if include-generic? (cons generic-tests dbtests) dbtests)]
+               [test/gui (dynamic-require 'rackunit/gui 'test/gui)])
+          (apply test/gui tests)
+          (eprintf "Press Cntl-C to end.\n") ;; HACK!
+          (with-handlers ([exn:break? (lambda _ (newline) (exit))])
+            (sync never-evt)))]
+       [else
+        (when include-generic?
+          (printf "Running generic tests\n")
+          (run-tests generic-tests)
+          (newline))
+        (for ([label labels])
+          (printf "Running ~s tests\n" label)
+          (run-tests
+           (make-all-tests label (get-dbconf (string->symbol label))))
+          (newline))]))

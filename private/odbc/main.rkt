@@ -22,7 +22,8 @@
                       #:user [user #f]
                       #:password [auth #f]
                       #:notice-handler [notice-handler void]
-                      #:strict-parameter-types? [strict-parameter-types? #f])
+                      #:strict-parameter-types? [strict-parameter-types? #f]
+                      #:character-mode [char-mode 'wchar])
   (when (and dsn database)
     (error 'odbc-connect "cannot give both #:dsn and #:database arguments"))
   (unless (or dsn database)
@@ -39,11 +40,13 @@
                    (env env)
                    (db db)
                    (notice-handler notice-handler)
-                   (strict-parameter-types? strict-parameter-types?)))))))))
+                   (strict-parameter-types? strict-parameter-types?)
+                   (char-mode char-mode)))))))))
 
 (define (odbc-driver-connect connection-string
                              #:notice-handler [notice-handler void]
-                             #:strict-parameter-types? [strict-parameter-types? #f])
+                             #:strict-parameter-types? [strict-parameter-types? #f]
+                             #:character-mode [char-mode 'wchar])
   (let ([notice-handler (make-handler notice-handler "notice")])
     (call-with-env 'odbc-driver-connect
       (lambda (env)
@@ -55,7 +58,8 @@
                    (env env)
                    (db db)
                    (notice-handler notice-handler)
-                   (strict-parameter-types? strict-parameter-types?)))))))))
+                   (strict-parameter-types? strict-parameter-types?)
+                   (char-mode char-mode)))))))))
 
 (define (odbc-data-sources)
   (call-with-env 'odbc-data-sources

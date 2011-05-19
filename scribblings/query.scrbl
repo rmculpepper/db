@@ -447,7 +447,22 @@ closed.
 
 @section{Transactions}
 
-@;{FIXME: explain differences between these functions and various SQL stmts}
+The following functions provide a consistent interface to
+transactions.
+
+ODBC connections should use the following functions exclusively
+instead of transaction-changing SQL statements such as @tt{START
+TRANSACTION} and @tt{COMMIT}. Using transaction-changing SQL may cause
+these functions to behave incorrectly and may cause additional
+problems in the ODBC driver.
+
+Other types of connections are discouraged from using
+transaction-changing SQL statements, but the consequences are less
+dire. The functions below will behave correctly, but the syntax and
+behavior of the SQL statements is idiosyncratic. For example, in MySQL
+@tt{START TRANSACTION} commits the current transaction, if one is
+active; in PostgreSQL @tt{COMMIT} silently rolls back the current
+transaction if an error occurred in a previous statement.
 
 @defproc[(start-transaction [c connection?])
          void?]{
@@ -464,8 +479,7 @@ closed.
   If no transaction is active, has no effect.
 }
 
-@defproc[(rollback-transaction [c connection?])
-         'rollack]{
+@defproc[(rollback-transaction [c connection?]) void?]{
 
   Rolls back the current transaction, if one is active.
 

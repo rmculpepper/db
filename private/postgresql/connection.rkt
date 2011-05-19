@@ -30,7 +30,7 @@
     (define inport #f)
     (define outport #f)
     (define process-id #f)
-    (define secret-key #f)
+    (define in-transaction? #f)
 
     (super-new)
 
@@ -111,7 +111,11 @@
     ;; check-ready-for-query : symbol -> void
     (define/private (check-ready-for-query fsym or-eof?)
       (let ([r (recv-message fsym)])
-        (cond [(ReadyForQuery? r) (void)]
+        (cond [(ReadyForQuery? r)
+               ;; Update transaction status
+               (case (ReadyForQuery-transaction-status r)
+                 ((idle) (set! in-transaction? #f))
+                 ((transaction failed) (set! in-transaction? #t)))]
               [(and or-eof? (eof-object? r)) (void)]
               [else
                (error fsym "internal error: backend sent unexpected message")])))
@@ -245,7 +249,6 @@
            (void)]
           [(struct BackendKeyData (pid secret))
            (set! process-id pid)
-           (set! secret-key secret)
            (connect:expect-ready-for-query)]
           [_
            (error 'postgresql-connect
@@ -436,7 +439,49 @@
                 (cond [(CloseComplete? r) (void)]
                       [else (error 'free-statement "internal error: unexpected message")])
                 (check-ready-for-query 'free-statement #t)))))))
-    ))
+
+    ;; == Transactions
+
+    (define/public (transaction-status fsym)
+      ;; FIXME: is lock necessary?
+      (call-with-lock fsym
+        (lambda () in-transaction?)))
+
+    (define/public (start-transaction fsym flags)
+      (call-with-lock fsym
+        (lambda ()
+          (when in-transaction?
+            (error fsym "already in transaction"))
+          (let* ([isolation-level
+                  (cond [(memq 'serializable flags) "SERIALIZABLE"]
+                        [(memq 'repeatable-read flags) "REPEATABLE READ"]
+                        [(memq 'read-committed flags) "READ COMMITTED"]
+                        [(memq 'read-uncommitted flags) "READ UNCOMMITTED"]
+                        [else #f])]
+                 [rw-mode
+                  (cond [(memq 'read-only flags) " READ ONLY"]
+                        [(memq 'read-write flags) " READ WRITE"]
+                        [else ""])]
+                 [stmt
+                  (format "BEGIN WORK~a~a~a"
+                          (if isolation-level " ISOLATION LEVEL " "")
+                          (or isolation-level "")
+                          rw-mode)])
+            (query fsym stmt 'unused/start-transaction)
+            (void)))))
+
+    (define/public (end-transaction fsym mode)
+      (case mode
+        ((commit)
+         ;; Note: COMMIT can cause rollback if an error has occurred
+         (let* ([r (query fsym "COMMIT WORK" 'unused/commit-transaction)]
+                [command (cdr (assq 'command (simple-result-info r)))]) ;; string
+           (if (regexp-match #rx"^COMMIT" command)
+               'commit
+               'rollback)))
+        ((rollback)
+         (query fsym "ROLLBACK WORK" 'unused/rollback-transaction)
+         'rollback)))))
 
 
 ;; ========================================

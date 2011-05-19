@@ -41,46 +41,47 @@
     (define/public (connected?) (and -db #t))
 
     (define/public (query fsym stmt collector)
-      (query1 fsym stmt collector))
-
-    (define/private (query1 fsym stmt collector)
-      (cond [(string? stmt)
-             (let* ([pst (prepare1 fsym stmt #t)]
-                    [sb (send pst bind fsym null)])
-               (query1 fsym sb collector))]
-            [(statement-binding? stmt)
-             (let ([pst (statement-binding-pst stmt)]
-                   [params (statement-binding-params stmt)])
-               (send pst check-owner fsym this stmt)
-               (query1/p fsym pst params collector))]))
-
-    (define/private (query1/p fsym pst params collector)
-      (define-values (info0 rows)
-        (with-lock
-         (let ([db (get-db fsym)]
-               [stmt (send pst get-handle)])
-           (handle-status fsym (sqlite3_reset stmt) db)
-           (handle-status fsym (sqlite3_clear_bindings stmt) db)
-           (for ([i (in-naturals 1)]
-                 [param (in-list params)])
-             (load-param fsym db stmt i param))
-           (let* ([info
-                   (for/list ([i (in-range (sqlite3_column_count stmt))])
-                     `((name ,(sqlite3_column_name stmt i))
-                       (decltype ,(sqlite3_column_decltype stmt i))))]
-                  [rows (step* fsym db stmt)])
-             (handle-status fsym (sqlite3_reset stmt) db)
-             (handle-status fsym (sqlite3_clear_bindings stmt) db)
-             (values info rows)))))
-      (send pst after-exec)
-      (let-values ([(init combine finalize headers?)
-                    (collector (length info0) #t)])
+      (let* ([result
+              (with-lock
+               (let ([db (get-db fsym)])
+                 (query1 fsym stmt)))]
+             [stmt (car result)]
+             [info0 (cadr result)]
+             [rows (cddr result)])
+        (statement:after-exec stmt)
         (cond [(pair? info0)
-               (recordset (and headers? info0)
-                          (finalize
-                           (for/fold ([accum init]) ([row (in-list rows)])
-                             (combine accum row))))]
+               (let-values ([(init combine finalize headers?)
+                             (collector (length info0) #t)])
+                 (recordset (and headers? info0)
+                            (finalize
+                             (for/fold ([accum init]) ([row (in-list rows)])
+                               (combine accum row)))))]
               [else (simple-result '())])))
+
+    (define/private (query1 fsym stmt)
+      (let* ([stmt (cond [(string? stmt)
+                          (let* ([pst (prepare1 fsym stmt #t)])
+                            (send pst bind fsym null))]
+                         [(statement-binding? stmt)
+                          stmt])]
+             [pst (statement-binding-pst stmt)]
+             [params (statement-binding-params stmt)])
+        (send pst check-owner fsym this stmt)
+        (let ([db (get-db fsym)]
+              [stmt (send pst get-handle)])
+          (handle-status fsym (sqlite3_reset stmt) db)
+          (handle-status fsym (sqlite3_clear_bindings stmt) db)
+          (for ([i (in-naturals 1)]
+                [param (in-list params)])
+            (load-param fsym db stmt i param))
+          (let* ([info
+                  (for/list ([i (in-range (sqlite3_column_count stmt))])
+                    `((name ,(sqlite3_column_name stmt i))
+                      (decltype ,(sqlite3_column_decltype stmt i))))]
+                 [rows (step* fsym db stmt)])
+            (handle-status fsym (sqlite3_reset stmt) db)
+            (handle-status fsym (sqlite3_clear_bindings stmt) db)
+            (cons stmt (cons info rows))))))
 
     (define/private (load-param fsym db stmt i param)
       (handle-status
@@ -130,36 +131,35 @@
               [else (handle-status fsym s db)])))
 
     (define/public (prepare fsym stmt close-on-exec?)
-      (prepare1 fsym stmt close-on-exec?))
+      (with-lock (prepare1 fsym stmt close-on-exec?)))
 
     (define/private (prepare1 fsym sql close-on-exec?)
-      (with-lock
-       ;; no time between sqlite3_prepare and table entry
-       (let-values ([(db) (get-db fsym)]
-                    [(stmt prep-status tail)
-                     (sqlite3_prepare_v2 (get-db fsym) sql)])
-         (define (free!) (when stmt (sqlite3_finalize stmt)))
-         (when (string=? sql tail)
-           (free!) (error fsym "SQL syntax error in ~e" tail))
-         (when (not (zero? (string-length tail)))
-           (free!) (error fsym "multiple SQL statements given: ~e" tail))
-         (handle-status fsym prep-status db)
-         (or stmt
-             (begin (free!) (error fsym "internal error in prepare")))
-         (let* ([param-typeids
-                 (for/list ([i (in-range (sqlite3_bind_parameter_count stmt))])
-                   'any)]
-                [result-dvecs
-                 (for/list ([i (in-range (sqlite3_column_count stmt))])
-                   '#(any))]
-                [pst (new prepared-statement%
-                          (handle stmt)
-                          (close-on-exec? close-on-exec?)
-                          (param-typeids param-typeids)
-                          (result-dvecs result-dvecs)
-                          (owner this))])
-           (hash-set! statement-table pst #t)
-           pst))))
+      ;; no time between sqlite3_prepare and table entry
+      (let-values ([(db) (get-db fsym)]
+                   [(stmt prep-status tail)
+                    (sqlite3_prepare_v2 (get-db fsym) sql)])
+        (define (free!) (when stmt (sqlite3_finalize stmt)))
+        (when (string=? sql tail)
+          (free!) (error fsym "SQL syntax error in ~e" tail))
+        (when (not (zero? (string-length tail)))
+          (free!) (error fsym "multiple SQL statements given: ~e" tail))
+        (handle-status fsym prep-status db)
+        (or stmt
+            (begin (free!) (error fsym "internal error in prepare")))
+        (let* ([param-typeids
+                (for/list ([i (in-range (sqlite3_bind_parameter_count stmt))])
+                  'any)]
+               [result-dvecs
+                (for/list ([i (in-range (sqlite3_column_count stmt))])
+                  '#(any))]
+               [pst (new prepared-statement%
+                         (handle stmt)
+                         (close-on-exec? close-on-exec?)
+                         (param-typeids param-typeids)
+                         (result-dvecs result-dvecs)
+                         (owner this))])
+          (hash-set! statement-table pst #t)
+          pst)))
 
     (define/public (disconnect)
       (with-lock
@@ -183,6 +183,38 @@
            (send pst set-handle #f)
            (handle-status 'free-statement (sqlite3_finalize stmt))
            (void)))))
+
+
+    ;; == Transactions
+
+    (define/public (transaction-status fsym)
+      (with-lock
+       (let ([db (get-db fsym)])
+         (not (sqlite3_get_autocommit db)))))
+
+    (define/public (start-transaction fsym flags)
+      ;; FIXME: modes are DEFERRED | IMMEDIATE | EXCLUSIVE
+      (with-lock
+       (let ([db (get-db fsym)])
+         (when (not (sqlite3_get_autocommit db))
+           (error fsym "already in transaction"))
+         (let ([r (query1 fsym "BEGIN TRANSACTION")])
+           (statement:after-exec (car r)))
+         (void))))
+
+    (define/public (end-transaction fsym mode)
+      (with-lock
+       (let ([db (get-db fsym)])
+         (when (not (sqlite3_get_autocommit db))
+           (let ([r (case mode
+                      ((commit)
+                       (query1 fsym "COMMIT TRANSACTION"))
+                      ((rollback)
+                       (query1 fsym "ROLLBACK TRANSACTION")))])
+             (statement:after-exec (car r))))
+         mode)))
+
+    ;; ----
 
     (super-new)
     (register-finalizer this (lambda (obj) (send obj disconnect)))

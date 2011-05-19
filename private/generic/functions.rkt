@@ -347,6 +347,20 @@
 
 ;; ========================================
 
+(define (start-transaction c)
+  (send c start-transaction 'start-transaction null))
+
+(define (commit-transaction c)
+  (send c end-transaction 'commit-transaction 'commit))
+
+(define (rollback-transaction c)
+  (send c end-transaction 'rollback-transaction 'rollback))
+
+(define (in-transaction? c)
+  (send c transaction-status 'in-transaction?))
+
+;; ========================================
+
 #|
 (define-syntax defprepare
   (syntax-rules ()
@@ -486,4 +500,13 @@
   (-> connection? preparable/c any)]
  [prepare-query-fold
   (-> connection? preparable/c procedure? any/c any)]
-|#)
+|#
+
+ [start-transaction
+  (-> connection? void)]
+ [commit-transaction
+  (-> connection? (or/c 'commit 'rollback))]
+ [rollback-transaction
+  (-> connection? 'rollback)]
+ [in-transaction?
+  (-> connection? boolean?)])

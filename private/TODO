@@ -75,11 +75,7 @@ Types
   SQLGetStmtAttr:
   - SQL_ATTR_NOSCAN (for odbc escape sequences)
 
-- possible transaction api
-  - (query-start-transaction c [isolation-level])
-    = on odbc, set SQL_ATTR_AUTOCOMMIT=false; 
-    = on others, send "BEGIN WORK" string (and document as such!)
-  - (query-commit-transaction c), (query-rollback-transaction c)
-    = on odbc, call SQLEndTrans, then switch back to SQL_ATTR_AUTOCOMMIT=true
-  - (query-transaction-status c)
+- finish transaction api (isolation levels, docs, tests)
+  - explain effect of query errors on transaction status
+  - more consistent behavior on error (like pg?) (?)
   - enough to implement connection pooling?

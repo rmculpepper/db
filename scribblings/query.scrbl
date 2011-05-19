@@ -443,3 +443,40 @@ closed.
   Returns @racket[#t] if @racket[x] is a @tech{statement generator}
   created by @racket[statement-generator], @racket[#f] otherwise.
 }
+
+
+@section{Transactions}
+
+@defproc[(start-transaction [c connection?])
+         void?]{
+
+  Starts a transaction. If @racket[c] is already in a transaction, an
+  exception is raised.
+}
+
+@defproc[(commit-transaction [c connection?])
+         (or/c 'commit 'rollback)]{
+
+  Attempts to commit the current transaction, if one is
+  active. Returns @racket['commit] if the transaction was
+  committed, @racket['rollback] if the transaction was rolled back
+  because of an error.
+
+  If no transaction is active, has no effect.
+}
+
+@defproc[(rollback-transaction [c connection?])
+         'rollack]{
+
+  Rolls back the current transaction, if one is active. Returns
+  @racket['rollback].
+
+  If no transaction is active, has no effect.
+}
+
+@defproc[(in-transaction? [c connection?])
+         boolean?]{
+
+  Returns @racket[#t] if @racket[c] has a transaction is active,
+  @racket[#f] otherwise.
+}

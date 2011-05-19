@@ -34,6 +34,10 @@
     query         ;; symbol statement collector -> QueryResult
     prepare       ;; symbol preparable boolean -> prepared-statement<%>
 
+    start-transaction  ;; symbol -> void
+    end-transaction    ;; symbol (U 'commit 'rollback) -> (U 'commit 'rollback)
+    transaction-status ;; symbol -> boolean
+
     free-statement)) ;; prepared-statement<%> -> void
 
 ;; no-cache-prepare<%>

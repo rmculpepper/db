@@ -473,15 +473,74 @@
           (handle-status 'free-statement (SQLFreeHandle SQL_HANDLE_STMT stmt) stmt)
           (void))))
 
+    ;; Transactions
+
+    (define/public (transaction-status fsym)
+      (with-lock
+       (let ([db (get-db fsym)])
+         (let-values ([(status value) (SQLGetConnectAttr db SQL_ATTR_AUTOCOMMIT)])
+           (handle-status fsym status db)
+           (zero? value)))))
+
+    (define/public (start-transaction fsym flags)
+      ;; FIXME: flags
+      (with-lock
+       (let* ([db (get-db fsym)])
+         (let-values ([(status value) (SQLGetConnectAttr db SQL_ATTR_AUTOCOMMIT)])
+           (handle-status fsym status db)
+           (when (zero? value)
+             (error fsym "already in transaction")))
+         (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_OFF)])
+           (handle-status fsym status db)
+           (void)))))
+
+    (define/public (end-transaction fsym mode)
+      (with-lock
+       (let ([db (get-db fsym)]
+             [completion-type
+              (case mode
+                ((commit) SQL_COMMIT)
+                ((rollback) SQL_ROLLBACK))])
+         (handle-status fsym (SQLEndTran db completion-type) db)
+         (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)])
+           (handle-status fsym status db)
+           mode))))
+
+    ;; Handler
+
+    (define add-notice! ;; field, not method; allocate only once
+      (lambda (sqlstate message)
+        (set! async-handler-calls
+              (cons (lambda () (notice-handler sqlstate message))
+                    async-handler-calls))))
+
     (define/private (handle-status who s [handle #f]
                                    #:ignore-ok/info? [ignore-ok/info? #f])
-      (handle-status* who s handle
-                      #:ignore-ok/info? ignore-ok/info?
-                      #:on-notice (lambda (sqlstate message)
-                                    (set! async-handler-calls
-                                          (cons (lambda ()
-                                                  (notice-handler sqlstate message))
-                                                async-handler-calls)))))
+      (define (handle-error e)
+        ;; On error, driver may rollback whole transaction, last statement, etc.
+        ;; Options:
+        ;;   1) if transaction was rolled back, set autocommit=true
+        ;;   2) automatically rollback on error
+        ;;   3) create flag: "transaction had error, please call rollback" (like pg)
+        ;; Option 1 would be nice, but as far as I can tell, there's
+        ;; no way to find out if the transaction was rolled back. And
+        ;; it would be very bad to leave autocommit=false, because
+        ;; that would be interpreted as "still in same transaction".
+        ;; Go with (2) for now, maybe support (3) as option later.
+        ;; FIXME: I worry about multi-statements like "<cause error>; commit"
+        ;; if the driver does one-statement rollback.
+        (let ([db db])
+          (when db
+            ;; No handling, because it would interfere with handling in process.
+            (SQLEndTran db SQL_ROLLBACK)
+            (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)))
+        (raise e))
+      ;; Be careful: shouldn't do rollback before we call handle-status*
+      ;; just in case rollback destroys statement with diagnostic records.
+      (with-handlers ([exn:fail? handle-error])
+        (handle-status* who s handle
+                        #:ignore-ok/info? ignore-ok/info?
+                        #:on-notice add-notice!)))
 
     (super-new)
     (register-finalizer this (lambda (obj) (send obj disconnect)))))

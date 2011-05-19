@@ -339,3 +339,28 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
                    (bytes->string/utf-8 sql-state-buf #\? 0 5)
                    native-errcode
                    (bytes->string/utf-8 message-buf #\? 0 message-len))))
+
+(define-odbc SQLEndTran
+  (_fun (handle completion-type) ::
+        (_sqlsmallint = SQL_HANDLE_DBC)
+        (handle : _sqlhandle)
+        (completion-type : _sqlsmallint)
+        -> _sqlreturn))
+
+(define-odbc SQLGetConnectAttr
+  (_fun (handle attr) ::
+        (handle : _sqlhdbc)
+        (attr : _sqlinteger)
+        (value : (_ptr o _sqluinteger)) ;; the one attr we care about has uint value
+        (buflen : _sqlinteger = 0) ;; ignored
+        (#f : _pointer)
+        -> (status : _sqlreturn)
+        -> (values status value)))
+
+(define-odbc SQLSetConnectAttr
+  (_fun (handle attr value) ::
+        (handle : _sqlhdbc)
+        (attr : _sqlinteger)
+        (value : _sqluinteger) ;; the one attr we care about has uint value
+        (_sqlinteger = 0)
+        -> _sqlreturn))

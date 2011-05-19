@@ -27,6 +27,7 @@
 
     (define inport #f)
     (define outport #f)
+    (define in-transaction? #f)
 
     (super-new)
 
@@ -107,6 +108,13 @@
         (error fsym "internal error: unexpected packet"))
       (let-values ([(msg-num next) (parse-packet inport expectation field-dvecs)])
         (set! next-msg-num (add1 msg-num))
+        ;; Update transaction status, if ok or eof
+        (when (ok-packet? next)
+          (set! in-transaction?
+                (bitwise-bit-set? (ok-packet-server-status next) 0)))
+        (when (eof-packet? next)
+          (set! in-transaction?
+                (bitwise-bit-set? (eof-packet-server-status next) 0)))
         (match next
           [(? handshake-packet?)
            (advance 'handshake)]
@@ -365,8 +373,41 @@
             (when (and id outport) ;; outport = connected?
               (send pst set-handle #f)
               (fresh-exchange)
-              (send-message (make-command:statement-packet 'statement-close id)))))))))
+              (send-message (make-command:statement-packet 'statement-close id)))))))
 
+    ;; == Transactions
+
+    (define/public (transaction-status fsym)
+      (call-with-lock fsym (lambda () in-transaction?)))
+
+    (define/public (start-transaction fsym flags)
+      (call-with-lock fsym
+        (lambda ()
+          (when in-transaction?
+            (error fsym "already in transaction"))
+          ;; SET TRANSACTION ISOLATION LEVEL sets mode for *next* transaction
+          ;; so need lock around both statements
+          (let* ([isolation-level
+                  (cond [(memq 'serializable flags) "SERIALIZABLE"]
+                        [(memq 'repeatable-read flags) "REPEATABLE READ"]
+                        [(memq 'read-committed flags) "READ COMMITTED"]
+                        [(memq 'read-uncommitted flags) "READ UNCOMMITTED"]
+                        [else #f])]
+                 [set-stmt "SET TRANSACTION ISOLATION LEVEL "])
+            (when isolation-level
+              (query1 fsym (string-append set-stmt isolation-level))))
+          (query1 fsym "START TRANSACTION")
+          (void))))
+
+    (define/public (end-transaction fsym mode)
+      (case mode
+        ((commit)
+         (query fsym "COMMIT" 'unused/commit)
+         ;; FIXME: double-check status from result
+         'commit)
+        ((rollback)
+         (query fsym "ROLLBACK" 'unused/rollback)
+         'rollback)))))
 
 ;; ========================================
 

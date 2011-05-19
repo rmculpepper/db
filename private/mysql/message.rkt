@@ -268,7 +268,7 @@ Based on protocol documentation here:
 
 (define-struct (eof-packet packet)
   (warning-count
-   status)
+   server-status)
   #:transparent)
 
 (define-struct (row-data-packet packet)

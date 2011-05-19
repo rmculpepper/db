@@ -22,13 +22,6 @@
 (define-cpointer-type _sqlite3_database)
 (define-cpointer-type _sqlite3_statement)
 
-(define _pointer-number
-  (let ([ptrsize (ctype-sizeof _pointer)])
-    (cond
-      [(= ptrsize (ctype-sizeof _int)) _int]
-      [(= ptrsize (ctype-sizeof _long)) _long]
-      [else (error 'sqlite-ffi "Cannot find a number the same size as a pointer!")])))
-
 ;; -- Functions --
 
 ;; -- DB --
@@ -98,7 +91,7 @@
         (col : _int)
         (string-ptr : _string = the-string)
         (string-len : _int = (string-utf-8-length the-string))
-        (destructor : _pointer-number = SQLITE_TRANSIENT)
+        (destructor : _intptr = SQLITE_TRANSIENT)
         -> _int))
 (define-sqlite sqlite3_bind_blob
   (_fun (stmt col the-bytes) ::
@@ -106,7 +99,7 @@
         (col : _int)
         (byte-ptr : _bytes = the-bytes)
         (byte-len : _int = (bytes-length the-bytes))
-        (destructor : _pointer-number = SQLITE_TRANSIENT)
+        (destructor : _intptr = SQLITE_TRANSIENT)
         -> _int))
 (define-sqlite sqlite3_bind_null
   (_fun _sqlite3_statement _int -> _int))
@@ -140,6 +133,12 @@
         -> (blob : _bytes)
         -> (let ([len (sqlite3_column_bytes stmt col)])
              (bytes-copy (make-sized-byte-string blob len)))))
+
+;; ----------------------------------------
+
+(define-sqlite sqlite3_get_autocommit
+  (_fun _sqlite3_database
+        -> _bool))
 
 ;; ----------------------------------------
 
@@ -194,4 +193,6 @@
  [sqlite3_clear_bindings
   (c-> sqlite3_statement? status?)]
  [sqlite3_finalize
-  (c-> sqlite3_statement? status?)])
+  (c-> sqlite3_statement? status?)]
+ [sqlite3_get_autocommit
+  (c-> sqlite3_database? boolean?)])

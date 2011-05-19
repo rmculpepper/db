@@ -200,7 +200,10 @@ Connections are made using the following functions.
                         (or/c output-port? 'output 'error 
                               (-> string? string? any))
                         void]
-                       [#:strict-parameter-types? strict-parameter-types? #f])
+                       [#:strict-parameter-types? strict-parameter-types? #f]
+                       [#:character-mode character-mode
+                        (or/c 'wchar 'utf-8 'latin-1)
+                        'wchar])
          connection?]{
 
   Creates a connection to the ODBC Data Source named @racket[dsn]. The
@@ -215,8 +218,17 @@ Connections are made using the following functions.
   attempts to fetch and enforce specific types for query
   parameters. See @secref["odbc-types"] for more details.
 
+  By default, connections use ODBC's @tt{SQL_C_WCHAR}-based character
+  encoding (as UTF-16) to send Unicode character data. Unfortunately,
+  some drivers' support for this method is buggy. To use
+  @tt{SQL_C_CHAR} instead, set @racket[character-mode] to
+  @racket['utf-8] or @racket['latin-1].
+
   The @racket[database] argument is a deprecated equivalent of 
   @racket[dsn]. One or the other must be provided, but not both.
+
+  See @secref["odbc-status"] for notes on specific ODBC drivers and
+  recommendations for connection options.
 
   If the connection cannot be made, an exception is raised.
 }

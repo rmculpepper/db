@@ -45,7 +45,7 @@ prepared statements can be inspected using
 This section describes the correspondences between SQL types and
 Racket types for the supported database systems. 
 
-@subsection[#:tag "postgresql-types"]{PostgreSQL}
+@subsection[#:tag "postgresql-types"]{PostgreSQL types}
 
 This section applies to connections created with
 @racket[postgresql-connect]. 
@@ -124,7 +124,7 @@ types, and row types. These are currently not supported, but support
 may be added in future versions of this library.
 
 
-@subsection[#:tag "mysql-types"]{MySQL}
+@subsection[#:tag "mysql-types"]{MySQL types}
 
 This section applies to connections created with
 @racket[mysql-connect].
@@ -178,7 +178,7 @@ The MySQL @tt{enum} and @tt{set} types are not supported. As a
 workaround, cast them to/from either integers or strings.
 
 
-@subsection[#:tag "sqlite-types"]{SQLite}
+@subsection[#:tag "sqlite-types"]{SQLite types}
 
 This section applies to connections created with
 @racket[sqlite3-connect].
@@ -217,7 +217,7 @@ is converted as @tt{real}, not @tt{integer}.
 ]
 
 
-@subsection[#:tag "odbc-types"]{ODBC}
+@subsection[#:tag "odbc-types"]{ODBC types}
 
 This section applies to connections created with @racket[odbc-connect]
 or @racket[odbc-driver-connect].

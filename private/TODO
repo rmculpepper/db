@@ -13,6 +13,7 @@ To do
 Testing
 
 - run ODBC tests on Mac
+- run ODBC DB2, Oracle tests on win32; also test SQL Server ?
 
 - test connection-generators
 
@@ -42,8 +43,6 @@ Types
 
 ----
 
-- ODBC: reuse more buffers when possible
-
 - sqlite: allow configurable behavior on SQLITE_BUSY
   eg retry n times, retry forever, retry w/ timeout, fail
   (is db locked only for write or for whole transaction?)
@@ -56,3 +55,31 @@ Types
 - disconnect should always work, even on thread-damaged connections
   - but might need version with timeout and/or rudely? flag, because
     I can't think of a way to solve the lock problem that doesn't involve aux thread
+
+- More ODBC information
+  SQLGetInfo:
+  - SQL_CONVERT_<datatype> - use to refine supported types (?)
+  - SQL_CURSOR_{COMMIT,ROLLBACK}_BEHAVIOR - check that commit/rollback doesn't delete pstmts!
+  - SQL_DATABASE_NAME (see also SQLGetConnectAttr, SQL_ATTR_CURRENT_CATALOG)
+  - SQL_DBMS_NAME, SQL_DBMS_VER
+  - SQL_DEFAULT_TXN_ISOLATION
+  - SQL_DRIVER_NAME
+  - SQL_MAX_{CATALOG,COLUMN,IDENTIFIER,SCHEMA_NAME,TABLE_NAME}_NAME (min 128)
+  - SQL_SERVER_NAME
+  - SQL_TXN_CAPABLE, SQL_TXN_ISOLATION_OPTION
+  - SQL_USER_NAME
+  SQLGetConnectAttr:
+  - SQL_ATTR_AUTOCOMMIT (default is auto-commit on)
+  - SQL_ATTR_CURRENT_CATALOG
+  - SQL_ATTR_TXN_ISOLATION
+  SQLGetStmtAttr:
+  - SQL_ATTR_NOSCAN (for odbc escape sequences)
+
+- possible transaction api
+  - (query-start-transaction c [isolation-level])
+    = on odbc, set SQL_ATTR_AUTOCOMMIT=false; 
+    = on others, send "BEGIN WORK" string (and document as such!)
+  - (query-commit-transaction c), (query-rollback-transaction c)
+    = on odbc, call SQLEndTrans, then switch back to SQL_ATTR_AUTOCOMMIT=true
+  - (query-transaction-status c)
+  - enough to implement connection pooling?

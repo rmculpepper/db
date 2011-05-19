@@ -361,59 +361,6 @@
 
 ;; ========================================
 
-#|
-(define-syntax defprepare
-  (syntax-rules ()
-    [(defprepare name method)
-     (defprepare name method [#:check] [#:arg])]
-    [(defprepare name method [#:check check ...])
-     (defprepare name method [#:check check ...] [#:arg])]
-    [(defprepare name method [#:check check ...] [#:arg arg ...])
-     (define (name c sql arg ...)
-       (let ([pst (prepare1 'name c sql #f)])
-         (check 'name pst sql) ...
-         (lambda args (method c (send pst bind 'name args) arg ...))))]))
-
-(defprepare prepare-query-rows query-rows)
-
-(defprepare prepare-query-list query-list
-  [#:check check-results/one-column])
-
-(defprepare prepare-query-row query-row
-  [#:check check-results])
-
-(defprepare prepare-query-maybe-row query-maybe-row
-  [#:check check-results])
-
-(defprepare prepare-query-value query-value
-  [#:check check-results/one-column])
-
-(defprepare prepare-query-maybe-value query-maybe-value
-  [#:check check-results/one-column])
-
-(defprepare prepare-query-exec query-exec)
-
-(defprepare prepare-query query)
-
-(defprepare prepare-query-map query-map
-  [#:check check-results]
-  [#:arg proc])
-
-(defprepare prepare-query-for-each query-for-each
-  [#:check check-results]
-  [#:arg proc])
-
-(defprepare prepare-query-mapfilter query-mapfilter
-  [#:check check-results]
-  [#:arg map-proc filter-proc])
-
-(defprepare prepare-query-fold query-fold
-  [#:check check-results]
-  [#:arg combine base])
-|#
-
-;; ========================================
-
 (define preparable/c (or/c string? statement-generator?))
 
 (provide (rename-out [in-query* in-query]))
@@ -480,27 +427,6 @@
  [statement-generator
   (-> (or/c string? (-> dbsystem? string?))
       statement-generator?)]
-
-#| 
- [prepare-query
-  (-> connection? preparable/c any)]
- [prepare-query-exec
-  (-> connection? preparable/c any)]
- [prepare-query-rows
-  (-> connection? preparable/c any)]
- [prepare-query-list
-  (-> connection? preparable/c any)]
- [prepare-query-row
-  (-> connection? preparable/c any)]
- [prepare-query-maybe-row
-  (-> connection? preparable/c any)]
- [prepare-query-value
-  (-> connection? preparable/c any)]
- [prepare-query-maybe-value
-  (-> connection? preparable/c any)]
- [prepare-query-fold
-  (-> connection? preparable/c procedure? any/c any)]
-|#
 
  [start-transaction
   (-> connection? void)]

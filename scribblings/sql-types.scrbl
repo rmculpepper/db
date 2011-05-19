@@ -40,12 +40,15 @@ prepared statements can be inspected using
 @racket[prepared-statement-result-types].
 
 
-@section[#:tag "db-types"]{Type correspondences}
+@section[#:tag "db-types"]{SQL type conversions}
 
 This section describes the correspondences between SQL types and
 Racket types for the supported database systems. 
 
 @subsection[#:tag "postgresql-types"]{PostgreSQL}
+
+This section applies to connections created with
+@racket[postgresql-connect]. 
 
 The following table lists the PostgreSQL types known to this library,
 along with their corresponding Racket representations.
@@ -123,6 +126,9 @@ may be added in future versions of this library.
 
 @subsection[#:tag "mysql-types"]{MySQL}
 
+This section applies to connections created with
+@racket[mysql-connect].
+
 The following table lists the MySQL types known to this package, along
 with their corresponding Racket representations.
 
@@ -174,6 +180,9 @@ workaround, cast them to/from either integers or strings.
 
 @subsection[#:tag "sqlite-types"]{SQLite}
 
+This section applies to connections created with
+@racket[sqlite3-connect].
+
 The following table lists the SQLite types known to this package,
 along with their corresponding Racket representations.
 
@@ -209,6 +218,9 @@ is converted as @tt{real}, not @tt{integer}.
 
 
 @subsection[#:tag "odbc-types"]{ODBC}
+
+This section applies to connections created with @racket[odbc-connect]
+or @racket[odbc-driver-connect].
 
 The following table lists the ODBC types known to this package,
 along with their corresponding Racket representations.

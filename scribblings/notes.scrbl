@@ -10,7 +10,7 @@
 This section describes miscellaneous issues specific to particular
 database systems.
 
-@section[#:tag "connecting-to-server"]{Connecting to a server}
+@section[#:tag "connecting-to-server"]{Local sockets for PostgreSQL and MySQL servers}
 
 PostgreSQL and MySQL servers are sometimes configured by default to
 listen only on local sockets (also called ``unix domain
@@ -35,7 +35,7 @@ example, on Ubuntu 10.10 running MySQL 5.1, the socket is located at
 searched using the @racket[mysql-guess-socket-path] function.
 
 
-@section{Character encodings}
+@section{Client and database character encodings}
 
 Changing a connection's encoding via SQL statements such as @tt{SET
 NAMES} is not allowed; when possible, the connection will observe the
@@ -63,10 +63,11 @@ statement:
 
 @tt{SELECT 1 + ?;}
 
-PostgreSQL reports an expected type of @tt{int4} for the parameter and
+PostgreSQL reports an expected type of @tt{integer} for the parameter and
 will not accept other types. MySQL and SQLite, in contrast, report no
 useful parameter type information, and ODBC connections vary in
-behavior based on the driver and even the connection parameters.
+behavior based on the driver, the data source configuration, and the
+connection parameters (see @secref["odbc-status"] for specific notes).
 
 
 @section{PostgreSQL authentication}
@@ -89,52 +90,85 @@ SQLite support requires the appropriate native library, specifically
 @tt{libsqlite3.so.0} on Unix or @tt{sqlite3.dll} on Windows.
 
 ODBC support requires the appropriate native library, specifically
-@tt{libodbc.so.1} on Unix or @tt{odbc32.dll} on Windows. In addition,
-the appropriate ODBC Drivers must be installed and any Data Sources
-configured.
+@tt{libodbc.so.1} (from unixODBC; iODBC is not supported) on Unix or
+@tt{odbc32.dll} on Windows. In addition, the appropriate ODBC Drivers
+must be installed and any Data Sources configured.
 
 
-@section{ODBC}
+@section[#:tag "odbc-status"]{ODBC support status}
 
 ODBC support is experimental. This library is compatible only with
 ODBC 3.x Driver Managers. The behavior of ODBC connections can vary
 widely depending on the driver in use and even the configuration of a
 particular data source.
 
-This library is tested with the following configurations, where
-@bold{win32} means Windows Vista on a 32-bit processor and
-@bold{linux} means Ubuntu 11.04 and unixODBC on both x86 (32-bit) and
-x86-64 processors unless otherwise specified.
-@itemlist[
-@item{@bold{PostgreSQL Unicode} (version 09.00.0300) on @bold{win32} and
-  @bold{linux}: Set the following Data Source options to get specific
-  parameter type information: @tt{Protocol = 7.4} and
-  @tt{UserServerSidePrepare = 1}, and use the
-  @racket[#:strict-parameter-types?] connection option. One test
-  fails: no error is reported for multiple SQL statements in a
-  string. Older versions of the driver have a bug in @tt{WCHAR}
-  conversion; use @racket[#:character-mode 'utf-8] as a workaround.}
-@item{@bold{MySQL} on @bold{win32} and @bold{linux}: Avoid using the
-  @racket[#:strict-parameter-types?] connection option, as the driver
-  assigns all parameters the type @tt{varchar}. All tests pass.}
-@item{@bold{SQLite3} on @bold{linux}: Avoid
-  using the @racket[#:strict-parameter-types?] connection option, as
-  the driver assigns all parameters the type
-  @tt{longvarchar}. Furthermore, this driver interprets the
-  declared types of columns strictly, replacing nonconforming values
-  in query results with @tt{NULL}. All computed columns, even those
-  with explicit @tt{CAST}s, seem to be returned as @tt{text}. Several
-  tests fail because of this behavior.}
-@item{@bold{DB2} (IBM DB2 Express-C v9.7) on @bold{linux} (32-bit only):
-  With @tt{Driver} set to @tt{/home/db2inst1/sqllib/lib32/libdb2.so},
-  all tests pass.}
-@item{@bold{Oracle} (Oracle Database 10g Release 2, Express
-  Edition) on @bold{linux} (32-bit version only): It seems the
-  @tt{ORACLE_HOME} and @tt{LD_LIBRARY_PATH} environment variables must
-  be set according to the @tt{oracle_env.{csh,sh}} script for the
-  driver to work. Most tests pass; a few fail because of differences
-  in Oracle's handling of types. The Driver seems to return corrupt
-  data for @tt{TIME} results.}
-]
+The following sections describe the configurations that this library
+has been tested with. The platform @bold{win32} means Windows Vista on
+a 32-bit processor and @bold{linux} means Ubuntu 11.04 and unixODBC on
+both x86 (32-bit) and x86-64 processors, unless otherwise specified.
+
 Reports of success or failure on other platforms or with other drivers
 would be appreciated.
+
+@subsection{PostgreSQL ODBC driver}
+
+The PostgreSQL ODBC driver version 09.00.0300 has been tested on
+@bold{win32} and @bold{linux}. 
+
+To get specific parameter type information, set the following Data
+Source options: @tt{Protocol = 7.4} and @tt{UserServerSidePrepare =
+1}, and use the @racket[#:strict-parameter-types?] connection option.
+
+Older versions of the driver, including version 08.03.0200, provided
+by Ubuntu 11.04, seem to have a bug in the character mode this library
+uses by default; use the @racket[#:character-mode 'utf-8] connection
+option as a workaround.
+
+@subsection{MySQL ODBC driver}
+
+The MySQL ODBC driver version 5.1.6-1 has been tested on @bold{win32}
+and @bold{linux}.
+
+Avoid using the @racket[#:strict-parameter-types?] connection option,
+as the driver assigns all parameters the type @tt{varchar}. 
+
+@subsection{SQLite3 ODBC driver}
+
+Avoid using the @racket[#:strict-parameter-types?] connection option,
+as the driver assigns all parameters the type @tt{longvarchar}.
+Furthermore, this driver interprets the declared types of columns
+strictly, replacing nonconforming values in query results with
+@tt{NULL}. All computed columns, even those with explicit @tt{CAST}s,
+seem to be returned as @tt{text}.
+
+@subsection{DB2 ODBC driver}
+
+The driver from IBM DB2 Express-C v9.7 has been tested on @bold{linux}
+(32-bit only).
+
+For a typical installation where the instance resides at
+@tt{/home/db2inst1}, set the following option in the Driver
+configuration: @tt{Driver = /home/db2inst1/sqllib/lib32/libdb2.so}.
+
+The DB2 driver does not seem to accept a separate argument for the
+database to connect to; it must be the same as the Data Source name.
+
+@subsection{Oracle ODBC driver}
+
+The driver from Oracle Database 10g Release 2 Express Edition has been
+tested on @bold{linux} (32-bit only).
+
+It seems the @tt{ORACLE_HOME} and @tt{LD_LIBRARY_PATH} environment
+variables must be set according to the @tt{oracle_env.{csh,sh}} script
+for the driver to work. 
+
+Columns of type @tt{TIME} can cause a memory error (ie, Racket
+aborts). This seems to be due to a bug in Oracle's ODBC driver, but I
+do not yet have a workaround.
+
+@;{
+Maybe Oracle bug? See:
+  http://kr.forums.oracle.com/forums/thread.jspa?threadID=572661
+  http://stackoverflow.com/questions/38435/
+  http://forums.oracle.com/forums/thread.jspa?threadID=856713
+}

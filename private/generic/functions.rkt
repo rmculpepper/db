@@ -431,8 +431,8 @@
  [start-transaction
   (-> connection? void)]
  [commit-transaction
-  (-> connection? (or/c 'commit 'rollback))]
+  (-> connection? void?)]
  [rollback-transaction
-  (-> connection? 'rollback)]
+  (-> connection? void?)]
  [in-transaction?
   (-> connection? boolean?)])

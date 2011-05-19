@@ -402,12 +402,9 @@
     (define/public (end-transaction fsym mode)
       (case mode
         ((commit)
-         (query fsym "COMMIT" 'unused/commit)
-         ;; FIXME: double-check status from result
-         'commit)
+         (void (query fsym "COMMIT" 'unused/commit)))
         ((rollback)
-         (query fsym "ROLLBACK" 'unused/rollback)
-         'rollback)))))
+         (void (query fsym "ROLLBACK" 'unused/rollback)))))))
 
 ;; ========================================
 

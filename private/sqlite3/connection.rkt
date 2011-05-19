@@ -212,7 +212,7 @@
                       ((rollback)
                        (query1 fsym "ROLLBACK TRANSACTION")))])
              (statement:after-exec (car r))))
-         mode)))
+         (void))))
 
     ;; ----
 

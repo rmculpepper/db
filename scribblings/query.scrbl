@@ -447,6 +447,8 @@ closed.
 
 @section{Transactions}
 
+@;{FIXME: explain differences between these functions and various SQL stmts}
+
 @defproc[(start-transaction [c connection?])
          void?]{
 
@@ -454,13 +456,10 @@ closed.
   exception is raised.
 }
 
-@defproc[(commit-transaction [c connection?])
-         (or/c 'commit 'rollback)]{
+@defproc[(commit-transaction [c connection?]) void?]{
 
-  Attempts to commit the current transaction, if one is
-  active. Returns @racket['commit] if the transaction was
-  committed, @racket['rollback] if the transaction was rolled back
-  because of an error.
+  Attempts to commit the current transaction, if one is active. If the
+  transaction cannot be commited, an exception is raised.
 
   If no transaction is active, has no effect.
 }
@@ -468,8 +467,7 @@ closed.
 @defproc[(rollback-transaction [c connection?])
          'rollack]{
 
-  Rolls back the current transaction, if one is active. Returns
-  @racket['rollback].
+  Rolls back the current transaction, if one is active.
 
   If no transaction is active, has no effect.
 }

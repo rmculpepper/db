@@ -35,7 +35,7 @@
     prepare       ;; symbol preparable boolean -> prepared-statement<%>
 
     start-transaction  ;; symbol -> void
-    end-transaction    ;; symbol (U 'commit 'rollback) -> (U 'commit 'rollback)
+    end-transaction    ;; symbol (U 'commit 'rollback) -> void
     transaction-status ;; symbol -> boolean
 
     free-statement)) ;; prepared-statement<%> -> void

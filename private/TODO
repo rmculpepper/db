@@ -76,6 +76,8 @@ Types
   - SQL_ATTR_NOSCAN (for odbc escape sequences)
 
 - finish transaction api (isolation levels, docs, tests)
+  - figure out what happens if commit fails (non-serializable, for example)
+    - if converts to rollback, how to detect?
   - explain effect of query errors on transaction status
   - more consistent behavior on error (like pg?) (?)
   - enough to implement connection pooling?

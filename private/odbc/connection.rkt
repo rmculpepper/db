@@ -504,7 +504,7 @@
          (handle-status fsym (SQLEndTran db completion-type) db)
          (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)])
            (handle-status fsym status db)
-           mode))))
+           (void)))))
 
     ;; Handler
 

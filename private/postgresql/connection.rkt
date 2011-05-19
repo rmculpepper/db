@@ -30,7 +30,7 @@
     (define inport #f)
     (define outport #f)
     (define process-id #f)
-    (define in-transaction? #f)
+    (define tx-status #f) ;; #f, 'ok, 'error
 
     (super-new)
 
@@ -114,8 +114,9 @@
         (cond [(ReadyForQuery? r)
                ;; Update transaction status
                (case (ReadyForQuery-transaction-status r)
-                 ((idle) (set! in-transaction? #f))
-                 ((transaction failed) (set! in-transaction? #t)))]
+                 ((idle) (set! tx-status #f))
+                 ((transaction) (set! tx-status 'ok))
+                 ((failed) (set! tx-status 'error)))]
               [(and or-eof? (eof-object? r)) (void)]
               [else
                (error fsym "internal error: backend sent unexpected message")])))
@@ -262,14 +263,16 @@
     (define/public (query fsym stmt0 collector)
       (let-values ([(stmt result)
                     (call-with-lock fsym
-                      (lambda ()
-                        (let ([stmt (check-statement fsym stmt0)])
-                          (query1:enqueue stmt)
-                          (send-message (make-Sync))
-                          (begin0 (values stmt (query1:collect fsym stmt))
-                            (check-ready-for-query fsym #f)))))])
+                      (lambda () (query1 fsym stmt0)))])
         (statement:after-exec stmt)
         (query1:process-result fsym collector result)))
+
+    (define/private (query1 fsym stmt)
+      (let ([stmt (check-statement fsym stmt)])
+        (query1:enqueue stmt)
+        (send-message (make-Sync))
+        (begin0 (values stmt (query1:collect fsym stmt))
+          (check-ready-for-query fsym #f))))
 
     ;; check-statement : symbol statement -> statement-binding
     ;; Always prepare, so we can have type information to choose result formats.
@@ -445,12 +448,12 @@
     (define/public (transaction-status fsym)
       ;; FIXME: is lock necessary?
       (call-with-lock fsym
-        (lambda () in-transaction?)))
+        (lambda () (and tx-status #t))))
 
     (define/public (start-transaction fsym flags)
       (call-with-lock fsym
         (lambda ()
-          (when in-transaction?
+          (when tx-status
             (error fsym "already in transaction"))
           (let* ([isolation-level
                   (cond [(memq 'serializable flags) "SERIALIZABLE"]
@@ -473,15 +476,16 @@
     (define/public (end-transaction fsym mode)
       (case mode
         ((commit)
-         ;; Note: COMMIT can cause rollback if an error has occurred
-         (let* ([r (query fsym "COMMIT WORK" 'unused/commit-transaction)]
-                [command (cdr (assq 'command (simple-result-info r)))]) ;; string
-           (if (regexp-match #rx"^COMMIT" command)
-               'commit
-               'rollback)))
+         (call-with-lock fsym
+           (lambda ()
+             (when (eq? tx-status 'error)
+               ;; otherwise, COMMIT statement would cause silent ROLLBACK !!!
+               (error fsym "commit failed due to an earlier error in the transaction"))
+             (let-values ([(stmt result) (query1 fsym "COMMIT WORK")])
+               (statement:after-exec stmt)
+               (void)))))
         ((rollback)
-         (query fsym "ROLLBACK WORK" 'unused/rollback-transaction)
-         'rollback)))))
+         (void (query fsym "ROLLBACK WORK" 'unused/rollback-transaction)))))))
 
 
 ;; ========================================

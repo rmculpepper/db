@@ -190,25 +190,29 @@
 
     (define/public (start-transaction fsym flags)
       ;; FIXME: modes are DEFERRED | IMMEDIATE | EXCLUSIVE
-      (with-lock
-       (let ([db (get-db fsym)])
-         (when (not (sqlite3_get_autocommit db))
-           (error/already-in-tx fsym))
-         (let ([r (query1 fsym "BEGIN TRANSACTION")])
-           (statement:after-exec (car r)))
-         (void))))
+      (let ([stmt
+             (with-lock
+              (let ([db (get-db fsym)])
+                (when (not (sqlite3_get_autocommit db))
+                  (error/already-in-tx fsym))
+                (let ([r (query1 fsym "BEGIN TRANSACTION")])
+                  (car r))))])
+        (statement:after-exec stmt)
+        (void)))
 
     (define/public (end-transaction fsym mode)
-      (with-lock
-       (let ([db (get-db fsym)])
-         (when (not (sqlite3_get_autocommit db))
-           (let ([r (case mode
-                      ((commit)
-                       (query1 fsym "COMMIT TRANSACTION"))
-                      ((rollback)
-                       (query1 fsym "ROLLBACK TRANSACTION")))])
-             (statement:after-exec (car r))))
-         (void))))
+      (let ([stmt
+             (with-lock
+              (let ([db (get-db fsym)])
+                (when (not (sqlite3_get_autocommit db))
+                  (let ([r (case mode
+                             ((commit)
+                              (query1 fsym "COMMIT TRANSACTION"))
+                             ((rollback)
+                              (query1 fsym "ROLLBACK TRANSACTION")))])
+                    (car r)))))])
+        (statement:after-exec stmt)
+        (void)))
 
     ;; ----
 

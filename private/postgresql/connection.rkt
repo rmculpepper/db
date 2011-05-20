@@ -447,40 +447,45 @@
       (call-with-lock fsym (lambda () tx-status)))
 
     (define/public (start-transaction fsym flags)
-      (call-with-lock fsym
-        (lambda ()
-          (when tx-status
-            (error/already-in-tx fsym))
-          (let* ([isolation-level
-                  (cond [(memq 'serializable flags) "SERIALIZABLE"]
-                        [(memq 'repeatable-read flags) "REPEATABLE READ"]
-                        [(memq 'read-committed flags) "READ COMMITTED"]
-                        [(memq 'read-uncommitted flags) "READ UNCOMMITTED"]
-                        [else #f])]
-                 [rw-mode
-                  (cond [(memq 'read-only flags) " READ ONLY"]
-                        [(memq 'read-write flags) " READ WRITE"]
-                        [else ""])]
-                 [stmt
-                  (format "BEGIN WORK~a~a~a"
-                          (if isolation-level " ISOLATION LEVEL " "")
-                          (or isolation-level "")
-                          rw-mode)])
-            (query fsym stmt 'unused/start-transaction)
-            (void)))))
+      (let ([stmt
+             (call-with-lock fsym
+               (lambda ()
+                 (when tx-status
+                   (error/already-in-tx fsym))
+                 (let* ([isolation-level
+                         (cond [(memq 'serializable flags) "SERIALIZABLE"]
+                               [(memq 'repeatable-read flags) "REPEATABLE READ"]
+                               [(memq 'read-committed flags) "READ COMMITTED"]
+                               [(memq 'read-uncommitted flags) "READ UNCOMMITTED"]
+                               [else #f])]
+                        [rw-mode
+                         (cond [(memq 'read-only flags) " READ ONLY"]
+                               [(memq 'read-write flags) " READ WRITE"]
+                               [else ""])]
+                        [stmt
+                         (format "BEGIN WORK~a~a~a"
+                                 (if isolation-level " ISOLATION LEVEL " "")
+                                 (or isolation-level "")
+                                 rw-mode)])
+                   (let-values ([(stmt result) (query1 fsym stmt)])
+                     stmt))))])
+        (statement:after-exec stmt)
+        (void)))
 
     (define/public (end-transaction fsym mode)
-      (call-with-lock fsym
-        (lambda ()
-          (unless (eq? mode 'rollback)
-            ;; otherwise, COMMIT statement would cause silent ROLLBACK !!!
-            (check-valid-tx-status fsym tx-status))
-          (let ([stmt (case mode
-                        ((commit) "COMMIT WORK")
-                        ((rollback) "ROLLBACK WORK"))])
-            (let-values ([(stmt result) (query1 fsym stmt)])
-              (statement:after-exec stmt)
-              (void))))))))
+      (let ([stmt
+             (call-with-lock fsym
+               (lambda ()
+                 (unless (eq? mode 'rollback)
+                   ;; otherwise, COMMIT statement would cause silent ROLLBACK !!!
+                   (check-valid-tx-status fsym tx-status))
+                 (let ([stmt (case mode
+                               ((commit) "COMMIT WORK")
+                               ((rollback) "ROLLBACK WORK"))])
+                   (let-values ([(stmt result) (query1 fsym stmt)])
+                     stmt))))])
+        (statement:after-exec stmt)
+        (void)))))
 
 ;; ========================================
 

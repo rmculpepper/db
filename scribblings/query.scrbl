@@ -39,6 +39,8 @@ disconnected:
   connection's character encoding}
 @item{communication failures and internal errors in the library}
 ]
+See @secref["transactions"] for information on how errors can affect
+the transaction status.
 
 @bold{Character encoding} This library is designed to interact with
 database systems using the UTF-8 character encoding. The connection
@@ -445,24 +447,61 @@ closed.
 }
 
 
-@section{Transactions}
+@section[#:tag "transactions"]{Transactions}
 
-The following functions provide a consistent interface to
-transactions.
+The functions described in this section provide a consistent interface
+to transactions.
 
-ODBC connections should use the following functions exclusively
-instead of transaction-changing SQL statements such as @tt{START
-TRANSACTION} and @tt{COMMIT}. Using transaction-changing SQL may cause
-these functions to behave incorrectly and may cause additional
-problems in the ODBC driver.
+ODBC connections should use these functions exclusively instead of
+transaction-changing SQL statements such as @tt{START TRANSACTION} and
+@tt{COMMIT}. Using transaction-changing SQL may cause these functions
+to behave incorrectly and may cause additional problems in the ODBC
+driver.
 
-Other types of connections are discouraged from using
+PostgreSQL, MySQL, and SQLite connections are discouraged from using
 transaction-changing SQL statements, but the consequences are less
 dire. The functions below will behave correctly, but the syntax and
 behavior of the SQL statements is idiosyncratic. For example, in MySQL
 @tt{START TRANSACTION} commits the current transaction, if one is
 active; in PostgreSQL @tt{COMMIT} silently rolls back the current
 transaction if an error occurred in a previous statement.
+
+@bold{Errors} Query errors may affect an open transaction in one of
+three ways:
+@itemlist[#:style 'ordered
+@item{the transaction may remain open and unchanged}
+@item{the transaction may be automatically rolled back}
+@item{the transaction may become an @deftech{invalid transaction}; all
+subsequent queries will fail until the transaction is explicitly
+rolled back}
+]
+To avoid the silent loss of information, this library attempts to
+avoid behavior (2) completely. Behaviors (1) and (3) can be
+distinguished using the @racket[needs-rollback?] function. The
+following list is a rough guide to what errors cause which behaviors:
+@itemlist[
+@item{All errors raised by checks performed by this library, such as
+  parameter arity and type errors, leave the transaction open and
+  unchanged (1).}
+@item{All errors originating from PostgreSQL cause the transaction to
+  become invalid (3).}
+@item{Most errors originating from MySQL leave the transaction open
+  and unchanged (1), but a few cause the transaction to become invalid
+  (3). In the latter cases, the underlying behavior
+  of MySQL is to roll back the transaction but @emph{leave it open}
+  (see @hyperlink["http://dev.mysql.com/doc/refman/5.1/en/innodb-error-handling.html"]{the
+  MySQL documentation}). This library detects those cases and marks
+  the transaction invalid instead.}
+@item{All errors originating from SQLite leave the transaction
+  open and unchanged (1).}
+@item{All errors originating from an ODBC driver cause the transaction
+  to become invalid (3). The underlying behavior of ODBC drivers
+  varies widely, and ODBC provides no mechanism to detect when an
+  existing transaction has been rolled back, so this library
+  intercepts all errors and marks the transaction invalid instead.}
+]
+Future versions of this library may provide an option to choose
+between behaviors (2) and (3).
 
 @defproc[(start-transaction [c connection?])
          void?]{
@@ -491,4 +530,11 @@ transaction if an error occurred in a previous statement.
 
   Returns @racket[#t] if @racket[c] has a transaction is active,
   @racket[#f] otherwise.
+}
+
+@defproc[(needs-rollback? [c connection?]) boolean?]{
+
+  Returns @racket[#t] if @racket[c] is in an @tech{invalid
+  transaction}. All queries executed using @racket[c] will fail until
+  the transaction is explicitly rolled back.
 }

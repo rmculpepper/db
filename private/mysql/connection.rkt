@@ -27,7 +27,7 @@
 
     (define inport #f)
     (define outport #f)
-    (define in-transaction? #f)
+    (define tx-status #f) ;; #f, #t, or 'invalid
 
     (super-new)
 
@@ -108,13 +108,17 @@
         (error fsym "internal error: unexpected packet"))
       (let-values ([(msg-num next) (parse-packet inport expectation field-dvecs)])
         (set! next-msg-num (add1 msg-num))
-        ;; Update transaction status, if ok or eof
+        ;; Update transaction status (see Transactions below)
         (when (ok-packet? next)
-          (set! in-transaction?
+          (set! tx-status
                 (bitwise-bit-set? (ok-packet-server-status next) 0)))
         (when (eof-packet? next)
-          (set! in-transaction?
+          (set! tx-status
                 (bitwise-bit-set? (eof-packet-server-status next) 0)))
+        (when (error-packet? next)
+          (when tx-status
+            (when (member (error-packet-errno next) '(1213 1205))
+              (set! tx-status 'invalid))))
         (match next
           [(? handshake-packet?)
            (advance 'handshake)]
@@ -247,6 +251,7 @@
 
     ;; query : symbol Statement Collector -> QueryResult
     (define/public (query fsym stmt collector)
+      (check-valid-tx-status fsym)
       (let-values ([(stmt result)
                     (call-with-lock fsym
                       (lambda ()
@@ -336,6 +341,7 @@
 
     ;; prepare : symbol string boolean -> PreparedStatement
     (define/public (prepare fsym stmt close-on-exec?)
+      (check-valid-tx-status fsym)
       (call-with-lock fsym
         (lambda ()
           (prepare1 fsym stmt close-on-exec?))))
@@ -377,13 +383,26 @@
 
     ;; == Transactions
 
+    ;; MySQL: what causes implicit commit, when is transaction rolled back
+    ;;   http://dev.mysql.com/doc/refman/5.1/en/implicit-commit.html
+    ;;   http://dev.mysql.com/doc/refman/5.1/en/innodb-error-handling.html
+    ;;   http://dev.mysql.com/doc/refman/5.1/en/innodb-error-codes.html
+    ;;
+    ;; Sounds like MySQL rolls back transaction (but may keep open!) on
+    ;;   - transaction deadlock = 1213 (ER_LOCK_DEADLOCK)
+    ;;   - lock wait timeout (depends on config) = 1205 (ER_LOCK_WAIT_TIMEOUT)
+
     (define/public (transaction-status fsym)
-      (call-with-lock fsym (lambda () in-transaction?)))
+      (call-with-lock fsym (lambda () tx-status)))
+
+    (define/private (check-valid-tx-status fsym)
+      (when (eq? tx-status 'invalid)
+        (error fsym "current transaction is invalid and must be explicitly rolled back")))
 
     (define/public (start-transaction fsym flags)
       (call-with-lock fsym
         (lambda ()
-          (when in-transaction?
+          (when tx-status
             (error fsym "already in transaction"))
           ;; SET TRANSACTION ISOLATION LEVEL sets mode for *next* transaction
           ;; so need lock around both statements
@@ -400,11 +419,15 @@
           (void))))
 
     (define/public (end-transaction fsym mode)
-      (case mode
-        ((commit)
-         (void (query fsym "COMMIT" 'unused/commit)))
-        ((rollback)
-         (void (query fsym "ROLLBACK" 'unused/rollback)))))))
+      (call-with-lock fsym
+        (lambda ()
+          (unless (eq? mode 'rollback)
+            (check-valid-tx-status fsym))
+          (let ([stmt (case mode
+                        ((commit) "COMMIT")
+                        ((rollback) "ROLLBACK"))])
+            (query1 fsym stmt)
+            (void)))))))
 
 ;; ========================================
 

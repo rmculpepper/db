@@ -47,8 +47,6 @@ Types
   eg retry n times, retry forever, retry w/ timeout, fail
   (is db locked only for write or for whole transaction?)
 
-- add transaction awareness to connections? (eg begin/commit/rollback-tx, in-tx?)
-
 - doc: enumerate errors
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 
@@ -78,6 +76,7 @@ Types
 - finish transaction api (isolation levels, docs, tests)
   - figure out what happens if commit fails (non-serializable, for example)
     - if converts to rollback, how to detect?
-  - explain effect of query errors on transaction status
-  - more consistent behavior on error (like pg?) (?)
+  - add connect option #:rollback-invalid-transactions?
   - enough to implement connection pooling?
+
+- extract common error checks, messages etc

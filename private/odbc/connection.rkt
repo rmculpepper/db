@@ -61,6 +61,7 @@
     (define/public (connected?) (and db #t))
 
     (define/public (query fsym stmt collector)
+      (check-valid-tx-status fsym)
       (query1 fsym stmt collector))
 
     (define/private (query1 fsym stmt collector)
@@ -398,6 +399,7 @@
             [else (get-string)]))
 
     (define/public (prepare fsym stmt close-on-exec?)
+      (check-valid-tx-status fsym)
       (prepare1 fsym stmt close-on-exec?))
 
     (define/private (prepare1 fsym sql close-on-exec?)
@@ -475,27 +477,30 @@
 
     ;; Transactions
 
+    (define tx-status #f)
+
+    (define/private (check-valid-tx-status fsym)
+      (when (eq? tx-status 'invalid)
+        (error fsym "current transaction is invalid and must be explicitly rolled back")))
+
     (define/public (transaction-status fsym)
-      (with-lock
-       (let ([db (get-db fsym)])
-         (let-values ([(status value) (SQLGetConnectAttr db SQL_ATTR_AUTOCOMMIT)])
-           (handle-status fsym status db)
-           (zero? value)))))
+      (with-lock (let ([db (get-db fsym)]) tx-status)))
 
     (define/public (start-transaction fsym flags)
       ;; FIXME: flags
       (with-lock
        (let* ([db (get-db fsym)])
-         (let-values ([(status value) (SQLGetConnectAttr db SQL_ATTR_AUTOCOMMIT)])
-           (handle-status fsym status db)
-           (when (zero? value)
-             (error fsym "already in transaction")))
+         (when tx-status
+           (error fsym "already in transaction"))
          (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_OFF)])
            (handle-status fsym status db)
+           (set! tx-status #t)
            (void)))))
 
     (define/public (end-transaction fsym mode)
       (with-lock
+       (unless (eq? mode 'rollback)
+         (check-valid-tx-status fsym))
        (let ([db (get-db fsym)]
              [completion-type
               (case mode
@@ -504,6 +509,7 @@
          (handle-status fsym (SQLEndTran db completion-type) db)
          (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)])
            (handle-status fsym status db)
+           (set! tx-status #f)
            (void)))))
 
     ;; Handler
@@ -526,14 +532,13 @@
         ;; no way to find out if the transaction was rolled back. And
         ;; it would be very bad to leave autocommit=false, because
         ;; that would be interpreted as "still in same transaction".
-        ;; Go with (2) for now, maybe support (3) as option later.
+        ;; Go with (3) for now, maybe support (2) as option later.
         ;; FIXME: I worry about multi-statements like "<cause error>; commit"
         ;; if the driver does one-statement rollback.
         (let ([db db])
           (when db
-            ;; No handling, because it would interfere with handling in process.
-            (SQLEndTran db SQL_ROLLBACK)
-            (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)))
+            (when tx-status
+              (set! tx-status 'invalid))))
         (raise e))
       ;; Be careful: shouldn't do rollback before we call handle-status*
       ;; just in case rollback destroys statement with diagnostic records.

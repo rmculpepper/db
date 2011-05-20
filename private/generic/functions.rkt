@@ -357,7 +357,10 @@
   (send c end-transaction 'rollback-transaction 'rollback))
 
 (define (in-transaction? c)
-  (send c transaction-status 'in-transaction?))
+  (and (send c transaction-status 'in-transaction?) #t))
+
+(define (needs-rollback? c)
+  (eq? (send c transaction-status 'needs-rollback?) 'invalid))
 
 ;; ========================================
 
@@ -435,4 +438,6 @@
  [rollback-transaction
   (-> connection? void?)]
  [in-transaction?
+  (-> connection? boolean?)]
+ [needs-rollback?
   (-> connection? boolean?)])

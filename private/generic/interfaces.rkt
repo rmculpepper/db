@@ -36,7 +36,7 @@
 
     start-transaction  ;; symbol -> void
     end-transaction    ;; symbol (U 'commit 'rollback) -> void
-    transaction-status ;; symbol -> boolean
+    transaction-status ;; symbol -> (U boolean 'invalid)
 
     free-statement)) ;; prepared-statement<%> -> void
 

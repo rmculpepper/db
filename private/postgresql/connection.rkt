@@ -30,7 +30,7 @@
     (define inport #f)
     (define outport #f)
     (define process-id #f)
-    (define tx-status #f) ;; #f, 'ok, 'error
+    (define tx-status #f) ;; #f, #t, 'invalid
 
     (super-new)
 
@@ -115,8 +115,8 @@
                ;; Update transaction status
                (case (ReadyForQuery-transaction-status r)
                  ((idle) (set! tx-status #f))
-                 ((transaction) (set! tx-status 'ok))
-                 ((failed) (set! tx-status 'error)))]
+                 ((transaction) (set! tx-status #t))
+                 ((failed) (set! tx-status 'invalid)))]
               [(and or-eof? (eof-object? r)) (void)]
               [else
                (error fsym "internal error: backend sent unexpected message")])))
@@ -263,7 +263,9 @@
     (define/public (query fsym stmt0 collector)
       (let-values ([(stmt result)
                     (call-with-lock fsym
-                      (lambda () (query1 fsym stmt0)))])
+                      (lambda ()
+                        (check-valid-tx-status fsym)
+                        (query1 fsym stmt0)))])
         (statement:after-exec stmt)
         (query1:process-result fsym collector result)))
 
@@ -378,6 +380,7 @@
     (define/public (prepare fsym stmt close-on-exec?)
       (call-with-lock fsym
         (lambda ()
+          (check-valid-tx-status fsym)
           (prepare1 fsym stmt close-on-exec?))))
 
     (define/private (prepare1 fsym stmt close-on-exec?)
@@ -446,9 +449,11 @@
     ;; == Transactions
 
     (define/public (transaction-status fsym)
-      ;; FIXME: is lock necessary?
-      (call-with-lock fsym
-        (lambda () (and tx-status #t))))
+      (call-with-lock fsym (lambda () tx-status)))
+
+    (define/private (check-valid-tx-status fsym)
+      (when (eq? tx-status 'invalid)
+        (error fsym "current transaction is invalid and must be explicitly rolled back")))
 
     (define/public (start-transaction fsym flags)
       (call-with-lock fsym
@@ -474,19 +479,17 @@
             (void)))))
 
     (define/public (end-transaction fsym mode)
-      (case mode
-        ((commit)
-         (call-with-lock fsym
-           (lambda ()
-             (when (eq? tx-status 'error)
-               ;; otherwise, COMMIT statement would cause silent ROLLBACK !!!
-               (error fsym "commit failed due to an earlier error in the transaction"))
-             (let-values ([(stmt result) (query1 fsym "COMMIT WORK")])
-               (statement:after-exec stmt)
-               (void)))))
-        ((rollback)
-         (void (query fsym "ROLLBACK WORK" 'unused/rollback-transaction)))))))
-
+      (call-with-lock fsym
+        (lambda ()
+          (unless (eq? mode 'rollback)
+            ;; otherwise, COMMIT statement would cause silent ROLLBACK !!!
+            (check-valid-tx-status fsym))
+          (let ([stmt (case mode
+                        ((commit) "COMMIT WORK")
+                        ((rollback) "ROLLBACK WORK"))])
+            (let-values ([(stmt result) (query1 fsym stmt)])
+              (statement:after-exec stmt)
+              (void))))))))
 
 ;; ========================================
 

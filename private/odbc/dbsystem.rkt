@@ -11,8 +11,7 @@
          "../generic/sql-convert.rkt"
          "ffi.rkt")
 (provide dbsystem
-         supported-typeid?
-         unsupported-type)
+         supported-typeid?)
 
 (define odbc-dbsystem%
   (class* object% (dbsystem<%>)
@@ -47,24 +46,25 @@
           ((*typeid) *name) ...
           (else
            (lambda (fsym index param)
-             (unsupported-type fsym x))))))))
+             (error/unsupported-type fsym x))))))))
 
 (define (mk-check typeid pred)
   (lambda (fsym index param)
     (unless (pred param)
-      (error fsym "cannot convert to ODBC ~s type: ~e" (typeid->type typeid) param))
+      (error/no-convert fsym "ODBC" (typeid->type typeid) param))
     param))
 
 (define (check-numeric fsym index param)
-  (define (bad note) (error fsym "cannot convert to ODBC numeric type~a: ~e" note param))
+  (define (bad note)
+    (error/no-convert fsym "ODBC" "numeric" param note))
   (unless (rational? param) (bad ""))
   (let ([scaled (exact->scaled-integer (inexact->exact param))])
     (unless scaled (bad ""))
     (let ([ma (car scaled)]
           [ex (cdr scaled)])
       ;; check (abs ma) fits in 16*8 bits, ex fits in char
-      (unless (<= -128 ex 127) (bad " (scale too large)"))
-      (unless (< (abs ma) (expt 2 (* 16 8))) (bad " (mantissa too long)"))
+      (unless (<= -128 ex 127) (bad "(scale too large)"))
+      (unless (< (abs ma) (expt 2 (* 16 8))) (bad "(mantissa too long)"))
       (cons ma ex))))
 
 (defchecks get-check
@@ -146,6 +146,3 @@
   (case x
     ((0 1 2 3 4 5 6 7 8 9 12 91 92 93 -1 -2 -3 -4 -5 -6 -7 -8 -9 -10) #t)
     (else #f)))
-
-(define (unsupported-type fsym typeid)
-  (error fsym "unsupported type: (typeid ~s)" typeid))

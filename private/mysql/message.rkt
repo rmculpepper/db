@@ -11,6 +11,7 @@ Based on protocol documentation here:
 (require racket/match
          "../generic/sql-data.rkt"
          "../generic/sql-convert.rkt"
+         "../generic/interfaces.rkt"
          "../../util/private/geometry.rkt")
 (provide write-packet
          parse-packet
@@ -45,8 +46,8 @@ Based on protocol documentation here:
 (define (subport in len)
   (let ([bytes (io:read-bytes-as-bytes in len)])
     (unless (and (bytes? bytes) (= (bytes-length bytes) len))
-      (error 'subport "truncated input; expected ~s bytes, got ~s"
-             len (if (bytes? bytes) (bytes-length bytes) 0)))
+      (error/internal 'subport "truncated input; expected ~s bytes, got ~s"
+                      len (if (bytes? bytes) (bytes-length bytes) 0)))
     (open-input-bytes bytes)))
 
 ;; WRITING FUNCTIONS
@@ -156,7 +157,7 @@ Based on protocol documentation here:
     (else
      (let ([b (read-bytes count port)])
        (unless (and (bytes? b) (= count (bytes-length b)))
-         (error 'io:read-le-intN "unexpected eof; got ~s" b))
+         (error/internal 'io:read-le-intN "unexpected eof; got ~s" b))
        (let loop ([pos 0])
          (if (< pos count)
              (+ (arithmetic-shift (loop (add1 pos)) 8)
@@ -363,8 +364,8 @@ Based on protocol documentation here:
          [inp (subport in len)]
          [msg (parse-packet/1 inp expect len field-dvecs)])
     (when (port-has-bytes? inp)
-      (error 'parse-packet "bytes left over after parsing ~s; bytes were: ~s" 
-             msg (io:read-bytes-to-eof inp)))
+      (error/internal 'parse-packet "bytes left over after parsing ~s; bytes were: ~s" 
+                      msg (io:read-bytes-to-eof inp)))
     (values num msg)))
 
 (define (port-has-bytes? p)
@@ -382,11 +383,11 @@ Based on protocol documentation here:
      (parse-handshake-packet in len))
     ((auth)
      (unless (eq? (peek-byte in) #x00)
-       (error 'parse-packet "expect auth ok packet"))
+       (error/comm 'parse-packet "(expect authentication ok packet)"))
      (parse-ok-packet in len))
     ((ok)
      (unless (eq? (peek-byte in) #x00)
-       (error 'parse-packet "expect ok packet"))
+       (error/comm 'parse-packet "(expect ok packet)"))
      (parse-ok-packet in len))
     ((result)
      (if (eq? (peek-byte in) #x00)
@@ -411,7 +412,7 @@ Based on protocol documentation here:
          (parse-eof-packet in len)
          (parse-parameter-packet in len)))
     (else
-     (error 'parse-packet "bad expected packet type: ~s" expect))))
+     (error/comm 'parse-packet (format "(bad expected packet type: ~s)" expect)))))
 
 ;; Individual parsers
 
@@ -550,11 +551,8 @@ Based on protocol documentation here:
          [warnings (and (>= len 12) (io:read-le-int16 in))]
          [_ (io:read-bytes-to-eof in)])
     (unless (zero? ok)
-      (error 'parse-ok-prepared-statement-packet
-             "first byte was ~s" ok))
-    (make-ok-prepared-statement-packet statement-handler-id
-                                       columns
-                                       params)))
+      (error/comm 'parse-ok-prepared-statement-packet (format "first byte was ~s" ok)))
+    (make-ok-prepared-statement-packet statement-handler-id columns params)))
 
 (define (parse-parameter-packet in len)
   (let* ([type (io:read-le-int16 in)]
@@ -681,11 +679,11 @@ Based on protocol documentation here:
 
     ;; FIXME
     ((decimal)
-     (error 'get-param "unimplemented decimal type: ~s" type))
+     (error/internal 'get-param "unimplemented decimal type: ~s" type))
     ((enum set)
-     (error 'get-result "unimplemented type: ~s" type))
+     (error/internal 'get-result "unimplemented type: ~s" type))
     (else
-     (error 'get-result "unknown type: ~s" type))))
+     (error/internal 'get-result "unknown type: ~s" type))))
 
 (define (supported-result-typeid? typeid)
   (case typeid
@@ -717,7 +715,7 @@ Based on protocol documentation here:
         [(geometry2d? param)
          'geometry]
         [else
-         (error 'choose-param-type "internal error: bad parameter value: ~e" param)]))
+         (error/internal 'choose-param-type "bad parameter value: ~e" param)]))
 
 (define (write-binary-datum out type param)
   (case type
@@ -777,7 +775,7 @@ Based on protocol documentation here:
   (let ([val (assq key table)])
     (if val
         (cdr val)
-        (error function "not found: ~s" key))))
+        (error/internal function "not found: ~s" key))))
 
 (define (encode-flags flags table function)
   (apply bitwise-ior
@@ -923,7 +921,7 @@ Based on protocol documentation here:
 (define (encode-charset charset)
   (case charset
     ((utf8-general-ci) 33)
-    (else (error 'encode-charset "unknown charset: ~e" charset))))
+    (else (error/internal 'encode-charset "unknown charset: ~e" charset))))
 (define (decode-charset n)
   (case n
     ((33) 'utf8-general-ci)

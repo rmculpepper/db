@@ -6,7 +6,7 @@
 (require rackunit
          racket/class
          (prefix-in srfi: srfi/19)
-         "../private/generic/main.rkt"
+         "../base.rkt"
          "../private/generic/sql-convert.rkt"
          "config.rkt")
 (provide gen-sql-types:test)

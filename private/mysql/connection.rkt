@@ -48,7 +48,7 @@
       (semaphore-wait wlock)
       (when (and require-connected? (not outport))
         (semaphore-post wlock)
-        (error who "not connected")))
+        (error/not-connected who)))
 
     (define/private (unlock)
       (semaphore-post wlock))
@@ -102,9 +102,9 @@
         (unless (or (not expectation) 
                     (null? ss)
                     (memq expectation ss))
-          (error fsym "internal error: unexpected packet")))
+          (error/comm fsym)))
       (define (err packet)
-        (error fsym "internal error: unexpected packet"))
+        (error/comm fsym))
       (let-values ([(msg-num next) (parse-packet inport expectation field-dvecs)])
         (set! next-msg-num (add1 msg-num))
         ;; Update transaction status (see Transactions below)
@@ -207,16 +207,14 @@
                (scramble-password scramble password)
                dbname))
              (expect-auth-confirmation)]
-            [_
-             (error 'mysql-connect
-                    "internal error: unknown message during authentication")]))))
+            [_ (error/comm 'mysql-connect "during authentication")]))))
 
     (define/private (check-required-flags capabilities)
       (for-each (lambda (rf)
                   (unless (memq rf capabilities)
-                    (error 'mysql-connect
-                           "server does not support required capability: ~s"
-                           rf)))
+                    (uerror 'mysql-connect
+                            "server does not support required capability: ~s"
+                            rf)))
                 REQUIRED-CAPABILITIES))
 
     (define/private (desired-capabilities capabilities)
@@ -230,9 +228,7 @@
         (match r
           [(struct ok-packet (_ _ status warnings message))
            (after-connect)]
-          [_
-           (error 'mysql-connect
-                  "internal error: unknown message after authentication")])))
+          [_ (error/comm 'mysql-connect "after authentication")])))
 
     ;; Set connection to use utf8 encoding
     (define/private (after-connect)
@@ -250,7 +246,7 @@
 
     ;; query : symbol Statement Collector -> QueryResult
     (define/public (query fsym stmt collector)
-      (check-valid-tx-status fsym)
+      (check-valid-tx-status fsym tx-status)
       (let-values ([(stmt result)
                     (call-with-lock fsym
                       (lambda ()
@@ -273,7 +269,7 @@
                (send pst check-owner fsym this stmt)
                (for ([typeid (in-list (send pst get-result-typeids))])
                  (unless (supported-result-typeid? typeid)
-                   (error fsym "unsupported type: ~a" typeid)))
+                   (error/unsupported-type fsym typeid)))
                stmt)]
             [(and (string? stmt) (force-prepare-sql? fsym stmt))
              (let ([pst (prepare1 fsym stmt #t)])
@@ -340,7 +336,7 @@
 
     ;; prepare : symbol string boolean -> PreparedStatement
     (define/public (prepare fsym stmt close-on-exec?)
-      (check-valid-tx-status fsym)
+      (check-valid-tx-status fsym tx-status)
       (call-with-lock fsym
         (lambda ()
           (prepare1 fsym stmt close-on-exec?))))
@@ -394,15 +390,11 @@
     (define/public (transaction-status fsym)
       (call-with-lock fsym (lambda () tx-status)))
 
-    (define/private (check-valid-tx-status fsym)
-      (when (eq? tx-status 'invalid)
-        (error fsym "current transaction is invalid and must be explicitly rolled back")))
-
     (define/public (start-transaction fsym flags)
       (call-with-lock fsym
         (lambda ()
           (when tx-status
-            (error fsym "already in transaction"))
+            (error/already-in-tx fsym))
           ;; SET TRANSACTION ISOLATION LEVEL sets mode for *next* transaction
           ;; so need lock around both statements
           (let* ([isolation-level
@@ -421,7 +413,7 @@
       (call-with-lock fsym
         (lambda ()
           (unless (eq? mode 'rollback)
-            (check-valid-tx-status fsym))
+            (check-valid-tx-status fsym tx-status))
           (let ([stmt (case mode
                         ((commit) "COMMIT")
                         ((rollback) "ROLLBACK"))])

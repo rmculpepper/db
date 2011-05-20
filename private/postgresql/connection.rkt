@@ -52,7 +52,7 @@
       (semaphore-wait wlock)
       (when (and require-connected? (not outport))
         (semaphore-post wlock)
-        (error who "not connected")))
+        (error/not-connected who)))
 
     (define/private (unlock)
       (let ([handler-calls delayed-handler-calls])
@@ -117,8 +117,7 @@
                  ((transaction) (set! tx-status #t))
                  ((failed) (set! tx-status 'invalid)))]
               [(and or-eof? (eof-object? r)) (void)]
-              [else
-               (error fsym "internal error: backend sent unexpected message")])))
+              [else (error/comm fsym)])))
 
     ;; == Asynchronous messages
 
@@ -140,11 +139,11 @@
          (cond [(equal? name "client_encoding")
                 (unless (equal? value "UTF8")
                   (disconnect* #f)
-                  (error fsym
-                         (string-append
-                          "backend attempted to change the client character encoding "
-                          "from UTF8 to ~a, disconnecting")
-                         value))]
+                  (uerror fsym
+                          (string-append
+                           "backend attempted to change the client character encoding "
+                           "from UTF8 to ~a, disconnecting")
+                          value))]
                [else (void)])]))
 
     ;; == Connection management
@@ -215,31 +214,29 @@
            (connect:expect-ready-for-query)]
           [(struct AuthenticationCleartextPassword ())
            (unless (string? password)
-             (error 'postgresql-connect "password needed but not supplied"))
+             (error/need-password 'postgresql-connect))
            (unless allow-cleartext-password?
-             (error 'postgresql-connect (nosupport "cleartext password")))
+             (uerror 'postgresql-connect (nosupport "cleartext password")))
            (send-message (make-PasswordMessage password))
            (connect:expect-auth username password)]
           [(struct AuthenticationCryptPassword (salt))
            (unless #f ;; crypt() support removed
-             (error 'postgresql-connect (nosupport "crypt()-encrypted password")))
+             (uerror 'postgresql-connect (nosupport "crypt()-encrypted password")))
            (unless (string? password)
-             (error 'postgresql-connect "password needed but not supplied"))
+             (error/need-password 'postgresql-connect))
            (send-message (make-PasswordMessage (crypt-password password salt)))
            (connect:expect-auth username password)]
           [(struct AuthenticationMD5Password (salt))
            (unless (string? password)
-             (error 'postgresql-connect "password needed but not supplied"))
+             (error/need-password 'postgresql-connect))
            (send-message (make-PasswordMessage (md5-password username password salt)))
            (connect:expect-auth username password)]
           [(struct AuthenticationKerberosV5 ())
-           (error 'postgresql-connect (nosupport "KerberosV5 authentication"))]
+           (uerror 'postgresql-connect (nosupport "KerberosV5 authentication"))]
           [(struct AuthenticationSCMCredential ())
-           (error 'postgresql-connect (nosupport "SCM authentication"))]
+           (uerror 'postgresql-connect (nosupport "SCM authentication"))]
           ;; ErrorResponse handled by recv-message
-          [_
-           (error 'postgresql-connect
-                  "internal error: unknown message during authentication")])))
+          [_ (error/comm 'postgresql-connect "during authentication")])))
 
     ;; connect:expect-ready-for-query : -> void
     (define/private (connect:expect-ready-for-query)
@@ -251,8 +248,7 @@
            (set! process-id pid)
            (connect:expect-ready-for-query)]
           [_
-           (error 'postgresql-connect
-                  "internal error: unknown message after authentication")])))
+           (error/comm 'postgresql-connect "after authentication")])))
 
     ;; ============================================================
 
@@ -263,7 +259,7 @@
       (let-values ([(stmt result)
                     (call-with-lock fsym
                       (lambda ()
-                        (check-valid-tx-status fsym)
+                        (check-valid-tx-status fsym tx-status)
                         (query1 fsym stmt0)))])
         (statement:after-exec stmt)
         (query1:process-result fsym collector result)))
@@ -339,10 +335,10 @@
     (define/private (query1:error fsym r)
       (match r
         [(struct CopyInResponse (format column-formats))
-         (error fsym (nosupport "COPY IN statements"))]
+         (uerror fsym (nosupport "COPY IN statements"))]
         [(struct CopyOutResponse (format column-formats))
-         (error fsym (nosupport "COPY OUT statements"))]
-        [_ (error fsym "internal error: unexpected message")]))
+         (uerror fsym (nosupport "COPY OUT statements"))]
+        [_ (error/comm fsym)]))
 
     (define/private (query1:process-result fsym collector result)
       (match result
@@ -379,7 +375,7 @@
     (define/public (prepare fsym stmt close-on-exec?)
       (call-with-lock fsym
         (lambda ()
-          (check-valid-tx-status fsym)
+          (check-valid-tx-status fsym tx-status)
           (prepare1 fsym stmt close-on-exec?))))
 
     (define/private (prepare1 fsym stmt close-on-exec?)
@@ -419,7 +415,7 @@
         [other-r (prepare1:error fsym other-r)]))
 
     (define/private (prepare1:error fsym r)
-      (error fsym "internal error: unexpected message in prepare"))
+      (error/comm fsym "during prepare"))
 
     ;; name-counter : nat
     (define name-counter 0)
@@ -442,7 +438,7 @@
               (buffer-message (make-Sync))
               (let ([r (recv-message 'free-statement)])
                 (cond [(CloseComplete? r) (void)]
-                      [else (error 'free-statement "internal error: unexpected message")])
+                      [else (error/comm 'free-statement)])
                 (check-ready-for-query 'free-statement #t)))))))
 
     ;; == Transactions
@@ -450,15 +446,11 @@
     (define/public (transaction-status fsym)
       (call-with-lock fsym (lambda () tx-status)))
 
-    (define/private (check-valid-tx-status fsym)
-      (when (eq? tx-status 'invalid)
-        (error fsym "current transaction is invalid and must be explicitly rolled back")))
-
     (define/public (start-transaction fsym flags)
       (call-with-lock fsym
         (lambda ()
           (when tx-status
-            (error fsym "already in transaction"))
+            (error/already-in-tx fsym))
           (let* ([isolation-level
                   (cond [(memq 'serializable flags) "SERIALIZABLE"]
                         [(memq 'repeatable-read flags) "REPEATABLE READ"]
@@ -482,7 +474,7 @@
         (lambda ()
           (unless (eq? mode 'rollback)
             ;; otherwise, COMMIT statement would cause silent ROLLBACK !!!
-            (check-valid-tx-status fsym))
+            (check-valid-tx-status fsym tx-status))
           (let ([stmt (case mode
                         ((commit) "COMMIT WORK")
                         ((rollback) "ROLLBACK WORK"))])
@@ -530,8 +522,7 @@
                 (let ([r (parse-server-message in)])
                   (raise-backend-error 'postgresql-connect r)))
                (else
-                (error 'postgresql-connect
-                       "backend returned invalid response to SSL request")))))
+                (error/comm 'postgresql-connect "after SSL request")))))
           ((no)
            (super attach-to-ports in out)))))))
 
@@ -555,7 +546,7 @@
     (bytes-append #"md5" t)))
 
 (define (crypt-password password salt)
-  (error 'crypt-password "not implemented"))
+  (uerror 'crypt-password "not implemented"))
 
 ;; raise-backend-error : symbol ErrorResponse -> raises exn
 (define (raise-backend-error who r)

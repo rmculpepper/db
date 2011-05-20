@@ -6,7 +6,7 @@
 (require racket/contract
          racket/class
          racket/tcp
-         "../generic/main.rkt"
+         "../generic/interfaces.rkt"
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
          "connection.rkt"
@@ -25,7 +25,7 @@
          (+ (if (or server port) 1 0)
             (if socket 1 0))])
     (when (> connection-options 1)
-      (error 'mysql-connect "cannot give both server/port and socket arguments")))
+      (uerror 'mysql-connect "cannot give both server/port and socket arguments")))
   (let ([c (new connection%)])
     (cond [socket
            (let-values ([(in out) (unix-socket-connect socket)])

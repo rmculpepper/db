@@ -53,14 +53,14 @@
 
     (define/public (get-db fsym)
       (unless db
-        (error fsym "not connected"))
+        (error/not-connected fsym))
       db)
 
     (define/public (get-dbsystem) dbsystem)
     (define/public (connected?) (and db #t))
 
     (define/public (query fsym stmt collector)
-      (check-valid-tx-status fsym)
+      (check-valid-tx-status fsym tx-status)
       (query1 fsym stmt collector))
 
     (define/private (query1 fsym stmt collector)
@@ -79,7 +79,7 @@
         (for ([dvec (in-list result-dvecs)])
           (let ([typeid (field-dvec->typeid dvec)])
             (unless (supported-typeid? typeid)
-              (unsupported-type fsym typeid)))))
+              (error/unsupported-type fsym typeid)))))
       (define-values (dvecs rows)
         (with-lock
          (let* ([db (get-db fsym)]
@@ -215,7 +215,7 @@
                        (integer->integer-bytes (sql-timestamp-nanosecond x) 4 #f)))))]
             [(sql-null? param)
              (bind SQL_C_CHAR SQL_VARCHAR #f)]
-            [else (error fsym "internal error: convert to typeid ~a: ~e" typeid param)]))
+            [else (error/internal fsym "cannot convert to typeid ~a: ~e" typeid param)]))
 
     (define/private (fetch* fsym stmt result-typeids)
       ;; scratchbuf: create a single buffer here to try to reduce garbage
@@ -262,8 +262,8 @@
                               ((1) (read-byte in))
                               ((2) (integer-bytes->integer (read-bytes 2 in) #f))
                               ((4) (integer-bytes->integer (read-bytes 4 in) #f))
-                              (else (error 'get-int-list
-                                           "internal error: bad size: ~e" size)))))]))))
+                              (else (error/internal
+                                     'get-int-list "bad size: ~e" size)))))]))))
 
       (define (get-varbuf ctype ntlen convert)
         ;; ntlen is null-terminator length (1 for char data, 0 for binary, ??? for wchar)
@@ -398,7 +398,7 @@
             [else (get-string)]))
 
     (define/public (prepare fsym stmt close-on-exec?)
-      (check-valid-tx-status fsym)
+      (check-valid-tx-status fsym tx-status)
       (prepare1 fsym stmt close-on-exec?))
 
     (define/private (prepare1 fsym sql close-on-exec?)
@@ -478,10 +478,6 @@
 
     (define tx-status #f)
 
-    (define/private (check-valid-tx-status fsym)
-      (when (eq? tx-status 'invalid)
-        (error fsym "current transaction is invalid and must be explicitly rolled back")))
-
     (define/public (transaction-status fsym)
       (with-lock (let ([db (get-db fsym)]) tx-status)))
 
@@ -490,7 +486,7 @@
       (with-lock
        (let* ([db (get-db fsym)])
          (when tx-status
-           (error fsym "already in transaction"))
+           (error/already-in-tx fsym))
          (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_OFF)])
            (handle-status fsym status db)
            (set! tx-status #t)
@@ -499,7 +495,7 @@
     (define/public (end-transaction fsym mode)
       (with-lock
        (unless (eq? mode 'rollback)
-         (check-valid-tx-status fsym))
+         (check-valid-tx-status fsym tx-status))
        (let ([db (get-db fsym)]
              [completion-type
               (case mode
@@ -560,9 +556,8 @@
          s]
         [(= s SQL_ERROR)
          (when handle (diag-info who handle 'error #f))
-         (error who "error: ~e" s)]
+         (uerror who "unknown error (no diagnostic returned)")]
         [else s]))
-;; FIXME: check codes, what to allow, what to get error on
 
 (define (diag-info who handle mode on-notice)
   (let ([handle-type
@@ -570,7 +565,7 @@
                [(sqlhdbc? handle) SQL_HANDLE_DBC]
                [(sqlhstmt? handle) SQL_HANDLE_STMT]
                [else
-                (error 'diag-info "internal error: unknown handle type: ~e" handle)])])
+                (error/internal 'diag-info "unknown handle type: ~e" handle)])])
     (let-values ([(status sqlstate native-errcode message)
                   (SQLGetDiagRec handle-type handle 1)])
       (case mode

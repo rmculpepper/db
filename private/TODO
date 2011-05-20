@@ -78,5 +78,3 @@ Types
     - if converts to rollback, how to detect?
   - add connect option #:rollback-invalid-transactions?
   - enough to implement connection pooling?
-
-- extract common error checks, messages etc

@@ -69,9 +69,7 @@
   (let [(result (query1 c fsym sql collector))]
     (cond [(recordset? result) result]
           [else
-           (raise-mismatch-error
-            fsym
-            "query did not return recordset: " sql)])))
+           (error fsym "query did not return recordset: ~e" sql)])))
 
 ;; -fold : connection symbol Statement ('a fieldv -> 'a) 'a -> 'a
 (define (-fold c fsym sql f base)

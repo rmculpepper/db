@@ -6,8 +6,7 @@
 (require racket/class
          racket/contract
          racket/tcp
-         "../generic/main.rkt"
-         (only-in "../generic/interfaces.rkt" make-handler)
+         "../generic/interfaces.rkt"
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
          "connection.rkt"
@@ -36,7 +35,7 @@
              notification-handler
              (make-print-notification notification-handler))])
     (when (> connection-options 1)
-      (error 'postgresql-connect "cannot give both server/port and socket arguments"))
+      (uerror 'postgresql-connect "cannot give both server/port and socket arguments"))
     (let ([c (new connection%
                   (notice-handler notice-handler)
                   (notification-handler notification-handler)

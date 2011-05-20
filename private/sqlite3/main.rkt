@@ -5,7 +5,6 @@
 #lang racket/base
 (require racket/class
          racket/contract
-         "../generic/main.rkt"
          "../generic/check-access.rkt"
          "connection.rkt"
          "dbsystem.rkt"
@@ -38,5 +37,5 @@
                                      ((read/write) SQLITE_OPEN_READWRITE)
                                      ((create)
                                       (+ SQLITE_OPEN_READWRITE SQLITE_OPEN_CREATE))))])
-      (handle-status 'sqlite3-connect open-status)
+      (handle-status 'sqlite3-connect open-status db)
       (new connection% (db db)))))

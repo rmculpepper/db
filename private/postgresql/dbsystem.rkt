@@ -144,7 +144,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
   (case (bytes-ref x 0)
     ((0) #f)
     ((1) #t)
-    (else (error 'recv-boolean "bad value: ~e" x))))
+    (else (error/internal 'recv-boolean "bad value: ~e" x))))
 
 (define (recv-char1 x)
   (integer->char (bytes-ref x 0)))
@@ -334,8 +334,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 
 ;; send-error : string datum -> (raises error)
 (define (send-error f i type datum)
-  (error f "cannot send as SQL type ~s: ~e"
-         type datum))
+  (error/no-convert f "PostgreSQL" type datum))
 
 ;; == Readers and writers ==
 
@@ -373,7 +372,7 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 
     ;; "string" literals have type unknown; just treat as string
     ((705) recv-string)
-    (else (unsupported-type fsym typeid (typeid->type typeid)))))
+    (else (error/unsupported-type fsym typeid (typeid->type typeid)))))
 
 (define (typeid->type-writer typeid)
   (case typeid
@@ -418,9 +417,4 @@ record = cols:int4 (typeoid:int4 len/-1:int4 data:byte^len)^cols
 
 (define (make-unsupported-writer x t)
   (lambda (fsym . args)
-    (unsupported-type fsym x t)))
-
-(define (unsupported-type fsym x t)
-  (if t
-      (error fsym "unsupported type: ~a (typeid ~a)" t x)
-      (error fsym "unsupported type: (typeid ~a)" x)))
+    (error/unsupported-type fsym x t)))

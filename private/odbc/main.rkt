@@ -5,8 +5,7 @@
 #lang racket/base
 (require racket/class
          racket/contract
-         "../generic/main.rkt"
-         (only-in "../generic/interfaces.rkt" make-handler)
+         "../generic/interfaces.rkt"
          "../generic/check-access.rkt"
          "connection.rkt"
          "dbsystem.rkt"
@@ -25,9 +24,9 @@
                       #:strict-parameter-types? [strict-parameter-types? #f]
                       #:character-mode [char-mode 'wchar])
   (when (and dsn database)
-    (error 'odbc-connect "cannot give both #:dsn and #:database arguments"))
+    (uerror 'odbc-connect "cannot give both #:dsn and #:database arguments"))
   (unless (or dsn database)
-    (error 'odbc-connect "missing #:dsn argument"))
+    (uerror 'odbc-connect "missing #:dsn argument"))
   (let ([dsn (or dsn database)]
         [notice-handler (make-handler notice-handler "notice")])
     (call-with-env 'odbc-connect
@@ -105,7 +104,7 @@
                #:when (positive? (bytes-length p)))
       (let* ([s (bytes->string/utf-8 p)]
              [m (regexp-match-positions #rx"=" s)])
-        (unless m (error 'odbc-drivers "bad attribute syntax: ~e" s))
+        (unless m (error/internal 'odbc-drivers "bad attribute syntax: ~e" s))
         (let ([=-pos (caar m)])
           (cons (substring s 0 =-pos) (substring s (+ 1 =-pos))))))))
 

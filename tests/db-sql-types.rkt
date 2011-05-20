@@ -8,7 +8,7 @@
          racket/math
          racket/string
          (prefix-in srfi: srfi/19)
-         "../private/generic/main.rkt"
+         "../base.rkt"
          "../private/generic/sql-convert.rkt"
          "../util/geometry.rkt"
          "../util/postgresql.rkt"

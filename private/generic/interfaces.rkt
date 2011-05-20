@@ -225,3 +225,50 @@ producing plain old exn:fail.
                       (current-continuation-marks)
                       sqlstate
                       info)))
+
+;; ----------------------------------------
+
+;; Common Errors
+
+(provide uerror
+         error/internal
+         error/not-connected
+         error/need-password
+         error/comm
+         error/unsupported-type
+         check-valid-tx-status
+         error/already-in-tx
+         error/no-convert)
+
+;;(define uerror raise-user-error)
+(define uerror error)
+
+(define (error/internal fsym fmt . args)
+  (apply error fsym (string-append "internal error: " fmt) args))
+
+(define (error/not-connected fsym)
+  (uerror fsym "not connected"))
+
+(define (error/need-password fsym)
+  (uerror fsym "password needed but not supplied"))
+
+(define (error/comm fsym [when-occurred #f])
+  (if when-occurred
+      (error/internal fsym "communication problem ~a" when-occurred)
+      (error/internal fsym "communication problem")))
+
+(define (error/unsupported-type fsym typeid [type #f])
+  (if type
+      (uerror fsym "unsupported type: ~a (typeid ~a)" type typeid)
+      (uerror fsym "unsupported type: (typeid ~a)" typeid)))
+
+(define (error/already-in-tx fsym)
+  (uerror fsym "already in transaction"))
+
+(define (error/no-convert fsym sys type param [note #f])
+  (uerror fsym "cannot convert to ~a ~a type~a~a: ~e"
+          sys type (if note " " "") (or note "") param))
+
+(define (check-valid-tx-status fsym tx-status)
+  (when (eq? tx-status 'invalid)
+    (uerror fsym "current transaction is invalid and must be explicitly rolled back")))

@@ -5,6 +5,7 @@
 #lang racket/base
 (require (for-syntax racket/base)
          racket/match
+         "../generic/interfaces.rkt"
          "../generic/sql-data.rkt")
 (provide write-message
          parse-server-message
@@ -57,8 +58,8 @@
 (define (subport in len)
   (let ([bytes (io:read-bytes-as-bytes in len)])
     (unless (and (bytes? bytes) (= (bytes-length bytes) len))
-      (error 'subport "truncated input; expected ~s bytes, got ~s"
-             len (if (bytes? bytes) (bytes-length bytes) 0)))
+      (error/internal 'subport "truncated input; expected ~s bytes, got ~s"
+                      len (if (bytes? bytes) (bytes-length bytes) 0)))
     (open-input-bytes bytes)))
 
 
@@ -163,8 +164,9 @@
         ((5) (let ([salt (io:read-bytes-as-bytes p 4)])
                (make-AuthenticationMD5Password salt)))
         ((6) (make-AuthenticationSCMCredential))
-        (else (error 'parse:Authentication
-                     "unknown authentication method requested (~s)" tag))))))
+        (else
+         (error/internal 'authentication
+                         "unknown authentication method requested (~s)" tag))))))
 
 (define-struct StartupMessage (parameters))
 (define (write:StartupMessage p v)
@@ -432,7 +434,7 @@
                                 (string->symbol (format "write:~a" (syntax-e type))))))])
          #'(cond [(pred msg) (write port msg)] ...
                  [else
-                  (error 'write-message "internal error: unknown message type: ~e" msg)]))]))
+                  (error/internal 'write-message "unknown message type: ~e" msg)]))]))
   (gen-cond Sync
             Parse
             Describe
@@ -472,8 +474,7 @@
       (else
        (if (eof-object? c)
            c
-           (error 'parse-server-message
-                  "internal error: unknown message header byte: ~e" c))))))
+           (error/internal 'parse-server-message "unknown message header byte: ~e" c))))))
 
 ;; ========================================
 ;; Helpers

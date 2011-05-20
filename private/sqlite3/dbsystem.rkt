@@ -38,5 +38,5 @@
   (unless (or (real? param)
               (string? param)
               (bytes? param))
-    (error fsym "cannot convert to SQLite value: ~e" param))
+    (error/no-convert fsym "SQLite" "parameter" param))
   param)

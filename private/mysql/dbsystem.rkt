@@ -54,7 +54,7 @@
               (sql-day-time-interval? param)
               (sql-bits? param)
               (geometry2d? param))
-    (error fsym "cannot marshal as MySQL parameter: ~e" param))
+    (error/no-convert fsym "MySQL" "parameter" param))
   param)
 
 ;; ========================================

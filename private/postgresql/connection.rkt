@@ -11,7 +11,6 @@
          "../generic/interfaces.rkt"
          "../generic/sql-data.rkt"
          "../generic/prepared.rkt"
-         "../generic/exceptions.rkt"
          "message.rkt"
          "dbsystem.rkt")
 (provide connection%)

@@ -14,7 +14,7 @@
          "ffi.rkt"
          "dbsystem.rkt")
 (provide connection%
-         handle-status)
+         handle-status*)
 
 ;; == Connection
 
@@ -26,13 +26,17 @@
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
 
+    (define invalid-tx #f) ;; #f or 'invalid for compat w/ check-valid-tx-status
+    (define saved-tx-status #f) ;; set by with-lock, only valid while locked
+
     (define-syntax-rule (with-lock . body)
       (begin (semaphore-wait lock)
              (with-handlers ([values (lambda (e) (semaphore-post lock) (raise e))])
+               (set! saved-tx-status (get-tx-status))
                (begin0 (let () . body)
                  (semaphore-post lock)))))
 
-    (define/public (get-db fsym)
+    (define/private (get-db fsym)
       (or -db (error/not-connected fsym)))
 
     (define/public (get-dbsystem) dbsystem)
@@ -41,6 +45,7 @@
     (define/public (query fsym stmt collector)
       (let* ([result
               (with-lock
+               (check-valid-tx-status fsym invalid-tx)
                (let ([db (get-db fsym)])
                  (query1 fsym stmt)))]
              [stmt (car result)]
@@ -67,8 +72,8 @@
         (send pst check-owner fsym this stmt)
         (let ([db (get-db fsym)]
               [stmt (send pst get-handle)])
-          (handle-status fsym (sqlite3_reset stmt) db)
-          (handle-status fsym (sqlite3_clear_bindings stmt) db)
+          (handle-status fsym (sqlite3_reset stmt))
+          (handle-status fsym (sqlite3_clear_bindings stmt))
           (for ([i (in-naturals 1)]
                 [param (in-list params)])
             (load-param fsym db stmt i param))
@@ -77,8 +82,8 @@
                     `((name ,(sqlite3_column_name stmt i))
                       (decltype ,(sqlite3_column_decltype stmt i))))]
                  [rows (step* fsym db stmt)])
-            (handle-status fsym (sqlite3_reset stmt) db)
-            (handle-status fsym (sqlite3_clear_bindings stmt) db)
+            (handle-status fsym (sqlite3_reset stmt))
+            (handle-status fsym (sqlite3_clear_bindings stmt))
             (cons stmt (cons info rows))))))
 
     (define/private (load-param fsym db stmt i param)
@@ -95,8 +100,7 @@
              [(sql-null? param)
               (sqlite3_bind_null stmt i)]
              [else
-              (error/internal fsym "bad parameter: ~e" param)])
-       db))
+              (error/internal fsym "bad parameter: ~e" param)])))
 
     (define/private (step* fsym db stmt)
       (let ([c (step fsym db stmt)])
@@ -125,10 +129,12 @@
                                          (error/internal
                                           fsym "unknown column type: ~e" type)]))))
                  vec)]
-              [else (handle-status fsym s db)])))
+              [else (handle-status fsym s)])))
 
     (define/public (prepare fsym stmt close-on-exec?)
-      (with-lock (prepare1 fsym stmt close-on-exec?)))
+      (with-lock
+       (check-valid-tx-status fsym invalid-tx)
+       (prepare1 fsym stmt close-on-exec?)))
 
     (define/private (prepare1 fsym sql close-on-exec?)
       ;; no time between sqlite3_prepare and table entry
@@ -140,7 +146,7 @@
           (free!) (uerror fsym "SQL syntax error in ~e" tail))
         (when (not (zero? (string-length tail)))
           (free!) (uerror fsym "multiple SQL statements given: ~e" tail))
-        (handle-status fsym prep-status db)
+        (handle-status fsym prep-status)
         (unless stmt (begin (free!) (error/internal fsym "prepare failed")))
         (let* ([param-typeids
                 (for/list ([i (in-range (sqlite3_bind_parameter_count stmt))])
@@ -168,8 +174,8 @@
              (let ([stmt (send pst get-handle)])
                (when stmt
                  (send pst set-handle #f)
-                 (handle-status 'disconnect (sqlite3_finalize stmt) db))))
-           (handle-status 'disconnect (sqlite3_close db) db)
+                 (handle-status 'disconnect (sqlite3_finalize stmt)))))
+           (handle-status 'disconnect (sqlite3_close db))
            (void)))))
 
     (define/public (free-statement pst)
@@ -177,23 +183,30 @@
        (let ([stmt (send pst get-handle)])
          (when stmt
            (send pst set-handle #f)
-           (handle-status 'free-statement (sqlite3_finalize stmt) -db)
+           (handle-status 'free-statement (sqlite3_finalize stmt))
            (void)))))
 
 
     ;; == Transactions
 
+    ;; http://www.sqlite.org/lang_transaction.html
+
     (define/public (transaction-status fsym)
       (with-lock
        (let ([db (get-db fsym)])
-         (not (sqlite3_get_autocommit db)))))
+         (or invalid-tx (get-tx-status db)))))
 
-    (define/public (start-transaction fsym flags)
+    (define/private (get-tx-status [db -db])
+      (and db (not (sqlite3_get_autocommit db))))
+
+    (define/public (start-transaction fsym isolation)
+      ;; Isolation level can be set to READ UNCOMMITTED via pragma, but
+      ;; ignored in all but a few cases, don't bother.
       ;; FIXME: modes are DEFERRED | IMMEDIATE | EXCLUSIVE
       (let ([stmt
              (with-lock
               (let ([db (get-db fsym)])
-                (when (not (sqlite3_get_autocommit db))
+                (when (get-tx-status db)
                   (error/already-in-tx fsym))
                 (let ([r (query1 fsym "BEGIN TRANSACTION")])
                   (car r))))])
@@ -204,15 +217,30 @@
       (let ([stmt
              (with-lock
               (let ([db (get-db fsym)])
-                (when (not (sqlite3_get_autocommit db))
+                (unless (eq? mode 'rollback)
+                  (check-valid-tx-status fsym invalid-tx))
+                (when (get-tx-status db)
                   (let ([r (case mode
                              ((commit)
                               (query1 fsym "COMMIT TRANSACTION"))
                              ((rollback)
                               (query1 fsym "ROLLBACK TRANSACTION")))])
+                    (set! invalid-tx #f)
                     (car r)))))])
         (statement:after-exec stmt)
         (void)))
+
+    ;; ----
+
+    ;; Some errors can cause whole transaction to rollback;
+    ;; (see http://www.sqlite.org/lang_transaction.html)
+    ;; So when those errors occur, compare current tx-status w/ saved.
+    ;; Can't figure out how to test...
+    (define/private (handle-status who s)
+      (when (memv s maybe-rollback-status-list)
+        (when (and saved-tx-status (not (get-tx-status -db))) ;; was in trans, now not
+          (set! invalid-tx 'invalid)))
+      (handle-status* who s -db))
 
     ;; ----
 
@@ -235,7 +263,7 @@
 ;; handle-status : symbol integer -> integer
 ;; Returns the status code if no error occurred, otherwise
 ;; raises an exception with an appropriate message.
-(define (handle-status who s db)
+(define (handle-status* who s db)
   (if (or (= s SQLITE_OK)
           (= s SQLITE_ROW)
           (= s SQLITE_DONE))
@@ -276,3 +304,7 @@
          (sqlite3_errmsg db)]
         [(assoc s error-table) => cdr]
         [else "unknown condition"]))
+
+;; http://www.sqlite.org/lang_transaction.html
+(define maybe-rollback-status-list
+  (list SQLITE_FULL SQLITE_IOERR SQLITE_BUSY SQLITE_NOMEM SQLITE_INTERRUPT))

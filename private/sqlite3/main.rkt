@@ -37,5 +37,5 @@
                                      ((read/write) SQLITE_OPEN_READWRITE)
                                      ((create)
                                       (+ SQLITE_OPEN_READWRITE SQLITE_OPEN_CREATE))))])
-      (handle-status 'sqlite3-connect open-status db)
+      (handle-status* 'sqlite3-connect open-status db)
       (new connection% (db db)))))

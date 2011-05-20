@@ -469,16 +469,17 @@ transaction if an error occurred in a previous statement.
 @bold{Errors} Query errors may affect an open transaction in one of
 three ways:
 @itemlist[#:style 'ordered
-@item{the transaction may remain open and unchanged}
-@item{the transaction may be automatically rolled back}
-@item{the transaction may become an @deftech{invalid transaction}; all
+@item{the transaction remains open and unchanged}
+@item{the transaction is automatically rolled back}
+@item{the transaction becomes an @deftech{invalid transaction}; all
 subsequent queries will fail until the transaction is explicitly
 rolled back}
 ]
 To avoid the silent loss of information, this library attempts to
-avoid behavior (2) completely. Behaviors (1) and (3) can be
-distinguished using the @racket[needs-rollback?] function. The
-following list is a rough guide to what errors cause which behaviors:
+avoid behavior (2) completely by marking transactions as invalid
+instead (3). Invalid transactions can be identified using the
+@racket[needs-rollback?] function. The following list is a rough guide
+to what errors cause which behaviors:
 @itemlist[
 @item{All errors raised by checks performed by this library, such as
   parameter arity and type errors, leave the transaction open and
@@ -492,22 +493,38 @@ following list is a rough guide to what errors cause which behaviors:
   (see @hyperlink["http://dev.mysql.com/doc/refman/5.1/en/innodb-error-handling.html"]{the
   MySQL documentation}). This library detects those cases and marks
   the transaction invalid instead.}
-@item{All errors originating from SQLite leave the transaction
-  open and unchanged (1).}
+@item{Most errors originating from SQLite leave the transaction open
+  and unchanged (1), but a few cause the transaction to become
+  invalid (3). In the latter cases, the underlying behavior of SQLite
+  is to roll back the transaction (see
+  @hyperlink["http://www.sqlite.org/lang_transaction.html"]{the SQLite
+  documentation}). This library detects those cases and marks the
+  transaction invalid instead.}
 @item{All errors originating from an ODBC driver cause the transaction
   to become invalid (3). The underlying behavior of ODBC drivers
   varies widely, and ODBC provides no mechanism to detect when an
   existing transaction has been rolled back, so this library
   intercepts all errors and marks the transaction invalid instead.}
 ]
-Future versions of this library may provide an option to choose
-between behaviors (2) and (3).
+Future versions of this library may refine the set of errors that
+invalidate a transaction (for example, by identifying innocuous ODBC
+errors by SQLSTATE) and may provide an option to automatically
+rollback invalid transactions.
 
-@defproc[(start-transaction [c connection?])
+@defproc[(start-transaction [c connection?]
+                            [isolation-level
+                             (or/c 'serializable
+                                   'repeatable-read
+                                   'read-committed
+                                   'read-uncommitted
+                                   #f)
+                             #f])
          void?]{
 
-  Starts a transaction. If @racket[c] is already in a transaction, an
-  exception is raised.
+  Starts a transaction. If @racket[isolation-level] is given, it is
+  used as the isolation level for the transaction. 
+
+  If @racket[c] is already in a transaction, an exception is raised.
 }
 
 @defproc[(commit-transaction [c connection?]) void?]{
@@ -536,5 +553,6 @@ between behaviors (2) and (3).
 
   Returns @racket[#t] if @racket[c] is in an @tech{invalid
   transaction}. All queries executed using @racket[c] will fail until
-  the transaction is explicitly rolled back.
+  the transaction is explicitly rolled back using
+  @racket[rollback-transaction].
 }

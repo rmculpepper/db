@@ -345,8 +345,8 @@
 
 ;; ========================================
 
-(define (start-transaction c)
-  (send c start-transaction 'start-transaction null))
+(define (start-transaction c [isolation #f])
+  (send c start-transaction 'start-transaction isolation))
 
 (define (commit-transaction c)
   (send c end-transaction 'commit-transaction 'commit))
@@ -430,7 +430,9 @@
       statement-generator?)]
 
  [start-transaction
-  (-> connection? void)]
+  (->* (connection?)
+       ((or/c 'serializable 'repeatable-read 'read-committed 'read-uncommitted #f))
+       void?)]
  [commit-transaction
   (-> connection? void?)]
  [rollback-transaction

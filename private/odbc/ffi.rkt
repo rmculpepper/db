@@ -150,6 +150,16 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (_sqlinteger = 0)
         -> _sqlreturn))
 
+(define-odbc SQLGetInfo
+  (_fun (handle info) ::
+        (handle : _sqlhdbc)
+        (info : _sqlusmallint)
+        (value : (_ptr o _sqluinteger)) ;; the one case we care about is uint, not char
+        (0 : _sqlsmallint)
+        (#f : _pointer)
+        -> (status : _sqlreturn)
+        -> (values status value)))
+
 (define-odbc SQLGetFunctions
   (_fun (handle : _sqlhdbc)
         (function-id : _sqlusmallint)
@@ -351,7 +361,7 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
   (_fun (handle attr) ::
         (handle : _sqlhdbc)
         (attr : _sqlinteger)
-        (value : (_ptr o _sqluinteger)) ;; the one attr we care about has uint value
+        (value : (_ptr o _sqluinteger)) ;; the attrs we care about have uint value
         (buflen : _sqlinteger = 0) ;; ignored
         (#f : _pointer)
         -> (status : _sqlreturn)
@@ -361,6 +371,6 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
   (_fun (handle attr value) ::
         (handle : _sqlhdbc)
         (attr : _sqlinteger)
-        (value : _sqluinteger) ;; the one attr we care about has uint value
+        (value : _sqluinteger) ;; the attrs we care about have uint value
         (_sqlinteger = 0)
         -> _sqlreturn))

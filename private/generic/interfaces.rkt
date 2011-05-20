@@ -21,6 +21,8 @@
          no-cache-prepare<%>
          connector<%>
 
+         isolation-symbol->string
+
          make-handler
 
          (struct-out exn:fail:sql)
@@ -37,7 +39,7 @@
     query         ;; symbol statement collector -> QueryResult
     prepare       ;; symbol preparable boolean -> prepared-statement<%>
 
-    start-transaction  ;; symbol -> void
+    start-transaction  ;; symbol (U 'serializable ...) -> void
     end-transaction    ;; symbol (U 'commit 'rollback) -> void
     transaction-status ;; symbol -> (U boolean 'invalid)
 
@@ -202,6 +204,16 @@
                    ((error) (current-error-port))
                    (else out))
                  "~a: ~a (SQLSTATE ~a)\n" header message code))))
+
+;; ----------------------------------------
+
+(define (isolation-symbol->string isolation)
+  (case isolation
+    ((serializable)     "SERIALIZABLE")
+    ((repeatable-read)  "REPEATABLE READ")
+    ((read-committed)   "READ COMMITTED")
+    ((read-uncommitted) "READ UNCOMMITTED")
+    (else #f)))
 
 ;; ----------------------------------------
 

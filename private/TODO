@@ -78,3 +78,6 @@ Types
     - if converts to rollback, how to detect?
   - add connect option #:rollback-invalid-transactions?
   - enough to implement connection pooling?
+
+- Identify common ODBC errors that can't possibly rollback transaction
+  - test with PostgreSQL ODBC driver using "rollback on all errors" mode

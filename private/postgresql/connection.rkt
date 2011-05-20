@@ -446,27 +446,19 @@
     (define/public (transaction-status fsym)
       (call-with-lock fsym (lambda () tx-status)))
 
-    (define/public (start-transaction fsym flags)
+    (define/public (start-transaction fsym isolation)
       (let ([stmt
              (call-with-lock fsym
                (lambda ()
                  (when tx-status
                    (error/already-in-tx fsym))
-                 (let* ([isolation-level
-                         (cond [(memq 'serializable flags) "SERIALIZABLE"]
-                               [(memq 'repeatable-read flags) "REPEATABLE READ"]
-                               [(memq 'read-committed flags) "READ COMMITTED"]
-                               [(memq 'read-uncommitted flags) "READ UNCOMMITTED"]
-                               [else #f])]
-                        [rw-mode
-                         (cond [(memq 'read-only flags) " READ ONLY"]
-                               [(memq 'read-write flags) " READ WRITE"]
-                               [else ""])]
+                 (let* ([isolation-level (isolation-symbol->string isolation)]
+                        ;; 'read-only  => "READ ONLY"
+                        ;; 'read-write => "READ WRITE"
                         [stmt
-                         (format "BEGIN WORK~a~a~a"
-                                 (if isolation-level " ISOLATION LEVEL " "")
-                                 (or isolation-level "")
-                                 rw-mode)])
+                         (if isolation-level
+                             (string-append "BEGIN WORK ISOLATION LEVE " isolation-level)
+                             "BEGIN WORK")])
                    (let-values ([(stmt result) (query1 fsym stmt)])
                      stmt))))])
         (statement:after-exec stmt)

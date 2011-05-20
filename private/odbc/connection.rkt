@@ -32,6 +32,7 @@
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
     (define async-handler-calls null)
+    (define tx-status #f)
 
     (define use-describe-param?
       (and strict-parameter-types?
@@ -476,17 +477,34 @@
 
     ;; Transactions
 
-    (define tx-status #f)
-
     (define/public (transaction-status fsym)
       (with-lock (let ([db (get-db fsym)]) tx-status)))
 
-    (define/public (start-transaction fsym flags)
-      ;; FIXME: flags
+    (define/public (start-transaction fsym isolation)
       (with-lock
        (let* ([db (get-db fsym)])
          (when tx-status
            (error/already-in-tx fsym))
+         (let* ([ok-levels
+                 (let-values ([(status value) (SQLGetInfo db SQL_TXN_ISOLATION_OPTION)])
+                   (begin0 value (handle-status fsym status db)))]
+                [default-level
+                 (let-values ([(status value) (SQLGetInfo db SQL_DEFAULT_TXN_ISOLATION)])
+                   (begin0 value (handle-status fsym status db)))]
+                [requested-level
+                 (case isolation
+                   ((serializable) SQL_TXN_SERIALIZABLE)
+                   ((repeatable-read) SQL_TXN_REPEATABLE_READ)
+                   ((read-committed) SQL_TXN_READ_COMMITTED)
+                   ((read-uncommitted) SQL_TXN_READ_UNCOMMITTED)
+                   (else
+                    ;; MySQL ODBC returns 0 for default level, seems no good.
+                    ;; So if 0, use serializable.
+                    (if (zero? default-level) SQL_TXN_SERIALIZABLE default-level)))])
+           (when (zero? (bitwise-and requested-level ok-levels))
+             (uerror fsym "requested isolation level ~a is not available" isolation))
+           (let ([status (SQLSetConnectAttr db SQL_ATTR_TXN_ISOLATION requested-level)])
+             (handle-status fsym status db)))
          (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_OFF)])
            (handle-status fsym status db)
            (set! tx-status #t)
@@ -504,6 +522,7 @@
          (handle-status fsym (SQLEndTran db completion-type) db)
          (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)])
            (handle-status fsym status db)
+           ;; commit/rollback can fail; don't change status until possible error handled
            (set! tx-status #f)
            (void)))))
 

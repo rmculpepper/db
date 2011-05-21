@@ -50,7 +50,7 @@
         ;; bad prepare statements set statement to NULL, with no error reported
         (statement : (_ptr o _sqlite3_statement/null)) (tail : (_ptr o _string))
         -> (result : _int)
-        -> (values statement result tail)))
+        -> (values result statement tail)))
 
 (define-sqlite sqlite3_finalize
   (_fun _sqlite3_statement
@@ -155,7 +155,7 @@
   (c-> sqlite3_database? status?)]
  [sqlite3_prepare_v2
   (c-> sqlite3_database? string?
-       (values (or/c sqlite3_statement? false/c) status? string?))]
+       (values status? (or/c sqlite3_statement? false/c) string?))]
  [sqlite3_errmsg
   (c-> sqlite3_database? string?)]
  [sqlite3_step

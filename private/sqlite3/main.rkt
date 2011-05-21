@@ -13,7 +13,9 @@
          (rename-out [dbsystem sqlite3-dbsystem]))
 
 (define (sqlite3-connect #:database path-or-sym
-                         #:mode [mode 'read/write])
+                         #:mode [mode 'read/write]
+                         #:busy-retry-delay [busy-retry-delay 0.1]
+                         #:busy-retry-limit [busy-retry-limit 10])
   (let ([path
          (cond [(symbol? path-or-sym)
                 (case path-or-sym
@@ -38,4 +40,7 @@
                                      ((create)
                                       (+ SQLITE_OPEN_READWRITE SQLITE_OPEN_CREATE))))])
       (handle-status* 'sqlite3-connect open-status db)
-      (new connection% (db db)))))
+      (new connection%
+           (db db)
+           (busy-retry-limit busy-retry-limit)
+           (busy-retry-delay busy-retry-delay)))))

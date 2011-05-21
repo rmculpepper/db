@@ -39,10 +39,6 @@ Types
 
 ----
 
-- sqlite: allow configurable behavior on SQLITE_BUSY
-  eg retry n times, retry forever, retry w/ timeout, fail
-  (is db locked only for write or for whole transaction?)
-
 - doc: enumerate errors
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 

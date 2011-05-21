@@ -30,7 +30,8 @@
   (sort '(#:user #:database #:password #:server #:port #:socket
           #:allow-cleartext-password? #:ssl #:ssl-context
           #:notice-handler #:notification-handler
-          #:mode #:dsn #:strict-parameter-types? #:character-mode)
+          #:mode #:busy-retry-limit #:busy-retry-delay
+          #:dsn #:strict-parameter-types? #:character-mode)
         keyword<?))
 
 (define (wrap-kw-fun proc)
@@ -100,7 +101,9 @@
  ;; Duplicates contracts at sqlite3.rkt
  [sqlite3-connect
   (->* (#:database (or/c path-string? 'memory 'temporary))
-       (#:mode (or/c 'read-only 'read/write 'create))
+       (#:mode (or/c 'read-only 'read/write 'create)
+        #:busy-retry-limit (or/c exact-nonnegative-integer? +inf.0)
+        #:busy-retry-delay (and/c rational? (not/c negative?)))
        any/c)]
 
  ;; Duplicates contracts at odbc.rkt

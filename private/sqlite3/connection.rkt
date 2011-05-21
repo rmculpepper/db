@@ -21,6 +21,8 @@
 (define connection%
   (class* object% (connection<%>)
     (init db)
+    (init-private busy-retry-limit
+                  busy-retry-delay)
 
     (define -db db)
     (define statement-table (make-weak-hasheq))
@@ -72,8 +74,8 @@
         (send pst check-owner fsym this stmt)
         (let ([db (get-db fsym)]
               [stmt (send pst get-handle)])
-          (handle-status fsym (sqlite3_reset stmt))
-          (handle-status fsym (sqlite3_clear_bindings stmt))
+          (HANDLE fsym (sqlite3_reset stmt))
+          (HANDLE fsym (sqlite3_clear_bindings stmt))
           (for ([i (in-naturals 1)]
                 [param (in-list params)])
             (load-param fsym db stmt i param))
@@ -82,13 +84,12 @@
                     `((name ,(sqlite3_column_name stmt i))
                       (decltype ,(sqlite3_column_decltype stmt i))))]
                  [rows (step* fsym db stmt)])
-            (handle-status fsym (sqlite3_reset stmt))
-            (handle-status fsym (sqlite3_clear_bindings stmt))
+            (HANDLE fsym (sqlite3_reset stmt))
+            (HANDLE fsym (sqlite3_clear_bindings stmt))
             (cons stmt (cons info rows))))))
 
     (define/private (load-param fsym db stmt i param)
-      (handle-status
-       fsym
+      (HANDLE fsym
        (cond [(int64? param)
               (sqlite3_bind_int64 stmt i param)]
              [(real? param) ;; includes >64-bit exact integers
@@ -107,7 +108,7 @@
         (if c (cons c (step* fsym db stmt)) null)))
 
     (define/private (step fsym db stmt)
-      (let ([s (sqlite3_step stmt)])
+      (let ([s (HANDLE fsym (sqlite3_step stmt))])
         (cond [(= s SQLITE_DONE) #f]
               [(= s SQLITE_ROW)
                (let* ([column-count (sqlite3_column_count stmt)]
@@ -128,8 +129,7 @@
                                         [else
                                          (error/internal
                                           fsym "unknown column type: ~e" type)]))))
-                 vec)]
-              [else (handle-status fsym s)])))
+                 vec)])))
 
     (define/public (prepare fsym stmt close-on-exec?)
       (with-lock
@@ -138,16 +138,18 @@
 
     (define/private (prepare1 fsym sql close-on-exec?)
       ;; no time between sqlite3_prepare and table entry
-      (let-values ([(db) (get-db fsym)]
-                   [(stmt prep-status tail)
-                    (sqlite3_prepare_v2 (get-db fsym) sql)])
-        (define (free!) (when stmt (sqlite3_finalize stmt)))
-        (when (string=? sql tail)
-          (free!) (uerror fsym "SQL syntax error in ~e" tail))
-        (when (not (zero? (string-length tail)))
-          (free!) (uerror fsym "multiple SQL statements given: ~e" tail))
-        (handle-status fsym prep-status)
-        (unless stmt (begin (free!) (error/internal fsym "prepare failed")))
+      (let*-values ([(db) (get-db fsym)]
+                    [(prep-status stmt)
+                     (HANDLE fsym
+                      (let-values ([(prep-status stmt tail)
+                                    (sqlite3_prepare_v2 db sql)])
+                        (define (free!) (when stmt (sqlite3_finalize stmt)))
+                        (when (string=? sql tail)
+                          (free!) (uerror fsym "SQL syntax error in ~e" tail))
+                        (when (not (zero? (string-length tail)))
+                          (free!) (uerror fsym "multiple SQL statements given: ~e" tail))
+                        (values prep-status stmt)))])
+        (unless stmt (error/internal fsym "prepare failed"))
         (let* ([param-typeids
                 (for/list ([i (in-range (sqlite3_bind_parameter_count stmt))])
                   'any)]
@@ -174,8 +176,8 @@
              (let ([stmt (send pst get-handle)])
                (when stmt
                  (send pst set-handle #f)
-                 (handle-status 'disconnect (sqlite3_finalize stmt)))))
-           (handle-status 'disconnect (sqlite3_close db))
+                 (HANDLE 'disconnect (sqlite3_finalize stmt)))))
+           (HANDLE 'disconnect (sqlite3_close db))
            (void)))))
 
     (define/public (free-statement pst)
@@ -183,7 +185,7 @@
        (let ([stmt (send pst get-handle)])
          (when stmt
            (send pst set-handle #f)
-           (handle-status 'free-statement (sqlite3_finalize stmt))
+           (HANDLE 'free-statement (sqlite3_finalize stmt))
            (void)))))
 
 
@@ -232,6 +234,17 @@
 
     ;; ----
 
+    (define-syntax-rule (HANDLE who expr)
+      (handle* who (lambda () expr) 0))
+
+    (define/private (handle* who thunk iteration)
+      (call-with-values thunk
+        (lambda (s . rest)
+          (cond [(and (= s SQLITE_BUSY) (< iteration busy-retry-limit))
+                 (sleep busy-retry-delay)
+                 (handle* who thunk (add1 iteration))]
+                [else (apply values (handle-status who s) rest)]))))
+
     ;; Some errors can cause whole transaction to rollback;
     ;; (see http://www.sqlite.org/lang_transaction.html)
     ;; So when those errors occur, compare current tx-status w/ saved.
@@ -245,18 +258,7 @@
     ;; ----
 
     (super-new)
-    (register-finalizer this (lambda (obj) (send obj disconnect)))
-
-    #|
-    (define custodian-shutdown-trick
-      ;; When the custodian is shutdown, the box is emptied, and the
-      ;; dummy box becomes unreachable, triggering the finalizer.
-      (make-custodian-box
-       (current-custodian)
-       (let ([dummy (box this)])
-         (register-finalizer dummy (lambda (dummy) (send (unbox dummy) disconnect)))
-         dummy)))
-    |#))
+    (register-finalizer this (lambda (obj) (send obj disconnect)))))
 
 ;; ----------------------------------------
 

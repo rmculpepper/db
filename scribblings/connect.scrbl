@@ -184,7 +184,11 @@ Connections are made using the following functions.
 
 @defproc[(sqlite3-connect
                 [#:database database (or/c path-string? 'memory 'temporary)]
-                [#:mode mode (or/c 'read-only 'read/write 'create) 'read/write])
+                [#:mode mode (or/c 'read-only 'read/write 'create) 'read/write]
+                [#:busy-retry-limit busy-retry-limit 
+                 (or/c exact-nonnegative-integer? +inf.0) 10]
+                [#:busy-retry-delay busy-retry-delay
+                 (and/c rational? (not/c negative?)) 0.1])
          connection?]{
 
   Opens the SQLite database at the file named by @racket[database], if
@@ -199,6 +203,16 @@ Connections are made using the following functions.
   filesystem permissions permit). The @racket['create] mode is like
   @racket['read/write], except that if the given file does not exist,
   it is created as a new database.
+
+  SQLite uses @hyperlink["http://www.sqlite.org/lockingv3.html"]{coarse-grained
+  locking}, and many internal operations fail with the
+  @tt{SQLITE_BUSY} condition when a lock cannot be acquired. When an
+  internal operation fails because the database is busy, the
+  connection sleeps for @racket[busy-retry-delay] seconds and retries
+  the operation, up to @racket[busy-retry-limit] additional times. If
+  @racket[busy-retry-limit] is @racket[0], the operation is only
+  attempted once. If after @racket[busy-retry-limit] retries the
+  operation still does not succeed, an exception is raised.
 
   If the connection cannot be made, an exception is raised.
 

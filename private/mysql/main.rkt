@@ -53,7 +53,9 @@
            "notice: ~a (MySQL code ~a)\n" condition code))
 
 (define socket-paths
-  '("/var/run/mysqld/mysqld.sock"))
+  (case (system-type)
+    ((unix) '("/var/run/mysqld/mysqld.sock"))
+    (else '())))
 
 (define (mysql-guess-socket-path)
   (guess-socket-path/paths 'mysql-guess-socket-path socket-paths))

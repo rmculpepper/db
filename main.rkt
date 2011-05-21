@@ -3,7 +3,8 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require racket/runtime-path
+(require (for-syntax racket/base)
+         racket/runtime-path
          racket/promise
          racket/contract
          "base.rkt")
@@ -27,7 +28,7 @@
 
 (define known-keywords
   (sort '(#:user #:database #:password #:server #:port #:socket
-          #:allow-cleartext-password? #:ssl #:ssl-encrypt
+          #:allow-cleartext-password? #:ssl #:ssl-context
           #:notice-handler #:notification-handler
           #:mode #:dsn #:strict-parameter-types? #:character-mode)
         keyword<?))
@@ -57,6 +58,9 @@
   odbc-data-sources
   odbc-drivers)
 
+(define-lazy-functions 'openssl
+  ssl-client-context?)
+
 (provide/contract
  ;; Duplicates contracts at postgresql.rkt
  [postgresql-connect
@@ -67,8 +71,8 @@
         #:port (or/c exact-positive-integer? #f)
         #:socket (or/c path-string? #f)
         #:allow-cleartext-password? boolean?
-        #:ssl (symbols 'yes 'no 'optional)
-        #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
+        #:ssl (or/c 'yes 'no 'optional)
+        #:ssl-context ssl-client-context?
         #:notice-handler (or/c 'output 'error output-port? procedure?)
         #:notification-handler (or/c 'output 'error output-port? procedure?))
        any/c)]

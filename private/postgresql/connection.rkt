@@ -484,7 +484,7 @@
     (super-new)
 
     ;; attach-to-ports : input-port output-port -> void
-    (define/override (attach-to-ports in out [ssl 'no] [ssl-encrypt #f])
+    (define/override (attach-to-ports in out [ssl 'no] [ssl-context #f])
       (with-handlers ([(lambda _ #t)
                        (lambda (e)
                          (close-input-port in)
@@ -502,7 +502,7 @@
                 (let-values ([(sin sout)
                               (ports->ssl-ports in out
                                                 #:mode 'connect
-                                                #:encrypt ssl-encrypt 
+                                                #:context ssl-context
                                                 #:close-original? #t)])
                   (super attach-to-ports sin sout)))
                ((#\N)

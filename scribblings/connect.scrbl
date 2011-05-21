@@ -3,7 +3,8 @@
           scribble/eval
           scribble/struct
           racket/sandbox
-          "config.rkt")
+          "config.rkt"
+          (for-label openssl))
 
 @title[#:tag "connect"]{Connections}
 
@@ -24,7 +25,9 @@ Connections are made using the following functions.
                   [#:password password (or/c string? false/c) #f]
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
-                  [#:ssl ssl (symbols 'yes 'optional 'no) 'no]
+                  [#:ssl ssl (or/c 'yes 'optional 'no) 'no]
+                  [#:ssl-context ssl-context ssl-client-context?
+                   (ssl-make-client-context 'sslv3)]
                   [#:notice-handler notice-handler
                    (or/c 'output 'error output-port?
                          (-> string? string? any))
@@ -67,10 +70,17 @@ Connections are made using the following functions.
   connection. If the server refuses SSL, the connection raises an
   exception if @racket[ssl] was set to @racket['yes] or continues with
   an unencrypted connection if @racket[ssl] was set to
-  @racket['optional]. SSL may only be used with TCP connections, not
-  with local sockets.
+  @racket['optional]. By default, SSL provides encryption but does not
+  verify the identity of the server (see
+  @hyperlink["http://www.postgresql.org/docs/9.0/static/libpq-ssl.html"]{this
+  explanation}). Host verification can be required via the
+  @racket[ssl-context] argument; see @racket[ssl-set-verify!]. Some
+  servers use SSL certificates to authenticate clients; see
+  @racket[ssl-load-certificate-chain!] and
+  @racket[ssl-load-private-key!]. SSL may only be used with TCP
+  connections, not with local sockets.
 
-  The @racket[notice-handler] is called on informational messages
+  The @racket[notice-handler] is called on notice messages
   received asynchronously from the server. A common example is notice
   of an index created automatically for a table's primary key. The
   @racket[notice-handler] function takes two string arguments: the
@@ -136,6 +146,8 @@ Connections are made using the following functions.
   function, except that the first argument to a
   @racket[notice-handler] function is a MySQL-specific integer code
   rather than a SQLSTATE string.
+
+  If the connection cannot be made, an exception is raised.
 
   @(examples/results
     [(mysql-connect #:server "db.mysite.com"
@@ -206,7 +218,7 @@ Connections are made using the following functions.
                         (or/c output-port? 'output 'error 
                               (-> string? string? any))
                         void]
-                       [#:strict-parameter-types? strict-parameter-types? #f]
+                       [#:strict-parameter-types? strict-parameter-types? boolean? #f]
                        [#:character-mode character-mode
                         (or/c 'wchar 'utf-8 'latin-1)
                         'wchar])
@@ -216,12 +228,13 @@ Connections are made using the following functions.
   @racket[user] and @racket[password] arguments are optional, since
   that information may be incorporated into the data source
   definition, or it might not be relevant to the data source's driver.
-
   The @racket[notice-handler] argument behaves the same as in
-  @racket[postgresql-connect].
+  @racket[postgresql-connect].  The @racket[database] argument is a
+  deprecated equivalent of @racket[dsn]. One or the other must be
+  provided, but not both.
 
   If @racket[strict-parameter-types?] is true, then the connection
-  attempts to fetch and enforce specific types for query
+  attempts to determine and enforce specific types for query
   parameters. See @secref["odbc-types"] for more details.
 
   By default, connections use ODBC's @tt{SQL_C_WCHAR}-based character
@@ -229,9 +242,6 @@ Connections are made using the following functions.
   some drivers' support for this method is buggy. To use
   @tt{SQL_C_CHAR} instead, set @racket[character-mode] to
   @racket['utf-8] or @racket['latin-1].
-
-  The @racket[database] argument is a deprecated equivalent of 
-  @racket[dsn]. One or the other must be provided, but not both.
 
   See @secref["odbc-status"] for notes on specific ODBC drivers and
   recommendations for connection options.
@@ -244,14 +254,18 @@ Connections are made using the following functions.
                                (or/c output-port? 'output 'error
                                      (-> string? string? any))
                                void]
-                              [#:strict-parameter-types? strict-parameter-types? #f])
+                              [#:strict-parameter-types? strict-parameter-types? boolean? #f]
+                              [#:character-mode character-mode
+                               (or/c 'wchar 'utf-8 'latin-1)
+                               'wchar])
          connection?]{
 
   Creates a connection using an ODBC connection string containing a
   sequence of keyword and value connection parameters. The syntax of
   connection strings is described in
   @hyperlink["http://msdn.microsoft.com/en-us/library/ms715433%28v=VS.85%29.aspx"]{SQLDriverConnect}
-  (see Comments section); supported attributes depend on the driver.
+  (see Comments section); supported attributes depend on the
+  driver. The other arguments are the same as in @racket[odbc-connect].
 
   If the connection cannot be made, an exception is raised.
 }

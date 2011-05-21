@@ -4,6 +4,7 @@
 
 #lang racket/base
 (require racket/contract
+         openssl
          "base.rkt"
          "private/postgresql/main.rkt")
 
@@ -17,8 +18,8 @@
         #:port (or/c exact-positive-integer? #f)
         #:socket (or/c path-string? #f)
         #:allow-cleartext-password? boolean?
-        #:ssl (symbols 'yes 'no 'optional)
-        #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
+        #:ssl (or/c 'yes 'no 'optional)
+        #:ssl-context ssl-client-context?
         #:notice-handler (or/c 'output 'error output-port? procedure?)
         #:notification-handler (or/c 'output 'error output-port? procedure?))
        any/c)]

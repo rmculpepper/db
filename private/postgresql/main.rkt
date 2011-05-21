@@ -6,6 +6,7 @@
 (require racket/class
          racket/contract
          racket/tcp
+         openssl
          "../generic/interfaces.rkt"
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
@@ -24,7 +25,7 @@
                             #:socket [socket #f]
                             #:allow-cleartext-password? [allow-cleartext-password? #f]
                             #:ssl [ssl 'no]
-                            #:ssl-encrypt [ssl-encrypt 'sslv2-or-v3]
+                            #:ssl-context [ssl-context (ssl-make-client-context 'sslv3)]
                             #:notice-handler [notice-handler void]
                             #:notification-handler [notification-handler void])
   (let ([connection-options
@@ -46,12 +47,14 @@
                           [else (let ([server (or server "localhost")]
                                       [port (or port 5432)])
                                   (tcp-connect server port))])])
-        (send c attach-to-ports in out ssl ssl-encrypt)
+        (send c attach-to-ports in out ssl ssl-context)
         (send c start-connection-protocol database user password)
         c))))
 
 (define socket-paths
-  '("/var/run/postgresql/.s.PGSQL.5432"))
+  (case (system-type)
+    ((unix) '("/var/run/postgresql/.s.PGSQL.5432"))
+    (else '())))
 
 (define (postgresql-guess-socket-path)
   (guess-socket-path/paths 'postgresql-guess-socket-path socket-paths))

@@ -40,11 +40,13 @@
 
 (define-lazy-functions "private/postgresql/main.rkt"
   postgresql-connect
-  postgresql-guess-socket-path)
+  postgresql-guess-socket-path
+  postgresql-password-hash)
 
 (define-lazy-functions "private/mysql/main.rkt"
   mysql-connect
-  mysql-guess-socket-path)
+  mysql-guess-socket-path
+  mysql-password-hash)
 
 (define-lazy-functions "private/sqlite3/main.rkt"
   sqlite3-connect)
@@ -60,10 +62,10 @@
  [postgresql-connect
   (->* (#:user string?
         #:database string?)
-       (#:password (or/c string? false/c)
-        #:server (or/c string? false/c)
-        #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c path-string? false/c)
+       (#:password (or/c string? (list/c 'hash string?) #f)
+        #:server (or/c string? #f)
+        #:port (or/c exact-positive-integer? #f)
+        #:socket (or/c path-string? #f)
         #:allow-cleartext-password? boolean?
         #:ssl (symbols 'yes 'no 'optional)
         #:ssl-encrypt (symbols 'sslv2 'sslv3 'sslv2-or-v3)
@@ -72,19 +74,23 @@
        any/c)]
  [postgresql-guess-socket-path
   (-> path-string?)]
+ [postgresql-password-hash
+  (-> string? string? string?)]
 
  ;; Duplicates contracts at mysql.rkt
  [mysql-connect
   (->* (#:user string?
         #:database string?)
-       (#:password (or/c string? false/c)
-        #:server (or/c string? false/c)
-        #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c path-string? false/c)
+       (#:password (or/c string? (list/c 'hash string?) #f)
+        #:server (or/c string? #f)
+        #:port (or/c exact-positive-integer? #f)
+        #:socket (or/c path-string? #f)
         #:allow-cleartext-password? boolean?)
        any/c)]
  [mysql-guess-socket-path
   (-> path-string?)]
+ [mysql-password-hash
+  (-> string? string?)]
 
  ;; Duplicates contracts at sqlite3.rkt
  [sqlite3-connect

@@ -12,10 +12,12 @@
  [mysql-connect
   (->* (#:user string?
         #:database string?)
-       (#:password (or/c string? false/c)
-        #:server (or/c string? false/c)
-        #:port (or/c exact-positive-integer? false/c)
-        #:socket (or/c path-string? false/c))
+       (#:password (or/c string? (list/c 'hash string?) #f)
+        #:server (or/c string? #f)
+        #:port (or/c exact-positive-integer? #f)
+        #:socket (or/c path-string? #f))
        any/c)]
  [mysql-guess-socket-path
-  (-> path-string?)])
+  (-> path-string?)]
+ [mysql-password-hash
+  (-> string? string?)])

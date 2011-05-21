@@ -11,7 +11,8 @@
          "../generic/sql-data.rkt"
          "message.rkt"
          "dbsystem.rkt")
-(provide connection%)
+(provide connection%
+         password-hash)
 
 ;; Debugging
 (define DEBUG-RESPONSES #f)
@@ -420,12 +421,19 @@
 ;; scramble-password : bytes string -> bytes
 (define (scramble-password scramble password)
   (and scramble password
-       (let* ([password (string->bytes/latin-1 password)]
-              [stage1 (sha1-bytes (open-input-bytes password))]
+       (let* ([stage1 (cond [(string? password) (password-hash password)]
+                            [(pair? password)
+                             (hex-string->bytes (cadr password))])]
               [stage2 (sha1-bytes (open-input-bytes stage1))]
               [stage3 (sha1-bytes (open-input-bytes (bytes-append scramble stage2)))]
               [reply (bytes-xor stage1 stage3)])
          reply)))
+
+;; password-hash : string -> bytes
+(define (password-hash password)
+  (let* ([password (string->bytes/latin-1 password)]
+         [stage1 (sha1-bytes (open-input-bytes password))])
+    stage1))
 
 ;; bytes-xor : bytes bytes -> bytes
 ;; Assumes args are same length

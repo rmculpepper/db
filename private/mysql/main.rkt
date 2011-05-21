@@ -6,6 +6,7 @@
 (require racket/contract
          racket/class
          racket/tcp
+         file/sha1
          "../generic/interfaces.rkt"
          "../generic/socket.rkt"
          "../generic/find-socket.rkt"
@@ -13,6 +14,7 @@
          "dbsystem.rkt")
 (provide mysql-connect
          mysql-guess-socket-path
+         mysql-password-hash
          (rename-out [dbsystem mysql-dbsystem]))
 
 (define (mysql-connect #:user user
@@ -43,3 +45,6 @@
 
 (define (mysql-guess-socket-path)
   (guess-socket-path/paths 'mysql-guess-socket-path socket-paths))
+
+(define (mysql-password-hash password)
+  (bytes->hex-string (password-hash password)))

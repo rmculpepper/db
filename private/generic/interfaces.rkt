@@ -23,6 +23,8 @@
 
          isolation-symbol->string
 
+         hex-string->bytes
+
          make-handler
 
          (struct-out exn:fail:sql)
@@ -207,6 +209,8 @@
 
 ;; ----------------------------------------
 
+;; Isolation levels
+
 (define (isolation-symbol->string isolation)
   (case isolation
     ((serializable)     "SERIALIZABLE")
@@ -214,6 +218,44 @@
     ((read-committed)   "READ COMMITTED")
     ((read-uncommitted) "READ UNCOMMITTED")
     (else #f)))
+
+;; ----------------------------------------
+
+;; Passwords
+
+#|
+;; Also in file/sha1
+(define (bytes->hex-string b)
+  (define (int->hex-digit n)
+    (string-ref "0123456789abcdef" n))
+  (let* ([c (bytes-length b)]
+         [s (make-string (* 2 c))])
+    (for ([i (in-range c)])
+      (string-set! s (+ i i 0) (int->hex-digit (arithmetic-shift (bytes-ref b i) -4)))
+      (string-set! s (+ i i 1) (int->hex-digit (bitwise-and (bytes-ref b) #xFF))))
+    s))
+|#
+
+(define (hex-string->bytes s)
+  (define (hex-digit->int c)
+    (let ([c (char->integer c)])
+      (cond [(<= (char->integer #\0) c (char->integer #\9))
+             (- c (char->integer #\0))]
+            [(<= (char->integer #\a) c (char->integer #\f))
+             (- c (char->integer #\a))]
+            [(<= (char->integer #\A) c (char->integer #\F))
+             (- c (char->integer #\A))])))
+  (unless (and (string? s) (even? (string-length s))
+               (regexp-match? #rx"[0-9a-zA-Z]*" s))
+    (raise-type-error 'hex-string->bytes
+                      "string containing an even number of hexadecimal digits" s))
+  (let* ([c (quotient (string-length s) 2)]
+         [b (make-bytes c)])
+    (for ([i (in-range c)])
+      (let ([high (hex-digit->int (string-ref s (+ i i)))]
+            [low  (hex-digit->int (string-ref s (+ i i 1)))])
+        (bytes-set! b i (+ (arithmetic-shift high 4) low))))
+    b))
 
 ;; ----------------------------------------
 

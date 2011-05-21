@@ -13,6 +13,7 @@
          "dbsystem.rkt")
 (provide postgresql-connect
          postgresql-guess-socket-path
+         postgresql-password-hash
          (rename-out [dbsystem postgresql-dbsystem]))
 
 (define (postgresql-connect #:user user
@@ -62,3 +63,6 @@
              ((error) (current-error-port))
              (else out))
            "notification: ~a\n" condition))
+
+(define (postgresql-password-hash user password)
+  (bytes->string/latin-1 (password-hash user password)))

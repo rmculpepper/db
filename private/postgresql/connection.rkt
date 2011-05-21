@@ -13,7 +13,8 @@
          "../generic/prepared.rkt"
          "message.rkt"
          "dbsystem.rkt")
-(provide connection%)
+(provide connection%
+         password-hash)
 
 ;; Debugging
 (define DEBUG-RESPONSES #f)
@@ -220,14 +221,9 @@
            (send-message (make-PasswordMessage password))
            (connect:expect-auth username password)]
           [(struct AuthenticationCryptPassword (salt))
-           (unless #f ;; crypt() support removed
-             (uerror 'postgresql-connect (nosupport "crypt()-encrypted password")))
-           (unless (string? password)
-             (error/need-password 'postgresql-connect))
-           (send-message (make-PasswordMessage (crypt-password password salt)))
-           (connect:expect-auth username password)]
+           (uerror 'postgresql-connect (nosupport "crypt()-encrypted password"))]
           [(struct AuthenticationMD5Password (salt))
-           (unless (string? password)
+           (unless password
              (error/need-password 'postgresql-connect))
            (send-message (make-PasswordMessage (md5-password username password salt)))
            (connect:expect-auth username password)]
@@ -529,21 +525,25 @@
 (define (nosupport str)
   (string-append "not supported: " str))
 
-;; md5-password : string string bytes -> string
+;; ========================================
+
+;; md5-password : string (U string (list 'hash string)) bytes -> string
 ;; Compute the MD5 hash of a password in the form expected by the PostgreSQL 
 ;; backend.
 (define (md5-password user password salt)
-  (bytes->string/latin-1
-   (md5-password/bytes (string->bytes/latin-1 user)
-                       (string->bytes/latin-1 password)
-                       salt)))
-(define (md5-password/bytes user password salt)
-  (let* ([s (md5 (bytes-append password user))]
-         [t (md5 (bytes-append s salt))])
-    (bytes-append #"md5" t)))
+  (let ([hash
+         (cond [(pair? password) (string->bytes/latin-1 (cadr password))]
+               [(string? password) (password-hash user password)])])
+    (bytes->string/latin-1
+     (bytes-append #"md5" (md5 (bytes-append hash salt))))))
 
-(define (crypt-password password salt)
-  (uerror 'crypt-password "not implemented"))
+;; password-hash : string string -> bytes
+(define (password-hash user password)
+  (let ([user (string->bytes/latin-1 user)]
+        [password (string->bytes/latin-1 password)])
+    (md5 (bytes-append password user))))
+
+;; ========================================
 
 ;; raise-backend-error : symbol ErrorResponse -> raises exn
 (define (raise-backend-error who r)

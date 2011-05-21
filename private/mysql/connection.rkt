@@ -14,10 +14,6 @@
 (provide connection%
          password-hash)
 
-;; Debugging
-(define DEBUG-RESPONSES #f)
-(define DEBUG-SENT-MESSAGES #f)
-
 (define MAX-PACKET-LENGTH #x1000000)
 
 ;; ========================================
@@ -38,6 +34,17 @@
         [(with-disconnect-on-error . body)
          (with-handlers ([exn:fail? (lambda (e) (disconnect* #f) (raise e))])
            . body)]))
+
+    ;; ========================================
+
+    ;; == Debugging
+
+    (define DEBUG-RESPONSES #f)
+    (define DEBUG-SENT-MESSAGES #f)
+
+    (define/public (debug incoming? [outgoing? incoming?])
+      (set! DEBUG-RESPONSES incoming?)
+      (set! DEBUG-SENT-MESSAGES outgoing?))
 
     ;; ========================================
 

@@ -146,12 +146,12 @@
 ;; ========================================
 ;; The strange structures
 
-(define-struct AuthenticationOk ())
-(define-struct AuthenticationKerberosV5 ())
-(define-struct AuthenticationCleartextPassword ())
-(define-struct AuthenticationCryptPassword (salt))
-(define-struct AuthenticationMD5Password (salt))
-(define-struct AuthenticationSCMCredential ())
+(define-struct AuthenticationOk () #:transparent)
+(define-struct AuthenticationKerberosV5 () #:transparent)
+(define-struct AuthenticationCleartextPassword () #:transparent)
+(define-struct AuthenticationCryptPassword (salt) #:transparent)
+(define-struct AuthenticationMD5Password (salt) #:transparent)
+(define-struct AuthenticationSCMCredential () #:transparent)
 (define (parse:Authentication p)
   (with-length-in p #\R
     (let* ([tag (io:read-int32 p)])
@@ -168,7 +168,7 @@
          (error/internal 'authentication
                          "unknown authentication method requested (~s)" tag))))))
 
-(define-struct StartupMessage (parameters))
+(define-struct StartupMessage (parameters) #:transparent)
 (define (write:StartupMessage p v)
   (with-length-out p #f
     (io:write-int32 p 196608)
@@ -178,25 +178,25 @@
               (StartupMessage-parameters v))
     (io:write-byte p 0)))
 
-(define-struct SSLRequest ())
+(define-struct SSLRequest () #:transparent)
 (define (write:SSLRequest p v)
   (io:write-int32 p 8)
   (io:write-int32 p 80877103))
 
-(define-struct CancelRequest (process-id secret-key))
+(define-struct CancelRequest (process-id secret-key) #:transparent)
 (define (write:CancelRequest p v)
   (io:write-int32 p 16)
   (io:write-int32 p 80877102)
   (io:write-int32 p (CancelRequest-process-id v))
   (io:write-int32 p (CancelRequest-secret-key v)))
 
-(define-struct ErrorResponse (properties))
+(define-struct ErrorResponse (properties) #:transparent)
 (define (parse:ErrorResponse p)
   (with-length-in p #\E
     (let* ([fields (parse-field-list p)])
       (make-ErrorResponse fields))))
 
-(define-struct NoticeResponse (properties))
+(define-struct NoticeResponse (properties) #:transparent)
 (define (parse:NoticeResponse p)
   (with-length-in p #\N
     (let* ([fields (parse-field-list p)])
@@ -216,14 +216,14 @@
 ;; ========================================
 ;; The normal structures
 
-(define-struct BackendKeyData (process-id secret-key))
+(define-struct BackendKeyData (process-id secret-key) #:transparent)
 (define (parse:BackendKeyData p)
   (with-length-in p #\K
     (let* ([process-id (io:read-int32 p)]
            [secret-key (io:read-int32 p)])
       (make-BackendKeyData process-id secret-key))))
 
-(define-struct Bind (portal statement param-formats values result-formats))
+(define-struct Bind (portal statement param-formats values result-formats) #:transparent)
 (define (write:Bind p v)
   (match v
     [(struct Bind (portal statement param-formats values result-formats))
@@ -248,12 +248,12 @@
        (for ([result-format (in-list result-formats)])
          (io:write-int16 p result-format)))]))
 
-(define-struct BindComplete ())
+(define-struct BindComplete () #:transparent)
 (define (parse:BindComplete p)
   (with-length-in p #\2
     (make-BindComplete)))
 
-(define-struct Close (type name))
+(define-struct Close (type name) #:transparent)
 (define (write:Close p v)
   (match v
     [(struct Close (type name))
@@ -261,18 +261,18 @@
        (io:write-byte/char p (statement/portal->char type))
        (io:write-null-terminated-string p name))]))
 
-(define-struct CloseComplete ())
+(define-struct CloseComplete () #:transparent)
 (define (parse:CloseComplete p)
   (with-length-in p #\3
     (make-CloseComplete)))
 
-(define-struct CommandComplete (command))
+(define-struct CommandComplete (command) #:transparent)
 (define (parse:CommandComplete p)
   (with-length-in p #\C
     (let* ([command (io:read-null-terminated-string p)])
       (make-CommandComplete command))))
 
-(define-struct CopyInResponse (format column-formats))
+(define-struct CopyInResponse (format column-formats) #:transparent)
 (define (parse:CopyInResponse p)
   (with-length-in p #\G
     (let* ([format (io:read-byte p)]
@@ -281,7 +281,7 @@
               (io:read-int16 p))])
       (make-CopyInResponse format column-formats))))
 
-(define-struct CopyOutResponse (format column-formats))
+(define-struct CopyOutResponse (format column-formats) #:transparent)
 (define (parse:CopyOutResponse p)
   (with-length-in p #\H
     (let* ([format (io:read-byte p)]
@@ -290,7 +290,7 @@
               (io:read-int16 p))])
       (make-CopyOutResponse format column-formats))))
 
-(define-struct DataRow (values))
+(define-struct DataRow (values) #:transparent)
 (define (parse:DataRow p)
   (with-length-in p #\D
     (let* ([values
@@ -302,7 +302,7 @@
                                   (io:read-bytes-as-bytes p len)))))])
       (make-DataRow values))))
 
-(define-struct Describe (type name))
+(define-struct Describe (type name) #:transparent)
 (define (write:Describe p v)
   (match v
     [(struct Describe (type name))
@@ -310,12 +310,12 @@
        (io:write-byte/char p (statement/portal->char type))
        (io:write-null-terminated-string p name))]))
 
-(define-struct EmptyQueryResponse ())
+(define-struct EmptyQueryResponse () #:transparent)
 (define (parse:EmptyQueryResponse p)
   (with-length-in p #\I
     (make-EmptyQueryResponse)))
 
-(define-struct Execute (portal row-limit))
+(define-struct Execute (portal row-limit) #:transparent)
 (define (write:Execute p v)
   (match v
     [(struct Execute (portal row-limit))
@@ -323,16 +323,16 @@
        (io:write-null-terminated-string p portal)
        (io:write-int32 p row-limit))]))
 
-(define-struct Flush ())
+(define-struct Flush () #:transparent)
 (define (write:Flush p v)
   (with-length-out p #\H))
 
-(define-struct NoData ())
+(define-struct NoData () #:transparent)
 (define (parse:NoData p)
   (with-length-in p #\n
     (make-NoData)))
 
-(define-struct NotificationResponse (process-id condition info))
+(define-struct NotificationResponse (process-id condition info) #:transparent)
 (define (parse:NotificationResponse p)
   (with-length-in p #\A
     (let* ([process-id (io:read-int32 p)]
@@ -340,7 +340,7 @@
            [info (io:read-int32 p)])
       (make-NotificationResponse process-id condition info))))
 
-(define-struct ParameterDescription (type-oids))
+(define-struct ParameterDescription (type-oids) #:transparent)
 (define (parse:ParameterDescription p)
   (with-length-in p #\t
     (let* ([type-oids
@@ -348,14 +348,14 @@
               (io:read-int32 p))])
       (make-ParameterDescription type-oids))))
 
-(define-struct ParameterStatus (name value))
+(define-struct ParameterStatus (name value) #:transparent)
 (define (parse:ParameterStatus p)
   (with-length-in p #\S
     (let* ([name (io:read-null-terminated-string p)]
            [value (io:read-null-terminated-string p)])
       (make-ParameterStatus name value))))
 
-(define-struct Parse (name query type-oids))
+(define-struct Parse (name query type-oids) #:transparent)
 (define (write:Parse p v)
   (match v
     [(struct Parse (name query type-oids))
@@ -366,38 +366,38 @@
        (for ([type-oid (in-list type-oids)])
          (io:write-int32 p type-oid)))]))
 
-(define-struct ParseComplete ())
+(define-struct ParseComplete () #:transparent)
 (define (parse:ParseComplete p)
   (with-length-in p #\1
     (make-ParseComplete)))
 
-(define-struct PasswordMessage (password))
+(define-struct PasswordMessage (password) #:transparent)
 (define (write:PasswordMessage p v)
   (match v
     [(struct PasswordMessage (password))
      (with-length-out p #\p
        (io:write-null-terminated-string p password))]))
 
-(define-struct PortalSuspended ())
+(define-struct PortalSuspended () #:transparent)
 (define (parse:PortalSuspended p)
   (with-length-in p #\p
     (make-PortalSuspended)))
 
-(define-struct Query (query))
+(define-struct Query (query) #:transparent)
 (define (write:Query p v)
   (match v
     [(struct Query (query))
      (with-length-out p #\Q
        (io:write-null-terminated-string p query))]))
 
-(define-struct ReadyForQuery (transaction-status))
+(define-struct ReadyForQuery (transaction-status) #:transparent)
 (define (parse:ReadyForQuery p)
   (with-length-in p #\Z
     (let* ([transaction-status
             (char->transaction-status (io:read-byte/char p))])
       (make-ReadyForQuery transaction-status))))
 
-(define-struct RowDescription (fields))
+(define-struct RowDescription (fields) #:transparent)
 (define (parse:RowDescription p)
   (with-length-in p #\T
     (let* ([fields
@@ -412,11 +412,11 @@
                 (vector name table-oid column-attid type-oid type-size type-mod format-code)))])
       (make-RowDescription fields))))
 
-(define-struct Sync ())
+(define-struct Sync () #:transparent)
 (define (write:Sync p v)
   (with-length-out p #\S))
 
-(define-struct Terminate ())
+(define-struct Terminate () #:transparent)
 (define (write:Terminate p v)
   (with-length-out p #\X))
 

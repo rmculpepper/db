@@ -36,6 +36,7 @@ Based on protocol documentation here:
 
          supported-result-typeid?
          parse-field-dvec
+         field-dvec->name
          field-dvec->typeid
          field-dvec->field-info)
 
@@ -964,6 +965,9 @@ Based on protocol documentation here:
 
 (define (field-dvec->typeid dvec)
   (vector-ref dvec 7))
+
+(define (field-dvec->name dvec)
+  (vector-ref dvec 4))
 
 (define (field-dvec->flags dvec)
   (vector-ref dvec 8))

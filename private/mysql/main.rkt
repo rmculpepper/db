@@ -22,13 +22,17 @@
                        #:password [password #f]
                        #:server [server #f]
                        #:port [port #f]
-                       #:socket [socket #f])
+                       #:socket [socket #f]
+                       #:notice-handler [notice-handler void])
   (let ([connection-options
          (+ (if (or server port) 1 0)
             (if socket 1 0))])
     (when (> connection-options 1)
       (uerror 'mysql-connect "cannot give both server/port and socket arguments")))
-  (let ([c (new connection%)])
+  (let* ([notice-handler
+          (cond [(procedure? notice-handler) notice-handler]
+                [else (make-print-notice notice-handler)])]
+         [c (new connection% (notice-handler notice-handler))])
     (cond [socket
            (let-values ([(in out) (unix-socket-connect socket)])
              (send c attach-to-ports in out))]
@@ -39,6 +43,14 @@
                (send c attach-to-ports in out)))])
     (send c start-connection-protocol database user password)
     c))
+
+;; make-print-notification : output-port -> number string -> void
+(define ((make-print-notice out) code condition)
+  (fprintf (case out
+             ((output) (current-output-port))
+             ((error) (current-error-port))
+             (else out))
+           "notice: ~a (MySQL code ~a)\n" condition code))
 
 (define socket-paths
   '("/var/run/mysqld/mysqld.sock"))

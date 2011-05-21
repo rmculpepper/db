@@ -50,7 +50,7 @@
                  (let ([handler-calls async-handler-calls])
                    (set! async-handler-calls null)
                    (semaphore-post lock)
-                   (for-each (lambda (p) (p)) handler-calls))))))
+                   (for-each call-with-continuation-barrier handler-calls))))))
 
     (define/public (get-db fsym)
       (unless db

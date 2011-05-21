@@ -85,7 +85,8 @@
         #:server (or/c string? #f)
         #:port (or/c exact-positive-integer? #f)
         #:socket (or/c path-string? #f)
-        #:allow-cleartext-password? boolean?)
+        #:allow-cleartext-password? boolean?
+        #:notice-handler (or/c 'output 'error output-port? procedure?))
        any/c)]
  [mysql-guess-socket-path
   (-> path-string?)]

@@ -24,6 +24,7 @@
 
 (define connection%
   (class* object% (connection<%>)
+    (init-private notice-handler)
 
     (define inport #f)
     (define outport #f)
@@ -45,6 +46,9 @@
     ;; Lock; all communication occurs within lock.
     (define wlock (make-semaphore 1))
 
+    ;; Delay async handler calls until unlock.
+    (define delayed-handler-calls null)
+
     (define/private (lock who require-connected?)
       (semaphore-wait wlock)
       (when (and require-connected? (not outport))
@@ -52,7 +56,10 @@
         (error/not-connected who)))
 
     (define/private (unlock)
-      (semaphore-post wlock))
+      (let ([handler-calls (reverse delayed-handler-calls)])
+        (set! delayed-handler-calls null)
+        (semaphore-post wlock)
+        (for-each call-with-continuation-barrier handler-calls)))
 
     (define/private (call-with-lock who proc
                                     #:require-connected? [require-connected? #t])
@@ -248,20 +255,22 @@
     ;; query : symbol Statement Collector -> QueryResult
     (define/public (query fsym stmt collector)
       (check-valid-tx-status fsym tx-status)
-      (let-values ([(stmt result)
-                    (call-with-lock fsym
-                      (lambda ()
-                        (let ([stmt (check-statement fsym stmt)])
-                          (values stmt (query1 fsym stmt)))))])
-        ;; For some reason this is *really* slow:
-        ;; (statement:after-exec stmt)
+      (let*-values ([(stmt result)
+                     (call-with-lock fsym
+                       (lambda ()
+                         (let ([stmt (check-statement fsym stmt)])
+                           (values stmt (query1 fsym stmt #t)))))])
+        ;; For some reason, *really* slow: (statement:after-exec stmt)
         (query1:process-result fsym collector result)))
 
     ;; query1 : symbol Statement Collector -> QueryResult
-    (define/private (query1 fsym stmt)
-      (fresh-exchange)
-      (query1:enqueue stmt)
-      (query1:collect fsym (not (string? stmt))))
+    (define/private (query1 fsym stmt warnings?)
+      (let ([wbox (and warnings? (box 0))])
+        (fresh-exchange)
+        (query1:enqueue stmt)
+        (begin0 (query1:collect fsym (not (string? stmt)) wbox)
+          (when (and warnings? (not (zero? (unbox wbox))))
+            (fetch-warnings fsym)))))
 
     ;; check-statement : symbol any -> statement-binding
     (define/private (check-statement fsym stmt)
@@ -290,35 +299,38 @@
              (send-message (make-command-packet 'query stmt))]))
 
     ;; query1:collect : symbol bool -> QueryResult stream
-    (define/private (query1:collect fsym binary?)
+    (define/private (query1:collect fsym binary? wbox)
       (let ([r (recv fsym 'result)])
         (match r
           [(struct ok-packet (affected-rows insert-id status warnings message))
+           (when wbox (set-box! wbox warnings))
            (vector 'command `((affected-rows . ,affected-rows)
                               (insert-id . ,insert-id)
                               (status . ,status)
                               (message . ,message)))]
           [(struct result-set-header-packet (fields extra))
-           (query1:expect-fields fsym null binary?)])))
+           (let* ([field-dvecs (query1:get-fields fsym binary?)]
+                  [rows (query1:get-rows fsym field-dvecs binary? wbox)])
+             (vector 'recordset field-dvecs rows))])))
 
-    (define/private (query1:expect-fields fsym r-field-dvecs binary?)
+    (define/private (query1:get-fields fsym binary?)
       (let ([r (recv fsym 'field)])
         (match r
           [(? field-packet?)
-           (query1:expect-fields fsym (cons (parse-field-dvec r) r-field-dvecs) binary?)]
-          [(struct eof-packet (warning-count status))
-           (let ([field-dvecs (reverse r-field-dvecs)])
-             (vector 'recordset field-dvecs (query1:get-rows fsym field-dvecs binary?)))])))
+           (cons (parse-field-dvec r) (query1:get-fields fsym binary?))]
+          [(struct eof-packet (warning status))
+           null])))
 
-    (define/private (query1:get-rows fsym field-dvecs binary?)
+    (define/private (query1:get-rows fsym field-dvecs binary? wbox)
       ;; Note: binary? should always be #f, unless force-prepare-sql? misses something.
       (let ([r (recv fsym (if binary? 'binary-data 'data) field-dvecs)])
         (match r
           [(struct row-data-packet (data))
-           (cons data (query1:get-rows fsym field-dvecs binary?))]
+           (cons data (query1:get-rows fsym field-dvecs binary? wbox))]
           [(struct binary-row-data-packet (data))
-           (cons data (query1:get-rows fsym field-dvecs binary?))]
-          [(struct eof-packet (warning-count status))
+           (cons data (query1:get-rows fsym field-dvecs binary? wbox))]
+          [(struct eof-packet (warnings status))
+           (when wbox (set-box! wbox warnings))
            null])))
 
     (define/private (query1:process-result fsym collector result)
@@ -377,6 +389,26 @@
               (fresh-exchange)
               (send-message (make-command:statement-packet 'statement-close id)))))))
 
+    ;; == Warnings
+
+    (define/private (fetch-warnings fsym)
+      (unless (eq? notice-handler void)
+        (let ([result (query1 fsym "SHOW WARNINGS" #f)])
+          (define (find-index name dvecs)
+            (for/or ([dvec (in-list dvecs)]
+                     [i (in-naturals)])
+              (and (equal? (field-dvec->name dvec) name) i)))
+          (match result
+            [(vector 'recordset field-dvecs rows)
+             (let ([code-index (find-index "Code" field-dvecs)]
+                   [message-index (find-index "Message" field-dvecs)])
+               (for ([row (in-list rows)])
+                 (let ([code (string->number (vector-ref row code-index))]
+                       [message (vector-ref row message-index)])
+                   (set! delayed-handler-calls
+                         (cons (lambda () (notice-handler code message))
+                               delayed-handler-calls)))))]))))
+
     ;; == Transactions
 
     ;; MySQL: what causes implicit commit, when is transaction rolled back
@@ -401,8 +433,8 @@
           (let* ([isolation-level (isolation-symbol->string isolation)]
                  [set-stmt "SET TRANSACTION ISOLATION LEVEL "])
             (when isolation-level
-              (query1 fsym (string-append set-stmt isolation-level))))
-          (query1 fsym "START TRANSACTION")
+              (query1 fsym (string-append set-stmt isolation-level) #t)))
+          (query1 fsym "START TRANSACTION" #t)
           (void))))
 
     (define/public (end-transaction fsym mode)
@@ -413,7 +445,7 @@
           (let ([stmt (case mode
                         ((commit) "COMMIT")
                         ((rollback) "ROLLBACK"))])
-            (query1 fsym stmt)
+            (query1 fsym stmt #t)
             (void)))))))
 
 ;; ========================================

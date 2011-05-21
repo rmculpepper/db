@@ -124,12 +124,18 @@ Connections are made using the following functions.
                   [#:server server string? "localhost"]
                   [#:port port number? 3306]
                   [#:socket socket (or/c path-string? false/c) #f]
-                  [#:password password (or/c string? false/c) #f])
+                  [#:password password (or/c string? false/c) #f]
+                  [#:notice-handler notice-handler
+                   (or/c 'output 'error output-port?
+                         (-> exact-nonnegative-integer? string? any))
+                   void])
          connection?]{
 
   Creates a connection to a MySQL server. The meaning of the keyword
   arguments is similar to those of the @racket[postgresql-connect]
-  function.
+  function, except that the first argument to a
+  @racket[notice-handler] function is a MySQL-specific integer code
+  rather than a SQLSTATE string.
 
   @(examples/results
     [(mysql-connect #:server "db.mysite.com"

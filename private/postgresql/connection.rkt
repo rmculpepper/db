@@ -56,10 +56,10 @@
         (error/not-connected who)))
 
     (define/private (unlock)
-      (let ([handler-calls delayed-handler-calls])
+      (let ([handler-calls (reverse delayed-handler-calls)])
         (set! delayed-handler-calls null)
         (semaphore-post wlock)
-        (for-each (lambda (p) (p)) handler-calls)))
+        (for-each call-with-continuation-barrier handler-calls)))
 
     (define/private (call-with-lock who proc
                                    #:require-connected? [require-connected? #t])

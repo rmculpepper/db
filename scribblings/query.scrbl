@@ -22,9 +22,9 @@ processing the results.
 connection to be disconnected. Specifically, the following kinds of
 errors should never cause a connection to be disconnected:
 @itemize[
-@item{SQL syntax errors, including references to undefined tables,
+@item{SQL syntax errors, such as references to undefined tables,
   columns, or operations, etc}
-@item{SQL runtime errors, including integrity constraint violations}
+@item{SQL runtime errors, such as integrity constraint violations}
 @item{violations of a specialized query function's expectations, such
   as using @racket[query-value] with a query that returns multiple
   columns}

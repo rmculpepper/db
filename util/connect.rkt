@@ -48,23 +48,21 @@
             ((raise)
              (raise (cdr result)))))))
 
-    (define/public (connected?)
-      (call (lambda (obj) (send obj connected?))))
+    (define-syntax-rule (define-forward (method arg ...) ...)
+      (begin
+        (define/public (method arg ...)
+          (call (lambda (obj) (send obj method arg ...)))) ...))
 
-    (define/public (disconnect)
-      (call (lambda (obj) (send obj disconnect))))
-
-    (define/public (get-dbsystem)
-      (call (lambda (obj) (send obj get-dbsystem))))
-
-    (define/public (query fsym stmt collector)
-      (call (lambda (obj) (send obj query fsym stmt collector))))
-
-    (define/public (prepare fsym stmt close-on-exec?)
-      (call (lambda (obj) (send obj prepare fsym stmt close-on-exec?))))
-
-    (define/public (free-statement stmt)
-      (call (lambda (obj) (send obj free-statement stmt))))
+    (define-forward
+      (connected?)
+      (disconnect)
+      (get-dbsystem)
+      (query fsym stmt collector)
+      (prepare fsym stmt close-on-exec?)
+      (free-statement stmt)
+      (transaction-status fsym)
+      (start-transaction fsym isolation)
+      (end-transaction fsym mode))
 
     (super-new)))
 
@@ -172,7 +170,18 @@
 
     (define/public (free-statement stmt)
       (error 'free-statement
-             "internal error: connection-generator does not own statements"))))
+             "internal error: connection-generator does not own statements"))
+
+    (define/public (transaction-status fsym)
+      (let ([c (get-connection #f)])
+        (and c (send c transaction-status))))
+
+    (define/public (start-transaction fsym isolation)
+      (send (get-connection #t) start-transaction fsym isolation))
+
+    (define/public (end-transaction fsym mode)
+      (let ([c (get-connection #f)])
+        (when c (send c end-transaction fsym mode))))))
 
 ;; ----
 

@@ -16,11 +16,7 @@ Testing
 - run ODBC DB2, Oracle tests on win32; also test SQL Server ?
 
 - test connection-generators
-
-- test kill-safe-connection by creating dummy connection object:
-  - query method acquires lock, sleeps, releases lock, returns
-    maybe bumps external semaphore before sleeping
-    kill calling thread while sleeping to test kill-safe proxy
+- test kill-safe-connection
 
 ----
 
@@ -52,34 +48,17 @@ Types
 
 - disconnect should always work, even on thread-damaged connections
   - but might need version with timeout and/or rudely? flag, because
-    I can't think of a way to solve the lock problem that doesn't involve aux thread
+    I can't think of a way to solve the lock problem that doesn't involve aux thread.
 
-- More ODBC information
-  SQLGetInfo:
-  - SQL_CONVERT_<datatype> - use to refine supported types (?)
-  - SQL_CURSOR_{COMMIT,ROLLBACK}_BEHAVIOR - check that commit/rollback doesn't delete pstmts!
-  - SQL_DATABASE_NAME (see also SQLGetConnectAttr, SQL_ATTR_CURRENT_CATALOG)
-  - SQL_DBMS_NAME, SQL_DBMS_VER
-  - SQL_DEFAULT_TXN_ISOLATION
-  - SQL_DRIVER_NAME
-  - SQL_MAX_{CATALOG,COLUMN,IDENTIFIER,SCHEMA_NAME,TABLE_NAME}_NAME (min 128)
-  - SQL_SERVER_NAME
-  - SQL_TXN_CAPABLE, SQL_TXN_ISOLATION_OPTION
-  - SQL_USER_NAME
-  SQLGetConnectAttr:
-  - SQL_ATTR_AUTOCOMMIT (default is auto-commit on)
-  - SQL_ATTR_CURRENT_CATALOG
-  - SQL_ATTR_TXN_ISOLATION
-  SQLGetStmtAttr:
-  - SQL_ATTR_NOSCAN (for odbc escape sequences)
-
-- finish transaction api (docs, tests)
+- finish transaction api (tests)
   - add connect option #:rollback-invalid-transactions?
   - enough to implement connection pooling?
 
 - Identify common ODBC errors that can't possibly rollback transaction
   - test with PostgreSQL ODBC driver using "rollback on all errors" mode
 
-- fetch mysql warnings (only when notice handler present)
-
-- permit use of password hashes instead of raw passwords (postgresql, mysql)
+- More ODBC information (?)
+  SQLGetInfo:
+  - SQL_CONVERT_<datatype> - use to refine supported types (?)
+  - SQL_CURSOR_{COMMIT,ROLLBACK}_BEHAVIOR - check that commit/rollback doesn't delete pstmts!
+  - SQL_MAX_{CATALOG,COLUMN,IDENTIFIER,SCHEMA_NAME,TABLE_NAME}_NAME (min 128)

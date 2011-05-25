@@ -94,6 +94,134 @@ shutting down its ports.
 
 @;{========================================}
 
+@section{RaDSN (Racket Data Source Names)}
+
+@(my-defmodule util/radsn)
+
+Inspired by ODBC's Data Source Names, this library defines a mechanism
+for abbreviating connection information. A RaDSN (Racket Data Source
+name) is a symbol associated with a connection specification in a
+RaDSN file.
+
+@defstruct*[data-source
+              ([connector (or/c 'postgresql 'mysql 'sqlite3 'odbc)]
+               [args list?]
+               [extensions (listof (list/c symbol? any/c))])
+            #:mutable]{
+
+  Represents a data source. The @racket[connector] field determines
+  which connection function is used to create the connection. The
+  @racket[args] field is a partial list of arguments passed to the
+  connection function; additional arguments may be added when
+  @racket[radsn-connect] is called. The @racket[extensions] field
+  contains additional information about a connection; for example,
+  this library's testing framework uses it to store SQL dialect
+  flags.
+
+  Data sources can also be created using the
+  @racket[postgresql-data-source], etc auxiliary functions.
+}
+
+@defproc[(radsn-connect [radsn (or/c symbol? data-source?)]
+                        [#:radsn-file radsn-file path-string? (current-radsn-file)]
+                        [arg any/c] ...
+                        [#:<kw> kw-arg any/c] ...)
+         connection?]{
+
+  Makes a connection using the connection information associated with
+  @racket[radsn] in @racket[radsn-file]. The given @racket[arg]s and
+  @racket[kw-arg]s are added to those specified by @racket[radsn] to
+  form the complete arguments supplied to the connect function.
+
+  If @racket[radsn-file] does not exist, or if it contains no entry
+  for @racket[radsn], an exception is raised. If @racket[radsn] is a
+  @racket[data-source], then @racket[radsn-file] is ignored.
+}
+
+@defparam[current-radsn-file x path-string?]{
+
+  A parameter holding the location of the default RaDSN file. The
+  initial value is a file located immediately within
+  @racket[(find-system-path 'prefs-dir)].
+}
+
+@defproc[(get-radsn [radsn symbol?]
+                    [default any/c #f]
+                    [radsn-file path-string? (current-radsn-file)])
+         (or/c data-source? any/c)]{
+
+  Returns the @racket[data-source] associated with @racket[radsn] in
+  @racket[radsn-file].
+
+  If @racket[radsn-file] does not exist, an exception is raised. If
+  @racket[radsn-file] does not have an entry for @racket[radsn],
+  @racket[default] is called if it is a function or returned
+  otherwise.
+}
+
+@defproc[(put-radsn [radsn symbol?]
+                    [ds (or/c data-source? #f)]
+                    [radsn-file path-string? (current-radsn-file)])
+         void?]{
+
+  Associates @racket[radsn] with the given data source @racket[ds] in
+  @racket[radsn-file], replacing the previous association, if one
+  exists.
+}
+
+@(define absent @italic{absent})
+
+@deftogether[[
+@defproc[(postgresql-data-source
+           [#:user user string? @#,absent]
+           [#:database database string? @#,absent]
+           [#:server server string? @#,absent]
+           [#:port port exact-positive-integer? @#,absent]
+           [#:socket socket (or/c path-string? #f) @#,absent]
+           [#:password password (or/c string? #f) @#,absent]
+           [#:allow-cleartext-password? allow-cleartext-password? boolean? @#,absent]
+           [#:ssl ssl (or/c 'yes 'optional 'no) @#,absent]
+           [#:notice-handler notice-handler (or/c 'output 'error) @#,absent]
+           [#:notification-handler notification-handler (or/c 'output 'error) @#,absent])
+         data-source?]
+@defproc[(mysql-data-source
+           [#:user user string? @#,absent]
+           [#:database database string? @#,absent]
+           [#:server server string? @#,absent]
+           [#:port port exact-positive-integer? @#,absent]
+           [#:socket socket (or/c path-string? #f) @#,absent]
+           [#:password password (or/c string? #f) @#,absent]
+           [#:notice-handler notice-handler (or/c 'output 'error) @#,absent])
+         data-source?]
+@defproc[(sqlite3-data-source
+           [#:database database (or/c path-string? 'memory 'temporary) @#,absent]
+           [#:mode mode (or/c 'read-only 'read/write 'create) @#,absent]
+           [#:busy-retry-limit busy-retry-limit 
+            (or/c exact-nonnegative-integer? +inf.0) @#,absent]
+           [#:busy-retry-delay busy-retry-delay
+            (and/c rational? (not/c negative?)) @#,absent])
+         data-source?]
+@defproc[(odbc-data-source
+           [#:dsn dsn (or/c string? #f) @#,absent]
+           [#:database database (or/c string? #f) @#,absent]
+           [#:user user (or/c string? #f) @#,absent]
+           [#:password password (or/c string? #f) @#,absent]
+           [#:notice-handler notice-handler (or/c 'output 'error) @#,absent]
+           [#:strict-parameter-types? strict-parameter-types? boolean? @#,absent]
+           [#:character-mode character-mode (or/c 'wchar 'utf-8 'latin-1) @#,absent])
+         data-source?]]]{
+
+  Analogues of @racket[postgresql-connect], @racket[mysql-connect],
+  @racket[sqlite3-connect], and @racket[odbc-connect], respectively,
+  that return a @racket[data-source] describing the (partial)
+  connection information. All arguments are optional, even those that
+  are mandatory in the corresponding connection function; the missing
+  arguments must be supplied when @racket[radsn-connect] is called.
+}
+
+
+@;{========================================}
+
 @section[#:tag "geometry"]{Geometric types}
 
 @(my-defmodule util/geometry)

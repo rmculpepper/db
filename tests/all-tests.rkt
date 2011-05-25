@@ -10,7 +10,7 @@
          rackunit/text-ui
          racket/unit
          "../main.rkt"
-         "../private/radsn.rkt"
+         "../util/radsn.rkt"
          "config.rkt"
          "db-connection.rkt"
          "db-query.rkt"
@@ -69,7 +69,7 @@ Profiles are flattened, not hierarchical.
 
 (define (dbconf->unit x)
   (match x
-    [(dbconf dbtestname (and r (radsn connector _args exts)))
+    [(dbconf dbtestname (and r (data-source connector _args exts)))
      (let* ([connect (lambda () (radsn-connect r))]
             [dbsys (case connector ((odbc-driver) 'odbc) (else connector))]
             [dbflags (cond [(assq 'db:test exts) => cadr]
@@ -78,7 +78,7 @@ Profiles are flattened, not hierarchical.
 
 (define (odbc-unit dbtestname dbflags dbargs)
   (dbconf->unit
-   (dbconf dbtestname (radsn 'odbc dbargs `((db:test ,dbflags))))))
+   (dbconf dbtestname (data-source 'odbc dbargs `((db:test ,dbflags))))))
 
 ;; ----
 

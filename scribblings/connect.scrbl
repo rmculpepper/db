@@ -20,9 +20,9 @@ Connections are made using the following functions.
 @defproc[(postgresql-connect [#:user user string?]
                   [#:database database string?]
                   [#:server server string? "localhost"]
-                  [#:port port number? 5432]
-                  [#:socket socket (or/c path-string? false/c) #f]
-                  [#:password password (or/c string? false/c) #f]
+                  [#:port port exact-positive-integer? 5432]
+                  [#:socket socket (or/c path-string? #f) #f]
+                  [#:password password (or/c string? #f) #f]
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
                   [#:ssl ssl (or/c 'yes 'optional 'no) 'no]
@@ -132,9 +132,9 @@ Connections are made using the following functions.
 @defproc[(mysql-connect [#:user user string?]
                   [#:database database string?]
                   [#:server server string? "localhost"]
-                  [#:port port number? 3306]
-                  [#:socket socket (or/c path-string? false/c) #f]
-                  [#:password password (or/c string? false/c) #f]
+                  [#:port port exact-positive-integer? 3306]
+                  [#:socket socket (or/c path-string? #f) #f]
+                  [#:password password (or/c string? #f) #f]
                   [#:notice-handler notice-handler
                    (or/c 'output 'error output-port?
                          (-> exact-nonnegative-integer? string? any))

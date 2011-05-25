@@ -37,7 +37,7 @@ Profiles are flattened, not hierarchical.
 ;; ----------------------------------------
 
 (define pref-file
-  (make-parameter (build-path (find-system-path 'pref-dir) "ryanc-db-test.rktd")))
+  (make-parameter (build-path (find-system-path 'pref-dir) "db-test-config.rktd")))
 
 (define (get-dbconf name)
   (let ([conf (get-preference name (lambda () #f) 'timestamp (pref-file))])

@@ -58,3 +58,16 @@ Types
   - SQL_CONVERT_<datatype> - use to refine supported types (?)
   - SQL_CURSOR_{COMMIT,ROLLBACK}_BEHAVIOR - check that commit/rollback doesn't delete pstmts!
   - SQL_MAX_{CATALOG,COLUMN,IDENTIFIER,SCHEMA_NAME,TABLE_NAME}_NAME (min 128)
+
+- cursors? (Olin thinks cursors are important. I'm not sure.)
+
+- wishlist: port-closed-evt would let me implement connection-disconnected-evt,
+  might be useful for connection pooling (?)
+
+- extract locking code into base class
+  add 80% solution to hopeless-locked (hopeless-evt = never-evt or thread-dead-evt)
+
+- connection pooling
+  - needs to be easier to setup (right defaults)
+  - split off from connection-generator (use same class, different constructor function?)
+  - timeout clock starts after operation completes

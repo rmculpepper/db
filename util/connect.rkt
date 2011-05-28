@@ -15,7 +15,7 @@
 
 (define kill-safe-connection%
   (class* object% (connection<%>)
-    (init connection)
+    (init-private connection)
 
     (define req-channel (make-channel))
 
@@ -23,30 +23,27 @@
       (thread/suspend-to-kill
        (lambda ()
          (let loop ()
-           (let* ([req (channel-get req-channel)]
-                  [proc (car req)]
-                  [return-box (cadr req)]
-                  [return-sema (caddr req)])
-             (set-box! return-box
-                       (with-handlers ([(lambda (e) #t)
-                                        (lambda (e) (cons 'raise e))])
-                         (cons 'values
-                               (call-with-values (lambda () (proc connection)) list))))
-             (semaphore-post return-sema)
-             (loop))))))
+           ((channel-get req-channel))
+           (loop)))))
 
-    (define (call proc)
+    (define/private (call proc)
       (thread-resume safe-thread)
-      (let ([return-box (box #f)]
-            [return-sema (make-semaphore 0)])
-        (channel-put req-channel (list proc return-box return-sema))
-        (semaphore-wait return-sema)
-        (let ([result (unbox return-box)])
-          (case (car result)
-            ((values)
-             (apply values (cdr result)))
-            ((raise)
-             (raise (cdr result)))))))
+      (let ([result #f]
+            [sema (make-semaphore 0)])
+        (channel-put req-channel
+                     (lambda ()
+                       (set! result
+                             (with-handlers ([(lambda (e) #t)
+                                              (lambda (e) (cons 'raise e))])
+                               (cons 'values
+                                     (call-with-values
+                                         (lambda () (proc connection))
+                                       list))))
+                       (semaphore-post sema)))
+        (semaphore-wait sema)
+        (case (car result)
+          ((values) (apply values (cdr result)))
+          ((raise)  (raise (cdr result))))))
 
     (define-syntax-rule (define-forward (method arg ...) ...)
       (begin
@@ -72,96 +69,119 @@
 
 (define connection-generator%
   (class* object% (connection<%> no-cache-prepare<%>)
-    (init-private generate
-                  get-key
-                  fresh-alarm)
+    (init-private generate      ;; called from client thread
+                  get-key       ;; called from client thread
+                  timeout)
     (super-new)
 
+    (define custodian (current-custodian))
+
     (define req-channel (make-channel))
-    (define add-channel (make-channel))
 
-    (define/private (get-connection create?)
-      (thread-resume manager-thread)
-      (let* ([key (get-key)]
-             [b (box key)]
-             [sema (make-semaphore 0)])
-        (channel-put req-channel (cons b sema))
-        (semaphore-wait sema)
-        (let ([c (unbox b)])
-          (cond [(and c (send c connected?)) c]
-                [create?
-                 (let ([c (generate)])
-                   (channel-put add-channel (cons key c))
-                   c)]
-                [else #f]))))
+    ;; == methods called in manager thread ==
 
-    (define/private (remove-connection)
-      (thread-resume manager-thread)
-      (channel-put add-channel (cons (get-key) #f)))
+    ;; key=>conn : hasheq[key => connection]
+    (define key=>conn (make-hasheq))
+
+    ;; alarms : hasheq[connection => evt] (alarm wrapped to return key)
+    (define alarms (make-hasheq))
+
+    (define/private (get key) ;; also refreshes alarm
+      (let ([c (hash-ref key=>conn key #f)])
+        (when c (hash-set! alarms c (fresh-alarm-for key)))
+        c))
+
+    (define/private (put! key c)
+      (hash-set! key=>conn key c)
+      (hash-set! alarms c (fresh-alarm-for key)))
+
+    (define/private (fresh-alarm-for key)
+      (wrap-evt (alarm-evt (+ (current-inexact-milliseconds) timeout))
+                (lambda (a) key)))
+
+    (define/private (remove! key timeout?)
+      ;; timeout? = if connection open, then wait longer
+      (let* ([c (hash-ref key=>conn key #f)]
+             [in-trans? (with-handlers ([exn:fail? (lambda (e) #f)])
+                          (and c (send c transaction-status 'connection-generator)))])
+        (cond [(not c) (void)]
+              [(and timeout? in-trans?)
+               (hash-set! alarms c (fresh-alarm-for key timeout))]
+              [else
+               (hash-remove! key=>conn key)
+               (hash-remove! alarms c)
+               (send c disconnect)])))
 
     (define/private (manage)
-      (define connection-table (make-hasheq)) ;; key => (cons alarm-evt connection)
-      (define (fresh-alarm-for key)
-        (wrap-evt (fresh-alarm) (lambda (a) key)))
-      (define (put! key value)
-        (let* ([alarm (fresh-alarm-for key)])
-          (hash-set! connection-table key (cons alarm value))))
-      (define (get key) ;; also refreshes alarm
-        (let* ([value (hash-ref connection-table key #f)])
-          (and value
-               (let ([c (cdr value)]
-                     [alarm (fresh-alarm-for key)])
-                 (hash-set! connection-table key (cons alarm c))
-                 c))))
-      (let loop ()
-        (let* ([keys (hash-map connection-table (lambda (k v) k))]
-               [alarms (hash-map connection-table (lambda (k v) (car v)))])
-          (sync (handle-evt req-channel
-                            (lambda (box+sema)
-                              (let* ([b (car box+sema)]
-                                     [sema (cdr box+sema)]
-                                     [key (unbox b)])
-                                (set-box! b (get key))
-                                (semaphore-post sema))))
-                (handle-evt add-channel
-                            (lambda (key+val)
-                              (if (cdr key+val)
-                                  (put! (car key+val) (cdr key+val))
-                                  (hash-remove! connection-table (car key+val)))))
-                (handle-evt (choice-evt (apply choice-evt keys)
-                                        (apply choice-evt alarms))
-                            (lambda (key)
-                              (let ([c (hash-ref connection-table key #f)])
-                                (hash-remove! connection-table key)
-                                (when c (cleanup (cdr c)))))))
-          (loop))))
-
-    (define/private (cleanup c)
-      ;; FIXME: If c is damaged (eg, custodian killed ports), then disconnect
-      ;; might hang, so we spawn thread. This is not ideal.
-      (thread (lambda () (send c disconnect))))
+      (sync (handle-evt req-channel (lambda (proc) (proc)))
+            (let ([keys (hash-map key=>conn (lambda (k v) k))])
+              (handle-evt (apply choice-evt keys)
+                          ;; Assignment to key has expired: move to idle or disconnect.
+                          (lambda (key)
+                            (remove! key #f))))
+            (let ([alarm-evts (hash-map alarms (lambda (k v) v))])
+              (handle-evt (apply choice-evt alarm-evts)
+                          ;; Disconnect idle connection.
+                          (lambda (key)
+                            (remove! key #t)))))
+      (manage))
 
     (define manager-thread
       (thread/suspend-to-kill (lambda () (manage))))
 
+    ;; == methods called in client thread ==
+
+    (define/private (get-connection create?)
+      (thread-resume manager-thread)
+      (let* ([key (get-key)]
+             [c #f]
+             [sema (make-semaphore 0)])
+        (channel-put req-channel
+                     (lambda ()
+                       (set! c (get key create?))
+                       (semaphore-post sema)))
+        (semaphore-wait sema)
+        (cond [(and c (send c connected?)) c]
+              [create?
+               (let ([c* (parameterize ((current-custodian custodian))
+                           (generate))])
+                 (channel-put req-channel
+                              (lambda ()
+                                (when c (remove! key #f))
+                                (put! key c*)))
+                 c*)]
+              [else
+               (when c  ;; got disconnected connection!
+                 (channel-put req-channel (remove! key #f)))
+               #f])))
+
     ;; ----
 
-    (define/public (connected?)
-      (let ([c (get-connection #f)])
-        (and c (send c connected?))))
+    (define-syntax-rule (define-forward (req-con? no-con (method arg ...)) ...)
+      (begin (define/public (method arg ...)
+               (let ([c (get-connection req-con?)])
+                 (if c
+                     (send c method arg ...)
+                     no-con)))
+             ...))
+
+    (define-forward
+      (#f #f     (connected?))
+      (#t '_     (get-dbsystem))
+      (#t '_     (query fsym stmt collector))
+      (#t '_     (start-transaction fsym isolation))
+      (#f (void) (end-transaction fsym mode))
+      (#f #f     (transaction-status fsym)))
 
     (define/public (disconnect)
-      (let ([c (get-connection #f)])
+      (let ([c (get-connection #f)]
+            [key (get-key)])
         (when c
           (send c disconnect)
-          (remove-connection)))
+          (thread-resume manager-thread)
+          (channel-put req-channel
+                       (lambda () (remove! key #f #f)))))
       (void))
-
-    (define/public (get-dbsystem)
-      (send (get-connection #t) get-dbsystem))
-
-    (define/public (query fsym stmt collector)
-      (send (get-connection #t) query fsym stmt collector))
 
     (define/public (prepare fsym stmt close-on-exec?)
       (unless close-on-exec?
@@ -170,37 +190,28 @@
 
     (define/public (free-statement stmt)
       (error 'free-statement
-             "internal error: connection-generator does not own statements"))
+             "internal error: connection-generator does not own statements"))))
 
-    (define/public (transaction-status fsym)
-      (let ([c (get-connection #f)])
-        (and c (send c transaction-status))))
-
-    (define/public (start-transaction fsym isolation)
-      (send (get-connection #t) start-transaction fsym isolation))
-
-    (define/public (end-transaction fsym mode)
-      (let ([c (get-connection #f)])
-        (when c (send c end-transaction fsym mode))))))
-
-;; ----
+;; ========================================
 
 (define (kill-safe-connection connection)
   (new kill-safe-connection%
        (connection connection)))
 
-(define (connection-generator generate #:timeout [timeout #f])
-  (new connection-generator%
-       (generate generate)
-       (get-key (lambda () (thread-dead-evt (current-thread))))
-       (fresh-alarm (if timeout
-                        (lambda () (alarm-evt (+ (current-inexact-milliseconds)
-                                                 (* 1000 timeout))))
-                        (lambda () never-evt)))))
+(define (connection-generator generate
+                              #:timeout [timeout #f])
+  (let ([get-key (lambda () (thread-dead-evt (current-thread)))])
+    (new connection-generator%
+         (generate generate)
+         (get-key (lambda () (thread-dead-evt (current-thread))))
+         (timeout (* 1000 (or timeout +inf.0))))))
+
+;; ----
 
 (provide/contract
  [kill-safe-connection
   (-> connection? connection?)]
  [connection-generator
-  (->* ((-> connection?)) (#:timeout (and/c rational? positive?))
+  (->* ((-> connection?))
+       (#:timeout (and/c real? positive?))
        connection?)])

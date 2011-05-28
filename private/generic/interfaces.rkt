@@ -213,6 +213,12 @@
 
 ;; Connection base class (locking)
 
+;; Disabled for now, because this is an 80% solution. Unfortunately, I
+;; think a 100% solution would require an auxiliary kill-safe thread
+;; with multiple thread switches *per lock acquisition*. At that
+;; point, might as well just use kill-safe connection.
+(define USE-LOCK-HOLDER? #f)
+
 (define locking%
   (class object%
 
@@ -220,13 +226,14 @@
 
     (define lock (make-semaphore 1))
 
-    ;; lock-holder is never-evt when unlocked, thread-dead-evt of
-    ;; thread holding lock when locked... *nearly*. This lets us
-    ;; (sometimes/often) detect when a thread has died while holding a
-    ;; connection lock. There are tiny intervals when lock is held but
-    ;; lock-holder is never-evt; but doing better would seem to
-    ;; require a dedicated thread w/ context switches, etc. When it's
-    ;; *really* important, use killsafe-connection.
+    ;; Ideally, we would like to be able to detect if a thread has
+    ;; acquired the lock and then died, leaving the connection
+    ;; permanently locked. Roughly, we would like this: if lock is
+    ;; held by thread th, then lock-holder = (thread-dead-evt th), 
+    ;; and if lock is not held, then lock-holder = never-evt.
+    ;; Unfortunately, there are intervals when this is not true.
+    ;; Also, since lock-holder changes, reference might be stale, so
+    ;; need to double-check.
     (define lock-holder never-evt)
 
     ;; Delay async calls (eg, notice handler) until unlock
@@ -242,7 +249,7 @@
              [result (sync lock lock-holder)])
         (cond [(eq? result lock)
                ;; Acquired lock
-               (set! lock-holder me)
+               (when USE-LOCK-HOLDER? (set! lock-holder me))
                (when (and require-connected? (not (connected?)))
                  (semaphore-post lock)
                  (error/not-connected who))
@@ -260,7 +267,7 @@
     (define/private (unlock)
       (let ([async-calls (reverse delayed-async-calls)])
         (set! delayed-async-calls null)
-        (set! lock-holder never-evt)
+        (when USE-LOCK-HOLDER? (set! lock-holder never-evt))
         (semaphore-post lock)
         (for-each call-with-continuation-barrier async-calls)))
 

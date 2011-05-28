@@ -15,17 +15,17 @@ The bindings described in this section are not provided by
 @(my-defmodule util/connect)
 
 @defproc[(connection-generator
-             [generator (-> connection?)]
-             [#:timeout timeout (or/c #f (and/c rational? positive?)) #f])
+             [connect (-> connection?)]
+             [#:timeout timeout (and/c real? positive?) +inf.0])
          connection?]{
 
 Creates a virtual connection that creates actual connections on demand
-using the @racket[generator] function. A connection generator
+using the @racket[connect] function. A connection generator
 encapsulates a mapping of threads to actual connections. When a query
 function is called with a connection generator, the current thread's
 associated actual connection is used to execute the query. If there is
 no actual connection associated with the current thread, one is
-obtained by calling @racket[generator]. An actual connection is
+obtained by calling @racket[connect]. An actual connection is
 disconnected when its associated thread dies or if @racket[timeout]
 seconds elapse since the actual connection was last used.
 
@@ -76,7 +76,6 @@ execute parameterized queries expressed as strings or encapsulated via
 ]
 }
 
-
 @defproc[(kill-safe-connection [c connection?]) 
          connection?]{
 
@@ -89,6 +88,56 @@ not kill-safe.)
 Note: A kill-safe connection whose underlying connection uses ports to
 communicate with a database server is not protected from a custodian
 shutting down its ports.
+}
+
+
+@;{========================================}
+
+@section{Connection pooling}
+
+@(my-defmodule util/pool)
+
+@defproc[(connection-pool
+             [connect (-> connection?)]
+             [#:max-connections max-connections (or/c (integer-in 1 10000) +inf.0) +inf.0]
+             [#:max-idle-connections max-idle-connections (or/c (integer-in 1 10000) +inf.0) 2])
+         connection-pool?]{
+
+Creates a connection pool. The pool consists of up to
+@racket[max-connections], divided between leased connections and up to
+@racket[max-idle-connections] idle connections. The pool uses
+@racket[connect] to create new connections when needed; the
+@racket[connect] function must return a fresh connection each time it
+is called.
+}
+
+@defproc[(connection-pool? [x any/c]) boolean?]{
+
+Returns @racket[#t] if @racket[x] is a connection pool, @racket[#f]
+otherwise.
+}
+
+@defproc[(connection-pool-lease
+             [pool connection-pool?]
+             [release (or/c evt? custodian?) (current-thread)])
+         connection?]{
+
+Obtains a connection from the connection pool, using an existing idle
+connection in @racket[pool] if one is available. If no idle connection
+is available and the pool contains fewer than its maximum allowed
+connections, a new connection is created; otherwise an exception is
+raised.
+
+Calling @racket[disconnect] on the connection obtained causes the
+connection to be released back to the connection pool. The connection
+is also released if @racket[release] becomes available, if it is a
+synchronizable event, or if @racket[release] is shutdown, if it is a
+custodian.
+
+When a connection is released, it is kept as an idle connection if
+@racket[pool]'s idle connection limit would not be exceeded;
+otherwise, it is disconnected. If the connection is in a transaction,
+the transaction is rolled back.
 }
 
 

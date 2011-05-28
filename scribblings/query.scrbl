@@ -46,19 +46,20 @@ the transaction status.
 database systems using the UTF-8 character encoding. The connection
 functions attempt to negotiate UTF-8 communication at the beginning of
 every connection, but some systems also allow the character encoding
-to be changed via SQL commands. If this happens, the client might be
-unable to reliably communicate with the database, and data might get
-corrupted in transmission. @emph{Avoid changing a connection's
-character set encoding.}
+to be changed via SQL commands (eg, @tt{SET NAMES}). If this happens,
+the client might be unable to reliably communicate with the database,
+and data might get corrupted in transmission. Avoid changing a
+connection's character encoding. When possible, the connection will
+observe the change and automatically disconnect with an error.
 
 @bold{Synchronization} Connections are internally synchronized: it is
 safe to perform concurrent queries on the same connection object from
-different threads. @emph{Connections are not kill-safe:} killing a
-thread that is using a connection---or shutting down the connection's
-managing custodian---may leave the connection in a damaged state,
-causing future operations to return garbage, raise errors, or block
-indefinitely. See @secref["connect-util"] for a way to make kill-safe
-connections.
+different threads. Connections are not kill-safe: killing a thread
+that is using a connection---or shutting down the connection's
+managing custodian---may leave the connection locked, causing future
+operations to block indefinitely. See @secref["connect-util"] for a
+way to make kill-safe connections.
+
 
 @section{Statements}
 
@@ -98,9 +99,9 @@ and exactly one row.
 
 If a statement takes parameters, the parameter values are given as
 additional arguments immediately after the SQL statement. Only a
-statement given as a string, prepared statement, or statement
-generator can be given ``inline'' parameters; if the statement is a
-statement-binding, no inline parameters are permitted.
+statement given as a string, @tech{prepared statement}, or
+@tech{statement generator} can be given ``inline'' parameters; if the
+statement is a statement-binding, no inline parameters are permitted.
 
 The types of parameters and returned fields are described in
 @secref["sql-types"].

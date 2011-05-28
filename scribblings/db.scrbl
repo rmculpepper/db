@@ -6,10 +6,12 @@
 @title[#:version (my-package-version)]{db: Database connectivity}
 @author[@author+email["Ryan Culpepper" "ryanc@racket-lang.org"]]
 
+@section-index["database"]
 @section-index["postgresql"]
 @section-index["mysql"]
 @section-index["sqlite" "sqlite3"]
-@section-index["database" "sql"]
+@section-index["odbc"]
+@section-index["sql"]
 
 @centered{@bold{@italic{A database interface for functional programmers.}}}
 
@@ -18,9 +20,9 @@
 This package provides a high-level interface to several database
 systems. The following database systems are currently supported:
 @itemlist[
-@item{@bold{PostgreSQL versions 7.4 and later}}
-@item{@bold{MySQL versions 5 and later}}
-@item{@bold{SQLite version 3} --- requires native library}
+@item{@bold{@hyperlink["http://www.postgresql.org"]{PostgreSQL} versions 7.4 and later}}
+@item{@bold{@hyperlink["http://www.mysql.com"]{MySQL} versions 5 and later}}
+@item{@bold{@hyperlink["http://www.sqlite.org"]{SQLite} version 3} --- requires native library}
 @item{@bold{ODBC} --- requires ODBC installation}
 ]
 Support for PostgreSQL and MySQL does not rely on any

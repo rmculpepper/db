@@ -35,11 +35,7 @@ example, on Ubuntu 10.10 running MySQL 5.1, the socket is located at
 searched using the @racket[mysql-guess-socket-path] function.
 
 
-@section{Client and database character encodings}
-
-Changing a connection's encoding via SQL statements such as @tt{SET
-NAMES} is not allowed; when possible, the connection will observe the
-change and automatically disconnect with an error.
+@section{Database character encodings}
 
 In most cases, a PostgreSQL or MySQL database's character encoding is
 irrelevant, since the connect function always requests translation to
@@ -163,12 +159,13 @@ variables must be set according to the @tt{oracle_env.{csh,sh}} script
 for the driver to work. 
 
 Columns of type @tt{TIME} can cause a memory error (ie, Racket
-aborts). This seems to be due to a bug in Oracle's ODBC driver, but I
-do not yet have a workaround.
+aborts). This seems to be due to a
+@hyperlink["http://forums.oracle.com/forums/thread.jspa?threadID=572661"]{bug}
+in Oracle's ODBC driver, but I do not yet have a workaround.
 
 @;{
 Maybe Oracle bug? See:
-  http://kr.forums.oracle.com/forums/thread.jspa?threadID=572661
+  http://forums.oracle.com/forums/thread.jspa?threadID=572661
   http://stackoverflow.com/questions/38435/
   http://forums.oracle.com/forums/thread.jspa?threadID=856713
 }

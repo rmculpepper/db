@@ -38,20 +38,17 @@ Connections are made using the following functions.
                    void])
          connection?]{
 
-  Creates a connection to a PostgreSQL server. The
-  @racket[postgresql-connect] function recognizes the keyword
-  arguments listed above. Only the @racket[user] and @racket[database]
-  arguments are mandatory.
+  Creates a connection to a PostgreSQL server. Only the
+  @racket[database] and @racket[user] arguments are mandatory.
 
   By default, the connection is made via TCP to @racket["localhost"]
-  at port @racket[5432]. To make a different TCP connection, specify
-  one or both of the @racket[server] and @racket[port] keyword
-  arguments.
+  at port @racket[5432]. To make a different TCP connection, provide
+  one or both of the @racket[server] and @racket[port] arguments.
 
   To connect via a local socket, specify the socket path as the
   @racket[socket] argument. You must not supply the @racket[socket]
   argument if you have also supplied either of the TCP arguments. See
-  also @secref{connecting-to-server} for notes the socket path, and
+  also @secref{connecting-to-server} for notes on socket paths, and
   see @racket[postgresql-guess-socket-path] for a way of automatically
   determining the socket path.  Sockets are only available under Linux
   (x86) and Mac OS X.
@@ -252,10 +249,10 @@ Connections are made using the following functions.
   parameters. See @secref["odbc-types"] for more details.
 
   By default, connections use ODBC's @tt{SQL_C_WCHAR}-based character
-  encoding (as UTF-16) to send Unicode character data. Unfortunately,
-  some drivers' support for this method is buggy. To use
-  @tt{SQL_C_CHAR} instead, set @racket[character-mode] to
-  @racket['utf-8] or @racket['latin-1].
+  encoding (as UTF-16) to send and receive Unicode character
+  data. Unfortunately, some drivers' support for this method is
+  buggy. To use @tt{SQL_C_CHAR} instead, set @racket[character-mode]
+  to @racket['utf-8] or @racket['latin-1].
 
   See @secref["odbc-status"] for notes on specific ODBC drivers and
   recommendations for connection options.

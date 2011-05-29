@@ -22,7 +22,7 @@
 ;; == Connection
 
 (define connection%
-  (class* object% (connection<%>)
+  (class* locking% (connection<%>)
     (init-private db
                   env
                   notice-handler
@@ -31,7 +31,6 @@
 
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
-    (define async-handler-calls null)
     (define tx-status #f)
 
     (define use-describe-param?
@@ -40,17 +39,9 @@
              (handle-status 'connect status db)
              supported?)))
 
-    (define-syntax-rule (with-lock . body)
-      (call-with-lock (lambda () . body)))
-
-    (define/private (call-with-lock proc)
-      (begin (semaphore-wait lock)
-             (with-handlers ([values (lambda (e) (semaphore-post lock) (raise e))])
-               (begin0 (proc)
-                 (let ([handler-calls async-handler-calls])
-                   (set! async-handler-calls null)
-                   (semaphore-post lock)
-                   (for-each call-with-continuation-barrier handler-calls))))))
+    (inherit call-with-lock
+             call-with-lock*
+             add-delayed-call!)
 
     (define/public (get-db fsym)
       (unless db
@@ -58,7 +49,7 @@
       db)
 
     (define/public (get-dbsystem) dbsystem)
-    (define/public (connected?) (and db #t))
+    (define/override (connected?) (and db #t))
 
     (define/public (query fsym stmt collector)
       (check-valid-tx-status fsym tx-status)
@@ -82,25 +73,26 @@
             (unless (supported-typeid? typeid)
               (error/unsupported-type fsym typeid)))))
       (define-values (dvecs rows)
-        (with-lock
-         (let* ([db (get-db fsym)]
-                [stmt (send pst get-handle)])
-           (let* (;; FIXME: reset/clear first (?)
-                  [param-bufs
-                   ;; Need to keep references to all bufs until after SQLExecute.
-                   (for/list ([i (in-naturals 1)]
-                              [param (in-list params)]
-                              [param-typeid (in-list (send pst get-param-typeids))])
-                     (load-param fsym db stmt i param param-typeid))])
-             (handle-status fsym (SQLExecute stmt) stmt)
-             (strong-void param-bufs))
-           (let* ([result-dvecs (send pst get-result-dvecs)]
-                  [rows
-                   (and (pair? result-dvecs)
-                        (fetch* fsym stmt (map field-dvec->typeid result-dvecs)))])
-             (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
-             (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
-             (values result-dvecs rows)))))
+        (call-with-lock fsym
+          (lambda ()
+            (let* ([db (get-db fsym)]
+                   [stmt (send pst get-handle)])
+              (let* (;; FIXME: reset/clear first (?)
+                     [param-bufs
+                      ;; Need to keep references to all bufs until after SQLExecute.
+                      (for/list ([i (in-naturals 1)]
+                                 [param (in-list params)]
+                                 [param-typeid (in-list (send pst get-param-typeids))])
+                        (load-param fsym db stmt i param param-typeid))])
+                (handle-status fsym (SQLExecute stmt) stmt)
+                (strong-void param-bufs))
+              (let* ([result-dvecs (send pst get-result-dvecs)]
+                     [rows
+                      (and (pair? result-dvecs)
+                           (fetch* fsym stmt (map field-dvec->typeid result-dvecs)))])
+                (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
+                (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
+                (values result-dvecs rows))))))
       (send pst after-exec)
       (let-values ([(init combine finalize headers?)
                     (collector (length dvecs) #t)])
@@ -403,35 +395,36 @@
       (prepare1 fsym stmt close-on-exec?))
 
     (define/private (prepare1 fsym sql close-on-exec?)
-      (with-lock
-       ;; no time between prepare and table entry
-       (let* ([stmt
-               (let*-values ([(db) (get-db fsym)]
-                             [(status stmt) (SQLAllocHandle SQL_HANDLE_STMT db)])
-                 ;; FIXME: if error, free stmt handle
-                 (handle-status fsym status db)
-                 (let ([status (SQLPrepare stmt sql)])
-                   (handle-status fsym status stmt)
-                   stmt))]
-              [param-typeids
-               (let-values ([(status param-count) (SQLNumParams stmt)])
-                 (handle-status fsym status stmt)
-                 (for/list ([i (in-range 1 (add1 param-count))])
-                   (describe-param fsym stmt i)))]
-              [result-dvecs
-               (let-values ([(status result-count) (SQLNumResultCols stmt)]
-                            [(scratchbuf) (make-bytes 100)])
-                 (handle-status fsym status stmt)
-                 (for/list ([i (in-range 1 (add1 result-count))])
-                   (describe-result-column fsym stmt i scratchbuf)))])
-         (let ([pst (new prepared-statement%
-                         (handle stmt)
-                         (close-on-exec? close-on-exec?)
-                         (owner this)
-                         (param-typeids param-typeids)
-                         (result-dvecs result-dvecs))])
-           (hash-set! statement-table pst #t)
-           pst))))
+      (call-with-lock fsym
+        (lambda ()
+          ;; no time between prepare and table entry
+          (let* ([stmt
+                  (let*-values ([(db) (get-db fsym)]
+                                [(status stmt) (SQLAllocHandle SQL_HANDLE_STMT db)])
+                    ;; FIXME: if error, free stmt handle
+                    (handle-status fsym status db)
+                    (let ([status (SQLPrepare stmt sql)])
+                      (handle-status fsym status stmt)
+                      stmt))]
+                 [param-typeids
+                  (let-values ([(status param-count) (SQLNumParams stmt)])
+                    (handle-status fsym status stmt)
+                    (for/list ([i (in-range 1 (add1 param-count))])
+                      (describe-param fsym stmt i)))]
+                 [result-dvecs
+                  (let-values ([(status result-count) (SQLNumResultCols stmt)]
+                               [(scratchbuf) (make-bytes 100)])
+                    (handle-status fsym status stmt)
+                    (for/list ([i (in-range 1 (add1 result-count))])
+                      (describe-result-column fsym stmt i scratchbuf)))])
+            (let ([pst (new prepared-statement%
+                            (handle stmt)
+                            (close-on-exec? close-on-exec?)
+                            (owner this)
+                            (param-typeids param-typeids)
+                            (result-dvecs result-dvecs))])
+              (hash-set! statement-table pst #t)
+              pst)))))
 
     (define/private (describe-param fsym stmt i)
       (cond [use-describe-param?
@@ -448,24 +441,25 @@
         (vector name type size digits)))
 
     (define/public (disconnect)
-      (with-lock
-       (when db
-         (let ([db* db]
-               [env* env]
-               [statements (hash-map statement-table (lambda (k v) k))])
-           (set! db #f)
-           (set! env #f)
-           (set! statement-table #f)
-           (for ([pst (in-list statements)])
-             (free-statement* 'disconnect pst))
-           (handle-status 'disconnect (SQLDisconnect db*) db*)
-           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_DBC db*))
-           (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_ENV env*))
-           (void)))))
+      (define (go)
+        (let ([db* db]
+              [env* env])
+          (when db*
+            (let ([statements (hash-map statement-table (lambda (k v) k))])
+              (set! db #f)
+              (set! env #f)
+              (set! statement-table #f)
+              (for ([pst (in-list statements)])
+                (free-statement* 'disconnect pst))
+              (handle-status 'disconnect (SQLDisconnect db*) db*)
+              (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_DBC db*))
+              (handle-status 'disconnect (SQLFreeHandle SQL_HANDLE_ENV env*))
+              (void)))))
+      (call-with-lock* 'disconnect go go #f))
 
     (define/public (free-statement pst)
-      (with-lock
-       (free-statement* 'free-statement pst)))
+      (define (go) (free-statement* 'free-statement pst))
+      (call-with-lock* 'free-statement go go #f))
 
     (define/private (free-statement* fsym pst)
       (let ([stmt (send pst get-handle)])
@@ -478,61 +472,62 @@
     ;; Transactions
 
     (define/public (transaction-status fsym)
-      (with-lock (let ([db (get-db fsym)]) tx-status)))
+      (call-with-lock fsym
+        (lambda () (let ([db (get-db fsym)]) tx-status))))
 
     (define/public (start-transaction fsym isolation)
-      (with-lock
-       (let* ([db (get-db fsym)])
-         (when tx-status
-           (error/already-in-tx fsym))
-         (let* ([ok-levels
-                 (let-values ([(status value) (SQLGetInfo db SQL_TXN_ISOLATION_OPTION)])
-                   (begin0 value (handle-status fsym status db)))]
-                [default-level
-                 (let-values ([(status value) (SQLGetInfo db SQL_DEFAULT_TXN_ISOLATION)])
-                   (begin0 value (handle-status fsym status db)))]
-                [requested-level
-                 (case isolation
-                   ((serializable) SQL_TXN_SERIALIZABLE)
-                   ((repeatable-read) SQL_TXN_REPEATABLE_READ)
-                   ((read-committed) SQL_TXN_READ_COMMITTED)
-                   ((read-uncommitted) SQL_TXN_READ_UNCOMMITTED)
-                   (else
-                    ;; MySQL ODBC returns 0 for default level, seems no good.
-                    ;; So if 0, use serializable.
-                    (if (zero? default-level) SQL_TXN_SERIALIZABLE default-level)))])
-           (when (zero? (bitwise-and requested-level ok-levels))
-             (uerror fsym "requested isolation level ~a is not available" isolation))
-           (let ([status (SQLSetConnectAttr db SQL_ATTR_TXN_ISOLATION requested-level)])
-             (handle-status fsym status db)))
-         (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_OFF)])
-           (handle-status fsym status db)
-           (set! tx-status #t)
-           (void)))))
+      (call-with-lock fsym
+        (lambda ()
+          (let* ([db (get-db fsym)])
+            (when tx-status
+              (error/already-in-tx fsym))
+            (let* ([ok-levels
+                    (let-values ([(status value) (SQLGetInfo db SQL_TXN_ISOLATION_OPTION)])
+                      (begin0 value (handle-status fsym status db)))]
+                   [default-level
+                     (let-values ([(status value) (SQLGetInfo db SQL_DEFAULT_TXN_ISOLATION)])
+                       (begin0 value (handle-status fsym status db)))]
+                   [requested-level
+                    (case isolation
+                      ((serializable) SQL_TXN_SERIALIZABLE)
+                      ((repeatable-read) SQL_TXN_REPEATABLE_READ)
+                      ((read-committed) SQL_TXN_READ_COMMITTED)
+                      ((read-uncommitted) SQL_TXN_READ_UNCOMMITTED)
+                      (else
+                       ;; MySQL ODBC returns 0 for default level, seems no good.
+                       ;; So if 0, use serializable.
+                       (if (zero? default-level) SQL_TXN_SERIALIZABLE default-level)))])
+              (when (zero? (bitwise-and requested-level ok-levels))
+                (uerror fsym "requested isolation level ~a is not available" isolation))
+              (let ([status (SQLSetConnectAttr db SQL_ATTR_TXN_ISOLATION requested-level)])
+                (handle-status fsym status db)))
+            (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_OFF)])
+              (handle-status fsym status db)
+              (set! tx-status #t)
+              (void))))))
 
     (define/public (end-transaction fsym mode)
-      (with-lock
-       (unless (eq? mode 'rollback)
-         (check-valid-tx-status fsym tx-status))
-       (let ([db (get-db fsym)]
-             [completion-type
-              (case mode
-                ((commit) SQL_COMMIT)
-                ((rollback) SQL_ROLLBACK))])
-         (handle-status fsym (SQLEndTran db completion-type) db)
-         (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)])
-           (handle-status fsym status db)
-           ;; commit/rollback can fail; don't change status until possible error handled
-           (set! tx-status #f)
-           (void)))))
+      (call-with-lock fsym
+        (lambda () 
+          (unless (eq? mode 'rollback)
+            (check-valid-tx-status fsym tx-status))
+          (let ([db (get-db fsym)]
+                [completion-type
+                 (case mode
+                   ((commit) SQL_COMMIT)
+                   ((rollback) SQL_ROLLBACK))])
+            (handle-status fsym (SQLEndTran db completion-type) db)
+            (let ([status (SQLSetConnectAttr db SQL_ATTR_AUTOCOMMIT SQL_AUTOCOMMIT_ON)])
+              (handle-status fsym status db)
+              ;; commit/rollback can fail; don't change status until possible error handled
+              (set! tx-status #f)
+              (void))))))
 
     ;; Handler
 
     (define add-notice! ;; field, not method; allocate only once
       (lambda (sqlstate message)
-        (set! async-handler-calls
-              (cons (lambda () (notice-handler sqlstate message))
-                    async-handler-calls))))
+        (add-delayed-call! (lambda () (notice-handler sqlstate message)))))
 
     (define/private (handle-status who s [handle #f]
                                    #:ignore-ok/info? [ignore-ok/info? #f])

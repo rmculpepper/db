@@ -19,7 +19,7 @@
 ;; ========================================
 
 (define connection-base%
-  (class* object% (connection<%> connector<%>)
+  (class* locking% (connection<%> connector<%>)
     (init-private notice-handler
                   notification-handler
                   allow-cleartext-password?)
@@ -27,6 +27,10 @@
     (define outport #f)
     (define process-id #f)
     (define tx-status #f) ;; #f, #t, 'invalid
+
+    (inherit call-with-lock
+             call-with-lock*
+             add-delayed-call!)
 
     (super-new)
 
@@ -48,32 +52,6 @@
       (set! DEBUG-SENT-MESSAGES outgoing?))
 
     ;; ========================================
-
-    ;; == Communication locking
-
-    ;; Lock; all communication occurs within lock.
-    (define wlock (make-semaphore 1))
-
-    ;; Delay async handler calls until unlock.
-    (define delayed-handler-calls null)
-
-    (define/private (lock who require-connected?)
-      (semaphore-wait wlock)
-      (when (and require-connected? (not outport))
-        (semaphore-post wlock)
-        (error/not-connected who)))
-
-    (define/private (unlock)
-      (let ([handler-calls (reverse delayed-handler-calls)])
-        (set! delayed-handler-calls null)
-        (semaphore-post wlock)
-        (for-each call-with-continuation-barrier handler-calls)))
-
-    (define/private (call-with-lock who proc
-                                   #:require-connected? [require-connected? #t])
-      (lock who require-connected?)
-      (with-handlers ([values (lambda (e) (unlock) (raise e))])
-        (begin0 (proc) (unlock))))
 
     ;; == Communication
     ;; (Must be called with lock acquired.)
@@ -134,16 +112,11 @@
     (define/private (handle-async-message fsym msg)
       (match msg
         [(struct NoticeResponse (properties))
-         (set! delayed-handler-calls
-               (cons (lambda ()
-                       (notice-handler (cdr (assq 'code properties))
-                                       (cdr (assq 'message properties))))
-                     delayed-handler-calls))]
+         (let ([code (cdr (assq 'code properties))]
+               [message (cdr (assq 'message properties))])
+           (add-delayed-call! (lambda () (notice-handler code message))))]
         [(struct NotificationResponse (pid condition info))
-         (set! delayed-handler-calls
-               (cons (lambda ()
-                       (notification-handler condition))
-                     delayed-handler-calls))]
+         (add-delayed-call! (lambda () (notification-handler condition)))]
         [(struct ParameterStatus (name value))
          (cond [(equal? name "client_encoding")
                 (unless (equal? value "UTF8")
@@ -179,12 +152,14 @@
       ;; If we don't hold the lock, try to acquire it and disconnect politely.
       ;; Except, if already disconnected, no need to acquire lock.
       (cond [(and no-lock-held? (connected?))
-             (call-with-lock 'disconnect (lambda () (go #t))
-                             #:require-connected? #f)]
+             (call-with-lock* 'disconnect
+               (lambda () (go #t))
+               (lambda () (go #f))
+               #f)]
             [else (go #f)]))
 
     ;; connected? : -> boolean
-    (define/public (connected?)
+    (define/override (connected?)
       (let ([outport outport])
         (and outport (not (port-closed? outport)))))
 
@@ -432,8 +407,7 @@
 
     ;; free-statement : prepared-statement -> void
     (define/public (free-statement pst)
-      (call-with-lock 'free-statement
-        #:require-connected? #f
+      (call-with-lock* 'free-statement
         (lambda ()
           (let ([name (send pst get-handle)])
             (when (and name outport) ;; outport = connected?
@@ -443,7 +417,9 @@
               (let ([r (recv-message 'free-statement)])
                 (cond [(CloseComplete? r) (void)]
                       [else (error/comm 'free-statement)])
-                (check-ready-for-query 'free-statement #t)))))))
+                (check-ready-for-query 'free-statement #t)))))
+        void
+        #f))
 
     ;; == Transactions
 

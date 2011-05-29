@@ -21,6 +21,8 @@
          no-cache-prepare<%>
          connector<%>
 
+         locking%
+
          isolation-symbol->string
 
          hex-string->bytes
@@ -209,6 +211,70 @@
 
 ;; ----------------------------------------
 
+;; Connection base class (locking)
+
+(define locking%
+  (class object%
+
+    ;; == Communication locking
+
+    (define lock (make-semaphore 1))
+
+    ;; lock-holder is never-evt when unlocked, thread-dead-evt of
+    ;; thread holding lock when locked... *nearly*. This lets us
+    ;; (sometimes/often) detect when a thread has died while holding a
+    ;; connection lock. There are tiny intervals when lock is held but
+    ;; lock-holder is never-evt; but doing better would seem to
+    ;; require a dedicated thread w/ context switches, etc. When it's
+    ;; *really* important, use killsafe-connection.
+    (define lock-holder never-evt)
+
+    ;; Delay async calls (eg, notice handler) until unlock
+    (define delayed-async-calls null)
+
+    ;; ----
+
+    (define/public (call-with-lock who proc)
+      (call-with-lock* who proc #f #t))
+
+    (define/public-final (call-with-lock* who proc hopeless require-connected?)
+      (let* ([me (thread-dead-evt (current-thread))]
+             [result (sync lock lock-holder)])
+        (cond [(eq? result lock)
+               ;; Acquired lock
+               (set! lock-holder me)
+               (when (and require-connected? (not (connected?)))
+                 (semaphore-post lock)
+                 (error/not-connected who))
+               (with-handlers ([values (lambda (e) (unlock) (raise e))])
+                 (begin0 (proc) (unlock)))]
+              [(eq? result lock-holder)
+               ;; Thread holding lock is dead
+               (if hopeless
+                   (hopeless)
+                   (error/hopeless who))]
+              [else
+               ;; lock-holder was stale; retry
+               (call-with-lock* who proc hopeless require-connected?)])))
+
+    (define/private (unlock)
+      (let ([async-calls (reverse delayed-async-calls)])
+        (set! delayed-async-calls null)
+        (set! lock-holder never-evt)
+        (semaphore-post lock)
+        (for-each call-with-continuation-barrier async-calls)))
+
+    ;; needs overriding
+    (define/public (connected?) #f)
+
+    (define/public-final (add-delayed-call! proc)
+      (set! delayed-async-calls (cons proc delayed-async-calls)))
+
+    (super-new)))
+
+
+;; ----------------------------------------
+
 ;; Isolation levels
 
 (define (isolation-symbol->string isolation)
@@ -289,6 +355,7 @@ producing plain old exn:fail.
          error/not-connected
          error/need-password
          error/comm
+         error/hopeless
          error/unsupported-type
          check-valid-tx-status
          error/already-in-tx
@@ -310,6 +377,9 @@ producing plain old exn:fail.
   (if when-occurred
       (error/internal fsym "communication problem ~a" when-occurred)
       (error/internal fsym "communication problem")))
+
+(define (error/hopeless fsym)
+  (uerror fsym "connection is permanently locked due to a terminated thread"))
 
 (define (error/unsupported-type fsym typeid [type #f])
   (if type

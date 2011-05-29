@@ -19,21 +19,23 @@
 ;; ========================================
 
 (define connection%
-  (class* object% (connection<%>)
+  (class* locking% (connection<%>)
     (init-private notice-handler)
 
     (define inport #f)
     (define outport #f)
     (define tx-status #f) ;; #f, #t, or 'invalid
 
+    (inherit call-with-lock
+             call-with-lock*
+             add-delayed-call!)
+
     (super-new)
 
     ;; with-disconnect-on-error
-    (define-syntax with-disconnect-on-error
-      (syntax-rules ()
-        [(with-disconnect-on-error . body)
-         (with-handlers ([exn:fail? (lambda (e) (disconnect* #f) (raise e))])
-           . body)]))
+    (define-syntax-rule (with-disconnect-on-error . body)
+      (with-handlers ([exn:fail? (lambda (e) (disconnect* #f) (raise e))])
+        . body))
 
     ;; ========================================
 
@@ -47,32 +49,6 @@
       (set! DEBUG-SENT-MESSAGES outgoing?))
 
     ;; ========================================
-
-    ;; == Communication locking
-
-    ;; Lock; all communication occurs within lock.
-    (define wlock (make-semaphore 1))
-
-    ;; Delay async handler calls until unlock.
-    (define delayed-handler-calls null)
-
-    (define/private (lock who require-connected?)
-      (semaphore-wait wlock)
-      (when (and require-connected? (not outport))
-        (semaphore-post wlock)
-        (error/not-connected who)))
-
-    (define/private (unlock)
-      (let ([handler-calls (reverse delayed-handler-calls)])
-        (set! delayed-handler-calls null)
-        (semaphore-post wlock)
-        (for-each call-with-continuation-barrier handler-calls)))
-
-    (define/private (call-with-lock who proc
-                                    #:require-connected? [require-connected? #t])
-      (lock who require-connected?)
-      (with-handlers ([values (lambda (e) (unlock) (raise e))])
-        (begin0 (proc) (unlock))))
 
     ;; == Communication
     ;; (Must be called with lock acquired.)
@@ -184,12 +160,14 @@
       ;; If we don't hold the lock, try to acquire it and disconnect politely.
       ;; Except, if already disconnected, no need to acquire lock.
       (cond [(and lock-not-held? (connected?))
-             (call-with-lock 'disconnect (lambda () (go #t))
-                             #:require-connected? #f)]
+             (call-with-lock* 'disconnect
+               (lambda () (go #t))
+               (lambda () (go #f))
+               #f)]
             [else (go #f)]))
 
     ;; connected? : -> boolean
-    (define/public (connected?)
+    (define/override (connected?)
       (let ([outport outport])
         (and outport (not (port-closed? outport)))))
 
@@ -387,14 +365,15 @@
            (cons (parse-field-dvec r) (prepare1:get-field-descriptions fsym))])))
 
     (define/public (free-statement pst)
-      (call-with-lock 'free-statement
-        #:require-connected? #f
+      (call-with-lock* 'free-statement
         (lambda ()
           (let ([id (send pst get-handle)])
             (when (and id outport) ;; outport = connected?
               (send pst set-handle #f)
               (fresh-exchange)
-              (send-message (make-command:statement-packet 'statement-close id)))))))
+              (send-message (make-command:statement-packet 'statement-close id)))))
+        void
+        #f))
 
     ;; == Warnings
 
@@ -412,9 +391,7 @@
                (for ([row (in-list rows)])
                  (let ([code (string->number (vector-ref row code-index))]
                        [message (vector-ref row message-index)])
-                   (set! delayed-handler-calls
-                         (cons (lambda () (notice-handler code message))
-                               delayed-handler-calls)))))]))))
+                   (add-delayed-call! (lambda () (notice-handler code message))))))]))))
 
     ;; == Transactions
 

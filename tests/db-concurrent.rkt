@@ -19,9 +19,15 @@
          (query-exec c "create temporary table play_numbers (n integer)")
          ;; transaction speeds up test by a factor of 6 on postgresql
          (query-exec c "begin")
-         (for-each thread-wait
-                   (map thread
-                        (map (mk-worker c 100) (build-list workers add1)))))))))
+         (let ([exns null])
+           (parameterize ((uncaught-exception-handler
+                           (lambda (e) (set! exns (cons e exns)) ((error-escape-handler)))))
+             (for-each thread-wait
+                       (map thread
+                            (map (mk-worker c 100) (build-list workers add1)))))
+           (when (pair? exns)
+             (raise (make-exn (string-append "exception in thread: " (exn-message (car exns)))
+                              (exn-continuation-marks (car exns)))))))))))
 
 (define (((mk-worker c iterations) tid))
   (define insert-pst

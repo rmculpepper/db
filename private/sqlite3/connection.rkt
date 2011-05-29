@@ -19,37 +19,36 @@
 ;; == Connection
 
 (define connection%
-  (class* object% (connection<%>)
+  (class* locking% (connection<%>)
     (init db)
     (init-private busy-retry-limit
                   busy-retry-delay)
 
     (define -db db)
     (define statement-table (make-weak-hasheq))
-    (define lock (make-semaphore 1))
 
     (define invalid-tx #f) ;; #f or 'invalid for compat w/ check-valid-tx-status
     (define saved-tx-status #f) ;; set by with-lock, only valid while locked
 
-    (define-syntax-rule (with-lock . body)
-      (begin (semaphore-wait lock)
-             (with-handlers ([values (lambda (e) (semaphore-post lock) (raise e))])
-               (set! saved-tx-status (get-tx-status))
-               (begin0 (let () . body)
-                 (semaphore-post lock)))))
+    (inherit call-with-lock*
+             add-delayed-call!)
+
+    (define/override (call-with-lock fsym proc)
+      (call-with-lock* fsym (lambda () (set! saved-tx-status (get-tx-status)) (proc)) #f #t))
 
     (define/private (get-db fsym)
       (or -db (error/not-connected fsym)))
 
     (define/public (get-dbsystem) dbsystem)
-    (define/public (connected?) (and -db #t))
+    (define/override (connected?) (and -db #t))
 
     (define/public (query fsym stmt collector)
       (let* ([result
-              (with-lock
-               (check-valid-tx-status fsym invalid-tx)
-               (let ([db (get-db fsym)])
-                 (query1 fsym stmt)))]
+              (call-with-lock fsym
+                (lambda ()
+                  (check-valid-tx-status fsym invalid-tx)
+                  (let ([db (get-db fsym)])
+                    (query1 fsym stmt))))]
              [stmt (car result)]
              [info0 (cadr result)]
              [rows (cddr result)])
@@ -132,9 +131,10 @@
                  vec)])))
 
     (define/public (prepare fsym stmt close-on-exec?)
-      (with-lock
-       (check-valid-tx-status fsym invalid-tx)
-       (prepare1 fsym stmt close-on-exec?)))
+      (call-with-lock fsym
+        (lambda ()
+          (check-valid-tx-status fsym invalid-tx)
+          (prepare1 fsym stmt close-on-exec?))))
 
     (define/private (prepare1 fsym sql close-on-exec?)
       ;; no time between sqlite3_prepare and table entry
@@ -166,27 +166,30 @@
           pst)))
 
     (define/public (disconnect)
-      (with-lock
-       (when -db
-         (let ([db -db]
-               [statements (hash-map statement-table (lambda (k v) k))])
-           (set! -db #f)
-           (set! statement-table #f)
-           (for ([pst (in-list statements)])
-             (let ([stmt (send pst get-handle)])
-               (when stmt
-                 (send pst set-handle #f)
-                 (HANDLE 'disconnect (sqlite3_finalize stmt)))))
-           (HANDLE 'disconnect (sqlite3_close db))
-           (void)))))
+      ;; FIXME: Reorder effects to be more robust if thread killed within disconnect (?)
+      (define (go)
+        (when -db
+          (let ([db -db]
+                [statements (hash-map statement-table (lambda (k v) k))])
+            (set! -db #f)
+            (set! statement-table #f)
+            (for ([pst (in-list statements)])
+              (let ([stmt (send pst get-handle)])
+                (when stmt
+                  (send pst set-handle #f)
+                  (HANDLE 'disconnect (sqlite3_finalize stmt)))))
+            (HANDLE 'disconnect (sqlite3_close db))
+            (void))))
+      (call-with-lock* 'disconnect go go #f))
 
     (define/public (free-statement pst)
-      (with-lock
-       (let ([stmt (send pst get-handle)])
-         (when stmt
-           (send pst set-handle #f)
-           (HANDLE 'free-statement (sqlite3_finalize stmt))
-           (void)))))
+      (define (go)
+        (let ([stmt (send pst get-handle)])
+          (when stmt
+            (send pst set-handle #f)
+            (HANDLE 'free-statement (sqlite3_finalize stmt))
+            (void))))
+      (call-with-lock* 'free-statement go go #f))
 
 
     ;; == Transactions
@@ -194,9 +197,10 @@
     ;; http://www.sqlite.org/lang_transaction.html
 
     (define/public (transaction-status fsym)
-      (with-lock
-       (let ([db (get-db fsym)])
-         (or invalid-tx (get-tx-status db)))))
+      (call-with-lock fsym
+        (lambda ()
+          (let ([db (get-db fsym)])
+            (or invalid-tx (get-tx-status db))))))
 
     (define/private (get-tx-status [db -db])
       (and db (not (sqlite3_get_autocommit db))))
@@ -206,29 +210,31 @@
       ;; ignored in all but a few cases, don't bother.
       ;; FIXME: modes are DEFERRED | IMMEDIATE | EXCLUSIVE
       (let ([stmt
-             (with-lock
-              (let ([db (get-db fsym)])
-                (when (get-tx-status db)
-                  (error/already-in-tx fsym))
-                (let ([r (query1 fsym "BEGIN TRANSACTION")])
-                  (car r))))])
+             (call-with-lock fsym
+               (lambda ()
+                 (let ([db (get-db fsym)])
+                   (when (get-tx-status db)
+                     (error/already-in-tx fsym))
+                   (let ([r (query1 fsym "BEGIN TRANSACTION")])
+                     (car r)))))])
         (statement:after-exec stmt)
         (void)))
 
     (define/public (end-transaction fsym mode)
       (let ([stmt
-             (with-lock
-              (let ([db (get-db fsym)])
-                (unless (eq? mode 'rollback)
-                  (check-valid-tx-status fsym invalid-tx))
-                (when (get-tx-status db)
-                  (let ([r (case mode
-                             ((commit)
-                              (query1 fsym "COMMIT TRANSACTION"))
-                             ((rollback)
-                              (query1 fsym "ROLLBACK TRANSACTION")))])
-                    (set! invalid-tx #f)
-                    (car r)))))])
+             (call-with-lock fsym
+               (lambda ()
+                 (let ([db (get-db fsym)])
+                   (unless (eq? mode 'rollback)
+                     (check-valid-tx-status fsym invalid-tx))
+                   (when (get-tx-status db)
+                     (let ([r (case mode
+                                ((commit)
+                                 (query1 fsym "COMMIT TRANSACTION"))
+                                ((rollback)
+                                 (query1 fsym "ROLLBACK TRANSACTION")))])
+                       (set! invalid-tx #f)
+                       (car r))))))])
         (statement:after-exec stmt)
         (void)))
 

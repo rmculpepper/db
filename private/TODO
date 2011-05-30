@@ -64,10 +64,9 @@ Types
 - wishlist: port-closed-evt would let me implement connection-disconnected-evt,
   might be useful for connection pooling (?)
 
-- extract locking code into base class
-  add 80% solution to hopeless-locked (hopeless-evt = never-evt or thread-dead-evt)
-
 - connection pooling
   - needs to be easier to setup (right defaults)
   - split off from connection-generator (use same class, different constructor function?)
   - timeout clock starts after operation completes
+
+- odbc: use odbc async execution to avoid blocking all Racket threads

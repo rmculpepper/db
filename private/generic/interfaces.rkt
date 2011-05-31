@@ -28,6 +28,7 @@
          hex-string->bytes
 
          make-handler
+         guess-socket-path/paths
 
          (struct-out exn:fail:sql)
          raise-sql-error)
@@ -208,6 +209,14 @@
                    ((error) (current-error-port))
                    (else out))
                  "~a: ~a (SQLSTATE ~a)\n" header message code))))
+
+;; == Socket paths
+
+(define (guess-socket-path/paths function paths)
+  (or (for/or ([path (in-list paths)])
+        (and (file-exists? path) path))
+      (error function
+             "could not find socket path")))
 
 ;; ----------------------------------------
 

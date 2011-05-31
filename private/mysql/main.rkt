@@ -9,7 +9,6 @@
          file/sha1
          "../generic/interfaces.rkt"
          "../generic/socket.rkt"
-         "../generic/find-socket.rkt"
          "connection.rkt"
          "dbsystem.rkt")
 (provide mysql-connect

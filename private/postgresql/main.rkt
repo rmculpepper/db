@@ -9,7 +9,6 @@
          openssl
          "../generic/interfaces.rkt"
          "../generic/socket.rkt"
-         "../generic/find-socket.rkt"
          "connection.rkt"
          "dbsystem.rkt")
 (provide postgresql-connect

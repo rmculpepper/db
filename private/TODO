@@ -65,3 +65,13 @@ Types
   might be useful for connection pooling (?)
 
 - odbc: use odbc async execution to avoid blocking all Racket threads
+
+- eliminate dbsystem objects?
+
+- "connector" = (-> connection?) | data-source? | connection-pool?
+  and make eg connection-generator take any "connector" instead of just function
+
+- rename radsn-connect, util/radsn
+  but what? (ds-connect, util/ds ?)
+
+- check/improve time representations

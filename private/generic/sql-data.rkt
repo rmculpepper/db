@@ -30,6 +30,22 @@
 
 ;; ----
 
+#|
+
+** problems with Racket date:
+
+ - fields in wrong order
+ - too many fields (not checked for correctness?)
+ - timezone, dst? field too limited (?)
+ - no fractional seconds
+
+** problems with SRFI date:
+
+ - fields in wrong order
+ - timezone offset too limited
+
+|#
+
 (define-struct sql-date (year month day) #:transparent)
 (define-struct sql-time (hour minute second nanosecond tz) #:transparent)
 (define-struct sql-timestamp

@@ -15,7 +15,7 @@ The bindings described in this section are not provided by
 @(my-defmodule util/connect)
 
 @defproc[(connection-generator
-             [connect (-> connection?)]
+             [connect (or/c (-> connection?) connection-pool?)]
              [#:timeout timeout (and/c real? positive?) +inf.0])
          connection?]{
 
@@ -28,6 +28,10 @@ no actual connection associated with the current thread, one is
 obtained by calling @racket[connect]. An actual connection is
 disconnected when its associated thread dies or if @racket[timeout]
 seconds elapse since the actual connection was last used.
+
+If @racket[connect] is a connection pool, the actual connection is
+obtained by calling @racket[connection-pool-lease] on
+@racket[connect].
 
 When given a connection produced by @racket[connection-generator],
 @racket[connected?] indicates whether there is an actual connection
@@ -76,27 +80,6 @@ execute parameterized queries expressed as strings or encapsulated via
 ]
 }
 
-@defproc[(kill-safe-connection [c connection?]) 
-         connection?]{
-
-Creates a proxy for connection @racket[c]. All queries performed
-through the proxy are kill-safe; that is, if a thread is killed during
-a call to a query function such as @racket[query], the connection will
-not become locked or damaged. (Connections are normally thread-safe but
-not kill-safe.)
-
-Note: A kill-safe connection whose underlying connection uses ports to
-communicate with a database server is not protected from a custodian
-shutting down its ports.
-}
-
-
-@;{========================================}
-
-@section{Connection pooling}
-
-@(my-defmodule util/pool)
-
 @defproc[(connection-pool
              [connect (-> connection?)]
              [#:max-connections max-connections (or/c (integer-in 1 10000) +inf.0) +inf.0]
@@ -138,6 +121,20 @@ When a connection is released, it is kept as an idle connection if
 @racket[pool]'s idle connection limit would not be exceeded;
 otherwise, it is disconnected. If the connection is in a transaction,
 the transaction is rolled back.
+}
+
+@defproc[(kill-safe-connection [c connection?]) 
+         connection?]{
+
+Creates a proxy for connection @racket[c]. All queries performed
+through the proxy are kill-safe; that is, if a thread is killed during
+a call to a query function such as @racket[query], the connection will
+not become locked or damaged. (Connections are normally thread-safe but
+not kill-safe.)
+
+Note: A kill-safe connection whose underlying connection uses ports to
+communicate with a database server is not protected from a custodian
+shutting down its ports.
 }
 
 

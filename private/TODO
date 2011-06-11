@@ -1,12 +1,17 @@
 To do
 =====
 
-- after Racket 5.1.1 release:
-  - set required-core-version to 5.1.1
-  - drop private/generic/check-access.rkt
-  - split private/generic/socket.rkt into separate package
-  - use ryanc/macros:2/lazy-require in main.rkt
-  - use ryanc/macros:2/relation in message modules
+** For version 1.2:
+
+- rename radsn-connect (but to what?), merge util/radsn into util/connect
+
+** For version 2.0:
+
+- set required-core-version to 5.1.1
+- drop private/generic/check-access.rkt
+- split private/generic/socket.rkt into separate package
+- use ryanc/macros:2/lazy-require in main.rkt
+- use ryanc/macros:2/relation in message modules
 
 ----
 
@@ -14,9 +19,8 @@ Testing
 
 - run ODBC tests on Mac
 - run ODBC DB2, Oracle tests on win32; also test SQL Server ?
-
-- test connection-generators
-- test kill-safe-connection
+- test util/connect features
+- test transaction functions
 
 ----
 
@@ -39,21 +43,20 @@ Types
 
 ----
 
-- doc: enumerate errors
+- document/enumerate errors
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 
 - disconnect should always work, even on thread-damaged connections
   - but might need version with timeout and/or rudely? flag, because
     I can't think of a way to solve the lock problem that doesn't involve aux thread.
 
-- finish transaction api (tests)
-  - add connect option #:rollback-invalid-transactions?
-  - enough to implement connection pooling?
+- finish transaction api: tests, custom sqlite options (?), custom mysql options (?)
+  - add connect option #:rollback-invalid-transactions? (?)
 
-- Identify common ODBC errors that can't possibly rollback transaction
+- identify common ODBC errors that can't possibly rollback transaction
   - test with PostgreSQL ODBC driver using "rollback on all errors" mode
 
-- More ODBC information (?)
+- more ODBC information (?)
   SQLGetInfo:
   - SQL_CONVERT_<datatype> - use to refine supported types (?)
   - SQL_CURSOR_{COMMIT,ROLLBACK}_BEHAVIOR - check that commit/rollback doesn't delete pstmts!
@@ -61,17 +64,16 @@ Types
 
 - cursors? (Olin thinks cursors are important. I'm not sure.)
 
-- wishlist: port-closed-evt would let me implement connection-disconnected-evt,
-  might be useful for connection pooling (?)
-
-- odbc: use odbc async execution to avoid blocking all Racket threads
+- ODBC: increase buffer size for eg column names, table names, etc.
+- ODBC: use async execution to avoid blocking all Racket threads
+- ODBC: alternative to connection strings
+  - probably best to create tmp DSN file, because string syntax is awful
 
 - eliminate dbsystem objects?
 
-- "connector" = (-> connection?) | data-source? | connection-pool?
-  and make eg connection-generator take any "connector" instead of just function
+- let connection-generator take data-source as connector
+- let connection-pool take data-source as connector
 
-- rename radsn-connect, util/radsn
-  but what? (ds-connect, util/ds ?)
+- check/improve time representations (?)
 
-- check/improve time representations
+- protect exports from {sqlite3,odbc}/ffi.rkt (?)

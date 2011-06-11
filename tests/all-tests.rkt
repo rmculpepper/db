@@ -10,7 +10,7 @@
          rackunit/text-ui
          racket/unit
          "../main.rkt"
-         "../util/radsn.rkt"
+         "../util/connect.rkt"
          "config.rkt"
          "db-connection.rkt"
          "db-query.rkt"

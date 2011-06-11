@@ -7,7 +7,6 @@
          rackunit
          "../base.rkt"
          "../util/connect.rkt"
-         "../util/pool.rkt"
          "config.rkt")
 (import database^ config^)
 (export test^)

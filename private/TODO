@@ -3,9 +3,12 @@ To do
 
 ** For version 1.2:
 
-- rename radsn-connect (but to what?), merge util/radsn into util/connect
-
 ** For version 2.0:
+
+- merge util/connect into base
+- eliminate dbsystem objects (??)
+- eliminate deprecated features
+  - query-fold, connection-generator, odbc-connect #:database arg
 
 - set required-core-version to 5.1.1
 - drop private/generic/check-access.rkt
@@ -43,6 +46,11 @@ Types
 
 ----
 
+- for wrapped/managed connections, detect if underlying connection gets
+  disconnected by server (eg, times out after 10 minutes of inactivity)
+  - at least, pool should make sure connection is alive when gotten from idle list
+  - add {keepalive : -> boolean} method to connection<%> (?)
+
 - document/enumerate errors
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
 
@@ -66,13 +74,8 @@ Types
 
 - ODBC: increase buffer size for eg column names, table names, etc.
 - ODBC: use async execution to avoid blocking all Racket threads
-- ODBC: alternative to connection strings
+- ODBC: alternative to connection strings (eg property alist)
   - probably best to create tmp DSN file, because string syntax is awful
-
-- eliminate dbsystem objects?
-
-- let connection-generator take data-source as connector
-- let connection-pool take data-source as connector
 
 - check/improve time representations (?)
 
@@ -83,3 +86,5 @@ Types
   - connection-pool-lease-evt
   - when is it useful in practice?
     - would make it easier to handle timeouts...
+
+- add ODBC-like functions for inspecting schemas (list-tables, etc)

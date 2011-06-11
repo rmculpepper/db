@@ -144,7 +144,7 @@
              [sema (make-semaphore 0)])
         (channel-put req-channel
                      (lambda ()
-                       (set! c (get key create?))
+                       (set! c (get key))
                        (semaphore-post sema)))
         (semaphore-wait sema)
         (cond [(and c (send c connected?)) c]

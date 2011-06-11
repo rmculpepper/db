@@ -50,10 +50,11 @@
 (void
  (interaction-eval #:eval the-eval
                    (require racket/class
-                            "main.rkt")))
-(void
+                            "main.rkt"))
  (interaction-eval #:eval the-eval
-                   (define connection% (class object% (super-new)))))
+                   (define connection% (class object% (super-new))))
+ (interaction-eval #:eval the-eval
+                   (define connection-pool% (class object% (super-new)))))
 
 (define-syntax-rule (examples/results [example result] ...)
   (examples #:eval the-eval (eval:alts example result) ...))

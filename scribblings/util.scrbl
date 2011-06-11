@@ -92,6 +92,22 @@ Creates a connection pool. The pool consists of up to
 @racket[connect] to create new connections when needed; the
 @racket[connect] function must return a fresh connection each time it
 is called.
+
+@examples/results[
+[(define pool
+  (connection-pool
+   (lambda () (displayln "connecting!") (sqlite3-connect ....))
+   #:max-idle-connections 1))
+ (void)]
+[(define c1 (connection-pool-lease pool))
+ (displayln "connecting!")]
+[(define c2 (connection-pool-lease pool))
+ (displayln "connecting!")]
+[(disconnect c1)
+ (void)]
+[(code:line (define c3 (connection-pool-lease pool)) (code:comment "reuses actual conn. from c1"))
+ (void)]
+]
 }
 
 @defproc[(connection-pool? [x any/c]) boolean?]{

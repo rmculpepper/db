@@ -77,3 +77,9 @@ Types
 - check/improve time representations (?)
 
 - protect exports from {sqlite3,odbc}/ffi.rkt (?)
+
+- add evt versions of functions
+  - for query functions (?)
+  - connection-pool-lease-evt
+  - when is it useful in practice?
+    - would make it easier to handle timeouts...

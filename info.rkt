@@ -16,10 +16,12 @@
     "PostgreSQL and MySQL support is implemented in pure Racket. "
     "The optional SQLite and ODBC support requires the appropriate "
     "native client libraries."))
-(define release-notes
-  '("Fixed native library names for ODBC, SQLite on Windows."))
 (define categories '(io net))
 (define can-be-loaded-with 'all)
 (define primary-file "main.rkt")
 (define required-core-version "5.1")
 (define repositories '("4.x"))
+
+(define release-notes
+  '("Fixed many ODBC bugs, added detailed ODBC status notes to documentation."
+    "Added connection pools, transaction functions, and DSN-like facility."))

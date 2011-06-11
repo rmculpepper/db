@@ -88,3 +88,26 @@ Types
     - would make it easier to handle timeouts...
 
 - add ODBC-like functions for inspecting schemas (list-tables, etc)
+
+
+History
+=======
+
+** Changes for version 1.1
+
++ fixed native library names for ODBC, SQLite on windows
+
+** Changes for version 1.2
+
+- postgresql mostly uses binary format
+- added geometric types, sql-bits
+- added more detailed notes on odbc status
+- renames (odbc #:database -> #:dsn, connection-generator -> virtual-connection)
++ odbc:
+  - fixed bug on windows
+  - use wchar
+  - tested/fixed Oracle support
+  - tested/fixed DB2 support
++ added connection-pools, radsn utils
++ added transaction functions
+- sqlite3 better busy handling

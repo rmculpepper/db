@@ -381,7 +381,7 @@
 
 (define (connection-pool connector
                          #:max-connections [max-connections +inf.0]
-                         #:max-idle-connections [max-idle-connections 2])
+                         #:max-idle-connections [max-idle-connections 10])
   (new connection-pool%
        (connector connector)
        (max-connections max-connections)

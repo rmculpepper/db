@@ -24,7 +24,7 @@ by reusing connections.
 @defproc[(connection-pool
              [connect (-> connection?)]
              [#:max-connections max-connections (or/c (integer-in 1 10000) +inf.0) +inf.0]
-             [#:max-idle-connections max-idle-connections (or/c (integer-in 1 10000) +inf.0) 2])
+             [#:max-idle-connections max-idle-connections (or/c (integer-in 1 10000) +inf.0) 10])
          connection-pool?]{
 
 Creates a @tech{connection pool}. The pool consists of up to
@@ -102,9 +102,9 @@ automatically releases them when they are no longer needed.
          connection?]{
 
 Creates a @tech{virtual connection} that creates actual connections on
-demand using the @racket[connect] function (or by calling
+demand using the @racket[connect] function, or by calling
 @racket[(connection-pool-lease connect)] if @racket[connect] is a
-@tech{connection pool}). A virtual connection encapsulates a mapping
+@tech{connection pool}. A virtual connection encapsulates a mapping
 of threads to actual connections. When a query function is called with
 a virtual connection, the current thread's associated actual
 connection is used to execute the query. If there is no actual
@@ -128,7 +128,7 @@ pool} combines convenience with efficiency:
 ]
 
 The resulting virtual connection leases a connection from the pool on
-demand for each servlet request thread and returns it when the thread
+demand for each servlet request thread and releases it when the thread
 terminates (that is, when the request has been handled).
 
 When given a connection produced by @racket[virtual-connection],
@@ -202,14 +202,12 @@ communicate with a database server is not protected from a custodian
 shutting down its ports.
 }
 
-
 @;{========================================}
 
 @subsection{RaDSN (Racket data source names)}
 
 A RaDSN (Racket Data Source name) is a symbol associated with a
-connection specification in a RaDSN file (inspired by ODBC's Data
-Source Names).
+connection specification in a RaDSN file (inspired by ODBC's DSNs).
 
 @defstruct*[data-source
               ([connector (or/c 'postgresql 'mysql 'sqlite3 'odbc)]
@@ -244,6 +242,18 @@ Source Names).
   If @racket[radsn-file] does not exist, or if it contains no entry
   for @racket[radsn], an exception is raised. If @racket[radsn] is a
   @racket[data-source], then @racket[radsn-file] is ignored.
+
+@examples/results[
+[(put-radsn 'me
+            (postgresql-data-source #:user "me"
+                                    #:database "me" 
+                                    #:password "icecream"))
+ (void)]
+[(radsn-connect 'me)
+ (new connection%)]
+[(radsn-connect 'me #:notice-handler (lambda (code msg) ....))
+ (new connection%)]
+]
 }
 
 @defparam[current-radsn-file x path-string?]{
@@ -255,7 +265,7 @@ Source Names).
 
 @defproc[(get-radsn [radsn symbol?]
                     [default any/c #f]
-                    [radsn-file path-string? (current-radsn-file)])
+                    [#:radsn-file radsn-file path-string? (current-radsn-file)])
          (or/c data-source? any/c)]{
 
   Returns the @racket[data-source] associated with @racket[radsn] in
@@ -269,7 +279,7 @@ Source Names).
 
 @defproc[(put-radsn [radsn symbol?]
                     [ds (or/c data-source? #f)]
-                    [radsn-file path-string? (current-radsn-file)])
+                    [#:radsn-file radsn-file path-string? (current-radsn-file)])
          void?]{
 
   Associates @racket[radsn] with the given data source @racket[ds] in

@@ -112,15 +112,13 @@ considered important.
 (define current-radsn-file
   (make-parameter (build-path (find-system-path 'pref-dir) "db-radsn-0.rktd")))
 
-(define (get-radsn name [default #f] [file #f])
-  (let* ([file (or file (current-radsn-file))]
-         [sexpr (get-preference name (lambda () #f) 'timestamp file)])
+(define (get-radsn name [default #f] #:radsn-file [file (current-radsn-file)])
+  (let* ([sexpr (get-preference name (lambda () #f) 'timestamp file)])
     (or (and sexpr (sexpr->data-source sexpr))
         (if (procedure? default) (default) default))))
 
-(define (put-radsn name value [file #f])
-  (let* ([file (or file (current-radsn-file))]
-         [sexpr (and value (data-source->sexpr value))])
+(define (put-radsn name value #:radsn-file [file (current-radsn-file)])
+  (let* ([sexpr (and value (data-source->sexpr value))])
     (put-preferences (list name)
                      (list sexpr)
                      (lambda () (error 'put-radsn "RaDSN file locked"))
@@ -142,17 +140,17 @@ considered important.
      (let* ([kws (map list kws kwargs)]
             [file-entry (assq '#:radsn-file kws)]
             [kws* (if file-entry (remq file-entry kws) kws)]
-            [file (and file-entry (cdr file-entry))])
+            [file (if file-entry (cdr file-entry) (current-radsn-file))])
        (unless (or (symbol? name) (data-source? name))
          (error 'radsn-connect
                 "expected symbol for first argument, got: ~e" name))
        (unless (or (path-string? file) (not file))
          (error 'radsn-connect
-                "expected path, string, or #f for #:radsn-file keyword, got: ~e"
+                "expected path or string for #:radsn-file keyword, got: ~e"
                 file))
-       (let ([r (if (data-source? name) name (get-radsn name #f file))])
+       (let ([r (if (data-source? name) name (get-radsn name #f #:radsn-file file))])
          (unless r
-           (error 'radsn-connect "cannot find RaDSN named ~e" name))
+           (error 'radsn-connect "cannot find data source named ~e" name))
          (let* ([rargs (parse-arglist (data-source-args r))]
                 [rpargs (first rargs)]
                 [rkwargs (second rargs)]
@@ -204,9 +202,9 @@ considered important.
  [radsn-connect procedure?] ;; Can't express "or any kw at all" w/ ->* contract.
  [current-radsn-file (parameter/c path-string?)]
  [get-radsn
-  (->* (symbol?) (any/c path-string?) any)]
+  (->* (symbol?) (any/c #:radsn-file path-string?) any)]
  [put-radsn
-  (->* (symbol? (or/c data-source? #f)) (path-string?) void?)]
+  (->* (symbol? (or/c data-source? #f)) (#:radsn-file path-string?) void?)]
  [postgresql-data-source
   (->* ()
        (#:user string?

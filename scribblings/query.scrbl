@@ -522,8 +522,10 @@ rollback invalid transactions.
                              #f])
          void?]{
 
-  Starts a transaction. If @racket[isolation-level] is given, it is
-  used as the isolation level for the transaction. 
+  Starts a transaction with isolation @racket[isolation-level]. If
+  @racket[isolation-level] is @racket[#f], the isolation is
+  database-dependent; it may be a default isolation level or it may be
+  the isolation level of the previous transaction.
 
   If @racket[c] is already in a transaction, an exception is raised.
 }

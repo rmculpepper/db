@@ -115,7 +115,9 @@ Calling @racket[disconnect] on the connection obtained causes the
 connection to be released back to the connection pool. The connection
 is also released if @racket[release] becomes available, if it is a
 synchronizable event, or if @racket[release] is shutdown, if it is a
-custodian.
+custodian. The default for @racket[release] is the current thread, so
+the resulting connection is released when the thread that requested it
+terminates.
 
 When a connection is released, it is kept as an idle connection if
 @racket[pool]'s idle connection limit would not be exceeded;

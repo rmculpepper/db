@@ -81,8 +81,9 @@
     (super-new)
 
     (define custodian (current-custodian))
-
     (define req-channel (make-channel))
+
+    (define DEBUG? #f)
 
     ;; == methods called in manager thread ==
 
@@ -124,11 +125,15 @@
               (handle-evt (apply choice-evt keys)
                           ;; Assignment to key has expired: move to idle or disconnect.
                           (lambda (key)
+                            (when DEBUG?
+                              (eprintf "** connection-generator: key expiration: ~e\n" key))
                             (remove! key #f))))
             (let ([alarm-evts (hash-map alarms (lambda (k v) v))])
               (handle-evt (apply choice-evt alarm-evts)
                           ;; Disconnect idle connection.
                           (lambda (key)
+                            (when DEBUG?
+                              (eprintf "** connection-generator: timeout\n"))
                             (remove! key #t)))))
       (manage))
 
@@ -196,7 +201,9 @@
 
     (define/public (free-statement stmt)
       (error 'free-statement
-             "internal error: connection-generator does not own statements"))))
+             "internal error: connection-generator does not own statements"))
+
+    (define/public (debug ?) (set! DEBUG? ?))))
 
 ;; ----
 
@@ -232,7 +239,11 @@
           (make-semaphore max-connections)))
 
     (define req-channel (make-channel))
-    (define debug? #f)
+
+    (define DEBUG? #f)
+    (define proxy-counter 1) ;; for debugging
+    (define actual-counter 1) ;; for debugging
+    (define actual=>number (make-weak-hasheq))
 
     ;; == methods called in manager thread ==
 
@@ -243,21 +254,30 @@
     (define idle-list null)
 
     (define/private (lease* key)
-      (when debug?
-        (eprintf "leasing connection (~a)\n" (if (pair? idle-list) "idle" "new")))
-      (let* ([raw-c
-              (cond [(pair? idle-list)
+      (let* ([take-idle? (pair? idle-list)]
+             [raw-c
+              (cond [take-idle?
                      (begin0 (car idle-list)
                        (set! idle-list (cdr idle-list)))]
                     [else (new-connection)])]
-             [c (new proxy-connection% (pool this) (connection raw-c))])
+             [proxy-number (begin0 proxy-counter (set! proxy-counter (add1 proxy-counter)))]
+             [c (new proxy-connection% (pool this) (connection raw-c) (number proxy-number))])
+        (when DEBUG?
+          (eprintf "** connection-pool: leasing connection #~a (~a @~a)\n"
+                   proxy-number
+                   (if take-idle? "idle" "new")
+                   (hash-ref actual=>number raw-c "???")))
         (hash-set! proxy=>evt c key)
         c))
 
-    (define/private (release* proxy raw-c)
-      (when debug?
-        (eprintf "releasing connection (~a)\n"
-                 (if (< (length idle-list) max-idle-connections) "idle" "disconnect")))
+    (define/private (release* proxy raw-c why)
+      (when DEBUG?
+        (eprintf "** connection-pool: releasing connection #~a (~a, ~a)\n"
+                 (send proxy get-number)
+                 (cond [(not raw-c) "no-op"]
+                       [(< (length idle-list) max-idle-connections) "idle"]
+                       [else "disconnect"])
+                 why))
       (hash-remove! proxy=>evt proxy)
       (when raw-c
         (with-handlers ([exn:fail? void])
@@ -268,9 +288,11 @@
         (when (semaphore? lease-evt) (semaphore-post lease-evt))))
 
     (define/private (new-connection)
-      (let ([c (connector)])
+      (let ([c (connector)]
+            [actual-number (begin0 actual-counter (set! actual-counter (add1 actual-counter)))])
         (when (or (hash-ref proxy=>evt c #f) (memq c idle-list))
           (uerror 'connection-pool "connect function did not produce a fresh connection"))
+        (hash-set! actual=>number c actual-number)
         c))
 
     (define/private (manage)
@@ -278,7 +300,7 @@
             (let ([evts (hash-map proxy=>evt (lambda (k v) (wrap-evt v (lambda (e) k))))])
               (handle-evt (apply choice-evt evts)
                           (lambda (proxy)
-                            (release* proxy (send proxy release-connection))))))
+                            (release* proxy (send proxy release-connection) "release-evt")))))
       (manage))
 
     (define manager-thread
@@ -302,21 +324,25 @@
     (define/public (release proxy)
       (thread-resume manager-thread)
       (let ([raw-c (send proxy release-connection)])
-        (channel-put req-channel (lambda () (release* proxy raw-c))))
+        (channel-put req-channel (lambda () (release* proxy raw-c "proxy disconnect"))))
       (void))
 
     (define/public (debug ?)
-      (set! debug? (eq? ? #t))
+      (case ?
+        ((#t) (set! DEBUG? #t))
+        ((#f) (set! DEBUG? #f)))
       (when ?
-        (eprintf "pool status: ~a assigned, ~a idle\n"
-                 (hash-count proxy=>evt) (length idle-list))))))
+        (eprintf "** connection-pool: status: ~a assigned, ~a idle; max #~a, max @~a\n"
+                 (hash-count proxy=>evt) (length idle-list)
+                 (sub1 proxy-counter) (sub1 actual-counter))))))
 
 ;; --
 
 (define proxy-connection%
   (class* locking% (connection<%>)
     (init-private connection
-                  pool)
+                  pool
+                  number)
     (inherit call-with-lock)
     (super-new)
 
@@ -344,6 +370,8 @@
 
     (define/public (disconnect)
       (send pool release this))
+
+    (define/public (get-number) number)
 
     (define/public (release-connection)
       (begin0 connection

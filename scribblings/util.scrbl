@@ -14,71 +14,12 @@ The bindings described in this section are not provided by
 
 @(my-defmodule util/connect)
 
-@defproc[(connection-generator
-             [connect (or/c (-> connection?) connection-pool?)]
-             [#:timeout timeout (and/c real? positive?) +inf.0])
-         connection?]{
+@subsection{Connection pooling}
 
-Creates a virtual connection that creates actual connections on demand
-using the @racket[connect] function. A connection generator
-encapsulates a mapping of threads to actual connections. When a query
-function is called with a connection generator, the current thread's
-associated actual connection is used to execute the query. If there is
-no actual connection associated with the current thread, one is
-obtained by calling @racket[connect]. An actual connection is
-disconnected when its associated thread dies or if @racket[timeout]
-seconds elapse since the actual connection was last used.
-
-If @racket[connect] is a connection pool, the actual connection is
-obtained by calling @racket[connection-pool-lease] on
-@racket[connect].
-
-When given a connection produced by @racket[connection-generator],
-@racket[connected?] indicates whether there is an actual connection
-associated with the current thread. Likewise, @racket[disconnect]
-causes the current actual connection associated with the thread (if
-there is one) to be disconnected, but the connection will be recreated
-if a query function is executed.
-
-@examples/results[
-[(define c
-   (connection-generator
-    (lambda ()
-      (printf "connecting!\n")
-      (postgresql-connect ....))))
- (void)]
-[(connected? c)
- (values #f)]
-[(query-value c "select 1")
- (begin (printf "connecting!\n") 1)]
-[(connected? c)
- (values #t)]
-[(void (thread (lambda () (displayln (query-value c "select 2")))))
- (begin (printf "connecting!\n") (displayln 2))]
-[(disconnect c)
- (void)]
-[(connected? c)
- (values #f)]
-[(query-value c "select 3")
- (begin (printf "connecting!\n") 3)]
-]
-
-Connections produced by @racket[connection-generator] may not be used
-with the @racket[prepare] function. However, they may still be used to
-execute parameterized queries expressed as strings or encapsulated via
-@racket[statement-generator].
-
-@examples/results[
-[(prepare c "select 2 + $1")
- (error 'prepare "cannot prepare statement with connection-generator")]
-[(query-value c "select 2 + $1" 2)
- 4]
-[(define pst (statement-generator "select 2 + $1"))
- (void)]
-[(query-value c pst 3)
- 5]
-]
-}
+Creating an ordinary connection is often a relatively costly
+operation; it may involve steps such as process creation and SSL
+negotiation. A @deftech{connection pool} helps reduce connection costs
+by reusing connections.
 
 @defproc[(connection-pool
              [connect (-> connection?)]
@@ -86,7 +27,7 @@ execute parameterized queries expressed as strings or encapsulated via
              [#:max-idle-connections max-idle-connections (or/c (integer-in 1 10000) +inf.0) 2])
          connection-pool?]{
 
-Creates a connection pool. The pool consists of up to
+Creates a @tech{connection pool}. The pool consists of up to
 @racket[max-connections], divided between leased connections and up to
 @racket[max-idle-connections] idle connections. The pool uses
 @racket[connect] to create new connections when needed; the
@@ -108,6 +49,10 @@ is called.
 [(code:line (define c3 (connection-pool-lease pool)) (code:comment "reuses actual conn. from c1"))
  (void)]
 ]
+
+See also @racket[virtual-connection] for a mechanism that eliminates
+the need to explicitly call @racket[connection-pool-lease] and
+@racket[disconnect].
 }
 
 @defproc[(connection-pool? [x any/c]) boolean?]{
@@ -141,6 +86,108 @@ otherwise, it is disconnected. If the connection is in a transaction,
 the transaction is rolled back.
 }
 
+
+@;{========================================}
+
+@subsection{Virtual connections}
+
+@;{Should have called this "virtual-connection" to start with.}
+
+A @deftech{virtual connection} creates actual connections on demand and
+automatically releases them when they are no longer needed.
+
+@defproc[(virtual-connection
+             [connect (or/c (-> connection?) connection-pool?)]
+             #| [#:timeout timeout (and/c real? positive?) +inf.0] |#)
+         connection?]{
+
+Creates a @tech{virtual connection} that creates actual connections on
+demand using the @racket[connect] function (or by calling
+@racket[(connection-pool-lease connect)] if @racket[connect] is a
+@tech{connection pool}). A virtual connection encapsulates a mapping
+of threads to actual connections. When a query function is called with
+a virtual connection, the current thread's associated actual
+connection is used to execute the query. If there is no actual
+connection associated with the current thread, one is obtained by
+calling @racket[connect]. An actual connection is disconnected when
+its associated thread dies.
+
+@;{or if @racket[timeout] seconds elapse since the actual connection was last used.}
+
+Virtual connections are especially useful in contexts such as web
+servlets, where each request is handled in a fresh thread. A single
+global virtual connection can be defined, freeing each servlet request
+from explicitly opening and closing its own connections. In
+particular, a @tech{virtual connection} backed by a @tech{connection
+pool} combines convenience with efficiency:
+
+@examples/results[
+[(define the-connection
+   (virtual-connection (connection-pool (lambda () ....))))
+ (void)]
+]
+
+The resulting virtual connection leases a connection from the pool on
+demand for each servlet request thread and returns it when the thread
+terminates (that is, when the request has been handled).
+
+When given a connection produced by @racket[virtual-connection],
+@racket[connected?] indicates whether there is an actual connection
+associated with the current thread. Likewise, @racket[disconnect]
+causes the current actual connection associated with the thread (if
+there is one) to be disconnected, but the connection will be recreated
+if a query function is executed.
+
+@examples/results[
+[(define c
+   (virtual-connection
+    (lambda ()
+      (printf "connecting!\n")
+      (postgresql-connect ....))))
+ (void)]
+[(connected? c)
+ (values #f)]
+[(query-value c "select 1")
+ (begin (printf "connecting!\n") 1)]
+[(connected? c)
+ (values #t)]
+[(void (thread (lambda () (displayln (query-value c "select 2")))))
+ (begin (printf "connecting!\n") (displayln 2))]
+[(disconnect c)
+ (void)]
+[(connected? c)
+ (values #f)]
+[(query-value c "select 3")
+ (begin (printf "connecting!\n") 3)]
+]
+
+Connections produced by @racket[virtual-connection] may not be used
+with the @racket[prepare] function. However, they may still be used to
+execute parameterized queries expressed as strings or encapsulated via
+@racket[statement-generator].
+
+@examples/results[
+[(prepare c "select 2 + $1")
+ (error 'prepare "cannot prepare statement with virtual connection")]
+[(query-value c "select 2 + $1" 2)
+ 4]
+[(define pst (statement-generator "select 2 + $1"))
+ (void)]
+[(query-value c pst 3)
+ 5]
+]
+}
+
+@defproc[(connection-generator [connect (-> connection?)])
+         connection?]{
+
+Deprecated. Equivalent to @racket[(virtual-connection connect)].
+}
+
+@;{========================================}
+
+@subsection{Kill-safe connections}
+
 @defproc[(kill-safe-connection [c connection?]) 
          connection?]{
 
@@ -158,14 +205,11 @@ shutting down its ports.
 
 @;{========================================}
 
-@section{RaDSN (Racket Data Source Names)}
+@subsection{RaDSN (Racket data source names)}
 
-@(my-defmodule util/radsn)
-
-Inspired by ODBC's Data Source Names, this library defines a mechanism
-for abbreviating connection information. A RaDSN (Racket Data Source
-name) is a symbol associated with a connection specification in a
-RaDSN file.
+A RaDSN (Racket Data Source name) is a symbol associated with a
+connection specification in a RaDSN file (inspired by ODBC's Data
+Source Names).
 
 @defstruct*[data-source
               ([connector (or/c 'postgresql 'mysql 'sqlite3 'odbc)]

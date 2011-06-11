@@ -71,9 +71,9 @@
 
 ;; ========================================
 
-;; Connection generator
+;; Virtual connection
 
-(define connection-generator%
+(define virtual-connection%
   (class* object% (connection<%> no-cache-prepare<%>)
     (init-private connector     ;; called from client thread
                   get-key       ;; called from client thread
@@ -110,7 +110,7 @@
       ;; timeout? = if connection open, then wait longer
       (let* ([c (hash-ref key=>conn key #f)]
              [in-trans? (with-handlers ([exn:fail? (lambda (e) #f)])
-                          (and c (send c transaction-status 'connection-generator)))])
+                          (and c (send c transaction-status 'virtual-connection)))])
         (cond [(not c) (void)]
               [(and timeout? in-trans?)
                (hash-set! alarms c (fresh-alarm-for key timeout))]
@@ -126,14 +126,14 @@
                           ;; Assignment to key has expired: move to idle or disconnect.
                           (lambda (key)
                             (when DEBUG?
-                              (eprintf "** connection-generator: key expiration: ~e\n" key))
+                              (eprintf "** virtual-connection: key expiration: ~e\n" key))
                             (remove! key #f))))
             (let ([alarm-evts (hash-map alarms (lambda (k v) v))])
               (handle-evt (apply choice-evt alarm-evts)
                           ;; Disconnect idle connection.
                           (lambda (key)
                             (when DEBUG?
-                              (eprintf "** connection-generator: timeout\n"))
+                              (eprintf "** virtual-connection: timeout\n"))
                             (remove! key #t)))))
       (manage))
 
@@ -196,28 +196,28 @@
 
     (define/public (prepare fsym stmt close-on-exec?)
       (unless close-on-exec?
-        (error fsym "cannot prepare statement with connection-generator"))
+        (error fsym "cannot prepare statement with virtual connection"))
       (send (get-connection #t) prepare fsym stmt close-on-exec?))
 
     (define/public (free-statement stmt)
       (error 'free-statement
-             "internal error: connection-generator does not own statements"))
+             "internal error: virtual connection does not own statements"))
 
     (define/public (debug ?) (set! DEBUG? ?))))
 
 ;; ----
 
-(define (connection-generator connector
-                              #:timeout [timeout #f])
+(define (virtual-connection connector
+                            #:timeout [timeout +inf.0])
   (let ([connector
          (cond [(connection-pool? connector)
                 (lambda () (connection-pool-lease connector))]
                [else connector])]
         [get-key (lambda () (thread-dead-evt (current-thread)))])
-    (new connection-generator%
+    (new virtual-connection%
          (connector connector)
          (get-key (lambda () (thread-dead-evt (current-thread))))
-         (timeout (* 1000 (or timeout +inf.0))))))
+         (timeout (* 1000 timeout)))))
 
 ;; ========================================
 
@@ -406,10 +406,16 @@
 (provide/contract
  [kill-safe-connection
   (-> connection? connection?)]
- [connection-generator
+
+ [virtual-connection
   (->* ((or/c (-> connection?) connection-pool?))
+       () ;; (#:timeout (and/c real? positive?))
+       connection?)]
+ [rename virtual-connection connection-generator
+  (->* ((-> connection?))
        (#:timeout (and/c real? positive?))
        connection?)]
+
  [connection-pool
   (->* ((-> connection?))
        (#:max-connections (or/c (integer-in 1 10000) +inf.0)
@@ -421,3 +427,6 @@
   (->* (connection-pool?)
        ((or/c custodian? evt?))
        connection?)])
+
+(require "private/radsn.rkt")
+(provide (all-from-out "private/radsn.rkt"))

@@ -7,7 +7,7 @@
          racket/match
          racket/file
          racket/list
-         "../main.rkt")
+         "../../main.rkt")
 
 #|
 RaDSN v0.1 format

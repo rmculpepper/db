@@ -11,7 +11,6 @@
                     racket/contract
                     (planet ryanc/db:1:2)
                     (planet ryanc/db:1:2/util/connect)
-                    (planet ryanc/db:1:2/util/radsn)
                     (planet ryanc/db:1:2/util/geometry)
                     (planet ryanc/db:1:2/util/postgresql)))
 (provide (all-defined-out)
@@ -19,7 +18,6 @@
                     (all-from-out racket/contract)
                     (all-from-out (planet ryanc/db:1:2))
                     (all-from-out (planet ryanc/db:1:2/util/connect))
-                    (all-from-out (planet ryanc/db:1:2/util/radsn))
                     (all-from-out (planet ryanc/db:1:2/util/geometry))
                     (all-from-out (planet ryanc/db:1:2/util/postgresql))))
 

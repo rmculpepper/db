@@ -22,7 +22,7 @@
 ;; == Connection
 
 (define connection%
-  (class* locking% (connection<%>)
+  (class* transactions% (connection<%>)
     (init-private db
                   env
                   notice-handler
@@ -31,7 +31,6 @@
 
     (define statement-table (make-weak-hasheq))
     (define lock (make-semaphore 1))
-    (define tx-status #f)
 
     (define use-describe-param?
       (and strict-parameter-types?
@@ -41,7 +40,9 @@
 
     (inherit call-with-lock
              call-with-lock*
-             add-delayed-call!)
+             add-delayed-call!
+             check-valid-tx-status)
+    (inherit-field tx-status)
 
     (define/public (get-db fsym)
       (unless db
@@ -52,7 +53,7 @@
     (define/override (connected?) (and db #t))
 
     (define/public (query fsym stmt collector)
-      (check-valid-tx-status fsym tx-status)
+      (check-valid-tx-status fsym)
       (query1 fsym stmt collector))
 
     (define/private (query1 fsym stmt collector)
@@ -391,7 +392,7 @@
             [else (get-string)]))
 
     (define/public (prepare fsym stmt close-on-exec?)
-      (check-valid-tx-status fsym tx-status)
+      (check-valid-tx-status fsym)
       (prepare1 fsym stmt close-on-exec?))
 
     (define/private (prepare1 fsym sql close-on-exec?)
@@ -510,7 +511,7 @@
       (call-with-lock fsym
         (lambda () 
           (unless (eq? mode 'rollback)
-            (check-valid-tx-status fsym tx-status))
+            (check-valid-tx-status fsym))
           (let ([db (get-db fsym)]
                 [completion-type
                  (case mode

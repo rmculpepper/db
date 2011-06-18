@@ -19,16 +19,16 @@
 ;; ========================================
 
 (define connection%
-  (class* locking% (connection<%>)
+  (class* transactions% (connection<%>)
     (init-private notice-handler)
-
     (define inport #f)
     (define outport #f)
-    (define tx-status #f) ;; #f, #t, or 'invalid
 
     (inherit call-with-lock
              call-with-lock*
-             add-delayed-call!)
+             add-delayed-call!
+             check-valid-tx-status)
+    (inherit-field tx-status)
 
     (super-new)
 
@@ -239,7 +239,7 @@
 
     ;; query : symbol Statement Collector -> QueryResult
     (define/public (query fsym stmt collector)
-      (check-valid-tx-status fsym tx-status)
+      (check-valid-tx-status fsym)
       (let*-values ([(stmt result)
                      (call-with-lock fsym
                        (lambda ()
@@ -334,7 +334,7 @@
 
     ;; prepare : symbol string boolean -> PreparedStatement
     (define/public (prepare fsym stmt close-on-exec?)
-      (check-valid-tx-status fsym tx-status)
+      (check-valid-tx-status fsym)
       (call-with-lock fsym
         (lambda ()
           (prepare1 fsym stmt close-on-exec?))))
@@ -425,7 +425,7 @@
       (call-with-lock fsym
         (lambda ()
           (unless (eq? mode 'rollback)
-            (check-valid-tx-status fsym tx-status))
+            (check-valid-tx-status fsym))
           (let ([stmt (case mode
                         ((commit) "COMMIT")
                         ((rollback) "ROLLBACK"))])

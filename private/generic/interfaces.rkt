@@ -22,6 +22,7 @@
          connector<%>
 
          locking%
+         transactions%
 
          isolation-symbol->string
 
@@ -288,6 +289,19 @@
 
     (super-new)))
 
+;; ----------------------------------------
+
+(define transactions%
+  (class locking%
+    ;; tx-status : #f, #t, 'invalid
+    (field [tx-status #f])
+
+    ;; check-valid-tx-status : symbol -> void
+    (define/public (check-valid-tx-status fsym)
+      (when (eq? tx-status 'invalid)
+        (uerror fsym "current transaction is invalid and must be explicitly rolled back")))
+
+    (super-new)))
 
 ;; ----------------------------------------
 
@@ -373,7 +387,6 @@ producing plain old exn:fail.
          error/comm
          error/hopeless
          error/unsupported-type
-         check-valid-tx-status
          error/already-in-tx
          error/no-convert)
 
@@ -408,7 +421,3 @@ producing plain old exn:fail.
 (define (error/no-convert fsym sys type param [note #f])
   (uerror fsym "cannot convert to ~a ~a type~a~a: ~e"
           sys type (if note " " "") (or note "") param))
-
-(define (check-valid-tx-status fsym tx-status)
-  (when (eq? tx-status 'invalid)
-    (uerror fsym "current transaction is invalid and must be explicitly rolled back")))

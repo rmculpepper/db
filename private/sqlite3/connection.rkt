@@ -19,19 +19,19 @@
 ;; == Connection
 
 (define connection%
-  (class* locking% (connection<%>)
+  (class* transactions% (connection<%>)
     (init db)
     (init-private busy-retry-limit
                   busy-retry-delay)
 
     (define -db db)
     (define statement-table (make-weak-hasheq))
-
-    (define invalid-tx #f) ;; #f or 'invalid for compat w/ check-valid-tx-status
     (define saved-tx-status #f) ;; set by with-lock, only valid while locked
 
     (inherit call-with-lock*
-             add-delayed-call!)
+             add-delayed-call!
+             check-valid-tx-status)
+    (inherit-field tx-status)  ;; only #f or 'invalid for compat w/ check-valid-tx-status
 
     (define/override (call-with-lock fsym proc)
       (call-with-lock* fsym (lambda () (set! saved-tx-status (get-tx-status)) (proc)) #f #t))
@@ -46,7 +46,7 @@
       (let* ([result
               (call-with-lock fsym
                 (lambda ()
-                  (check-valid-tx-status fsym invalid-tx)
+                  (check-valid-tx-status fsym)
                   (let ([db (get-db fsym)])
                     (query1 fsym stmt))))]
              [stmt (car result)]
@@ -133,7 +133,7 @@
     (define/public (prepare fsym stmt close-on-exec?)
       (call-with-lock fsym
         (lambda ()
-          (check-valid-tx-status fsym invalid-tx)
+          (check-valid-tx-status fsym)
           (prepare1 fsym stmt close-on-exec?))))
 
     (define/private (prepare1 fsym sql close-on-exec?)
@@ -200,7 +200,7 @@
       (call-with-lock fsym
         (lambda ()
           (let ([db (get-db fsym)])
-            (or invalid-tx (get-tx-status db))))))
+            (or tx-status (get-tx-status db))))))
 
     (define/private (get-tx-status [db -db])
       (and db (not (sqlite3_get_autocommit db))))
@@ -226,14 +226,14 @@
                (lambda ()
                  (let ([db (get-db fsym)])
                    (unless (eq? mode 'rollback)
-                     (check-valid-tx-status fsym invalid-tx))
+                     (check-valid-tx-status fsym))
                    (when (get-tx-status db)
                      (let ([r (case mode
                                 ((commit)
                                  (query1 fsym "COMMIT TRANSACTION"))
                                 ((rollback)
                                  (query1 fsym "ROLLBACK TRANSACTION")))])
-                       (set! invalid-tx #f)
+                       (set! tx-status #f)
                        (car r))))))])
         (statement:after-exec stmt)
         (void)))
@@ -258,7 +258,7 @@
     (define/private (handle-status who s)
       (when (memv s maybe-rollback-status-list)
         (when (and saved-tx-status (not (get-tx-status -db))) ;; was in trans, now not
-          (set! invalid-tx 'invalid)))
+          (set! tx-status 'invalid)))
       (handle-status* who s -db))
 
     ;; ----

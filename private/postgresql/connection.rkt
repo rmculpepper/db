@@ -19,18 +19,19 @@
 ;; ========================================
 
 (define connection-base%
-  (class* locking% (connection<%> connector<%>)
+  (class* transactions% (connection<%> connector<%>)
     (init-private notice-handler
                   notification-handler
                   allow-cleartext-password?)
     (define inport #f)
     (define outport #f)
     (define process-id #f)
-    (define tx-status #f) ;; #f, #t, 'invalid
 
     (inherit call-with-lock
              call-with-lock*
-             add-delayed-call!)
+             add-delayed-call!
+             check-valid-tx-status)
+    (inherit-field tx-status)
 
     (super-new)
 
@@ -238,7 +239,7 @@
       (let-values ([(stmt result)
                     (call-with-lock fsym
                       (lambda ()
-                        (check-valid-tx-status fsym tx-status)
+                        (check-valid-tx-status fsym)
                         (query1 fsym stmt0)))])
         (statement:after-exec stmt)
         (query1:process-result fsym collector result)))
@@ -354,7 +355,7 @@
     (define/public (prepare fsym stmt close-on-exec?)
       (call-with-lock fsym
         (lambda ()
-          (check-valid-tx-status fsym tx-status)
+          (check-valid-tx-status fsym)
           (prepare1 fsym stmt close-on-exec?))))
 
     (define/private (prepare1 fsym stmt close-on-exec?)
@@ -450,7 +451,7 @@
                (lambda ()
                  (unless (eq? mode 'rollback)
                    ;; otherwise, COMMIT statement would cause silent ROLLBACK !!!
-                   (check-valid-tx-status fsym tx-status))
+                   (check-valid-tx-status fsym))
                  (let ([stmt (case mode
                                ((commit) "COMMIT WORK")
                                ((rollback) "ROLLBACK WORK"))])

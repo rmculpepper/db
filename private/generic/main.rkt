@@ -4,13 +4,15 @@
 
 #lang racket/base
 (require (except-in "interfaces.rkt"
-                    statement-generator)
+                    virtual-statement)
          "sql-data.rkt"
          "functions.rkt")
 (provide (struct-out simple-result)
          (struct-out recordset)
          statement-binding?
-         statement-generator?
+         virtual-statement?
+         (rename-out [virtual-statement statement-generator]
+                     [virtual-statement? statement-generator?])
 
          (except-out (all-from-out "sql-data.rkt")
                      make-sql-bits/bytes

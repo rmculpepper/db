@@ -164,14 +164,14 @@ if a query function is executed.
 Connections produced by @racket[virtual-connection] may not be used
 with the @racket[prepare] function. However, they may still be used to
 execute parameterized queries expressed as strings or encapsulated via
-@racket[statement-generator].
+@racket[virtual-statement].
 
 @examples/results[
 [(prepare c "select 2 + $1")
  (error 'prepare "cannot prepare statement with virtual connection")]
 [(query-value c "select 2 + $1" 2)
  4]
-[(define pst (statement-generator "select 2 + $1"))
+[(define pst (virtual-statement "select 2 + $1"))
  (void)]
 [(query-value c pst 3)
  5]

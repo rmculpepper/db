@@ -166,12 +166,12 @@ attempting to use it with another connection results in an
 error. Unfortunately, in some scenarios such as web servlets, the
 lifetimes of connections are short or difficult to track, making
 prepared statements inconvenient. In such cases, a better tool is the
-@tech{statement generator}, which prepares statements on demand and
+@tech{virtual statement}, which prepares statements on demand and
 caches them for future use with the same connection.
 
 @my-interaction[
 [(define get-less-than-pst
-   (statement-generator "select n from the_numbers where n < $1"))
+   (virtual-statement "select n from the_numbers where n < $1"))
  (void)]
 [(code:line (query-list pgc1 get-less-than-pst 1) (code:comment "prepares statement for pgc1"))
  (list 0)]

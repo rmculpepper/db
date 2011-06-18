@@ -7,7 +7,7 @@
          racket/contract
          racket/class
          (rename-in "interfaces.rkt"
-                    [statement-generator make-statement-generator]))
+                    [virtual-statement make-virtual-statement]))
 
 ;; == Administrative procedures
 
@@ -37,7 +37,7 @@
 (define (statement? x)
   (or (string? x)
       (prepared-statement? x)
-      (statement-generator? x)
+      (virtual-statement? x)
       (statement-binding? x)))
 
 (define complete-statement?
@@ -54,9 +54,9 @@
 (define (prepared-statement-result-types pst)
   (send pst get-result-types))
 
-(define (statement-generator gen)
-  (make-statement-generator (make-weak-hasheq)
-                            (if (string? gen) (lambda (_) gen) gen)))
+(define (virtual-statement gen)
+  (make-virtual-statement (make-weak-hasheq)
+                          (if (string? gen) (lambda (_) gen) gen)))
 
 ;; == Query procedures
 
@@ -159,11 +159,11 @@
 (define (compose-statement fsym c stmt args checktype)
   (cond [(or (pair? args)
              (prepared-statement? stmt)
-             (statement-generator? stmt))
+             (virtual-statement? stmt))
          (let ([pst
                 (cond [(string? stmt)
                        (prepare1 fsym c stmt #t)]
-                      [(statement-generator? stmt)
+                      [(virtual-statement? stmt)
                        (prepare1 fsym c stmt #f)]
                       [(prepared-statement? stmt)
                        ;; Ownership check done later, by query method.
@@ -332,9 +332,9 @@
 (define (prepare1 fsym c stmt close-on-exec?)
   (cond [(string? stmt)
          (send c prepare fsym stmt close-on-exec?)]
-        [(statement-generator? stmt)
-         (let ([table (statement-generator-table stmt)]
-               [gen (statement-generator-gen stmt)]
+        [(virtual-statement? stmt)
+         (let ([table (virtual-statement-table stmt)]
+               [gen (virtual-statement-gen stmt)]
                [cache? (not (is-a? c no-cache-prepare<%>))])
            (let ([table-pst (hash-ref table c #f)])
              (or table-pst
@@ -362,7 +362,7 @@
 
 ;; ========================================
 
-(define preparable/c (or/c string? statement-generator?))
+(define preparable/c (or/c string? virtual-statement?))
 
 (provide (rename-out [in-query* in-query]))
 
@@ -425,9 +425,9 @@
  [bind-prepared-statement
   (-> prepared-statement? list? any)]
 
- [statement-generator
+ [virtual-statement
   (-> (or/c string? (-> dbsystem? string?))
-      statement-generator?)]
+      virtual-statement?)]
 
  [start-transaction
   (->* (connection?)

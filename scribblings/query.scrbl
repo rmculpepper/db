@@ -69,8 +69,8 @@ is one of the following:
 @item{a string containing a single SQL statement, possibly with
 parameters}
 @item{a @tech{prepared statement} produced by @racket[prepare]}
-@item{a @tech{statement generator} produced by
-@racket[statement-generator]}
+@item{a @tech{virtual statement} produced by
+@racket[virtual-statement]}
 @item{a statement-binding value produced by
 @racket[bind-prepared-statement]}
 ]
@@ -84,7 +84,7 @@ parameters}
   @racketblock[
     (or (string? x)
         (prepared-statement? x)
-        (statement-generator? x)
+        (virtual-statement? x)
         (statement-binding? x))
   ]
 }
@@ -331,7 +331,7 @@ prepared statements do not need to be (and cannot be) explicitly
 closed.
 
 @defproc[(prepare [connection connection?]
-                  [stmt (or/c string? statement-generator?)])
+                  [stmt (or/c string? virtual-statement?)])
          prepared-statement?]{
 
   Prepares a (possibly parameterized) statement. The resulting
@@ -409,10 +409,10 @@ closed.
   @racket[bind-prepared-statement], @racket[#f] otherwise.
 }
 
-@defproc[(statement-generator [gen (or/c string? (-> dbsystem? string?))])
-         statement-generator?]{
+@defproc[(virtual-statement [gen (or/c string? (-> dbsystem? string?))])
+         virtual-statement?]{
 
-  Creates a @deftech{statement generator} @racket[_stmt], which
+  Creates a @deftech{virtual statement} @racket[_stmt], which
   encapsulates a weak mapping of connections to prepared
   statements. When a query function is called with @racket[_stmt] and
   a connection, the weak hash is consulted to see if the statement has
@@ -427,7 +427,7 @@ closed.
 
 @examples/results[
 [(define pst
-   (statement-generator
+   (virtual-statement
     (lambda (dbsys)
       (case (dbsystem-name dbsys)
         ((postgresql) "select n from the_numbers where n < $1")
@@ -441,10 +441,19 @@ closed.
 ]
 }
 
-@defproc[(statement-generator? [x any/c]) boolean?]{
+@defproc[(virtual-statement? [x any/c]) boolean?]{
 
-  Returns @racket[#t] if @racket[x] is a @tech{statement generator}
-  created by @racket[statement-generator], @racket[#f] otherwise.
+  Returns @racket[#t] if @racket[x] is a @tech{virtual statement}
+  created by @racket[virtual-statement], @racket[#f] otherwise.
+}
+
+@deftogether[[
+@defproc[(statement-generator [gen (or/c string? (-> dbsystem? string?))])
+         virtual-statement?]
+@defproc[(statement-generator? [x any/c]) boolean?]]]{
+
+  Deprecated. Equivalents of @racket[virtual-statement] and
+  @racket[virtual-statement?].
 }
 
 

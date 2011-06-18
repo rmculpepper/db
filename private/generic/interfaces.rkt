@@ -12,7 +12,7 @@
          (struct-out recordset)
 
          (struct-out statement-binding)
-         (struct-out statement-generator)
+         (struct-out virtual-statement)
 
          init-private
 
@@ -117,11 +117,11 @@
 ;;     meta might include information such as text vs binary format
 (struct statement-binding (pst meta params))
 
-;; A statement-generator is:
-;;   - (statement-generator table gen)
+;; A virtual-statement is:
+;;   - (virtual-statement table gen)
 ;;     where table is a weak-hasheq[connection => prepared-statement]
 ;;     and gen is (dbsystem -> string)
-(struct statement-generator (table gen))
+(struct virtual-statement (table gen))
 
 ;; A YesNoOptional is one of 'yes, 'no, 'optional
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls

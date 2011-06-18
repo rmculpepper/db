@@ -100,7 +100,7 @@ and exactly one row.
 If a statement takes parameters, the parameter values are given as
 additional arguments immediately after the SQL statement. Only a
 statement given as a string, @tech{prepared statement}, or
-@tech{statement generator} can be given ``inline'' parameters; if the
+@tech{virtual statement} can be given ``inline'' parameters; if the
 statement is a statement-binding, no inline parameters are permitted.
 
 The types of parameters and returned fields are described in
@@ -522,7 +522,7 @@ errors by SQLSTATE) and may provide an option to automatically
 rollback invalid transactions.
 
 @defproc[(start-transaction [c connection?]
-                            [isolation-level
+                            [#:isolation isolation-level
                              (or/c 'serializable
                                    'repeatable-read
                                    'read-committed
@@ -567,4 +567,22 @@ rollback invalid transactions.
   transaction}. All queries executed using @racket[c] will fail until
   the transaction is explicitly rolled back using
   @racket[rollback-transaction].
+}
+
+@defproc[(call-with-transaction [c connection?]
+                                [proc (-> any)]
+                                [#:isolation isolation-level
+                                 (or/c 'serializable
+                                       'repeatable-read
+                                       'read-committed
+                                       'read-uncommitted
+                                       #f)
+                                 #f])
+         any]{
+
+  Calls @racket[proc] in the context of a new transaction with
+  isolation level @racket[isolation-level]. If @racket[proc] completes
+  normally, the transaction is committed and @racket[proc]'s results
+  are returned. If @racket[proc] raises an exception, the transaction
+  is rolled back.
 }

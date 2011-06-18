@@ -345,7 +345,7 @@
 
 ;; ========================================
 
-(define (start-transaction c [isolation #f])
+(define (start-transaction c #:isolation [isolation #f])
   (send c start-transaction 'start-transaction isolation))
 
 (define (commit-transaction c)
@@ -359,6 +359,15 @@
 
 (define (needs-rollback? c)
   (eq? (send c transaction-status 'needs-rollback?) 'invalid))
+
+(define (call-with-transaction c proc #:isolation [isolation #f])
+  (send c start-transaction 'call-with-transaction isolation)
+  (begin0 (with-handlers ([(lambda (e) #t)
+                           (lambda (e)
+                             (send c end-transaction 'call-with-transaction 'rollback)
+                             (raise e))])
+            (proc))
+    (send c end-transaction 'call-with-transaction 'commit)))
 
 ;; ========================================
 
@@ -431,7 +440,7 @@
 
  [start-transaction
   (->* (connection?)
-       ((or/c 'serializable 'repeatable-read 'read-committed 'read-uncommitted #f))
+       (#:isolation (or/c 'serializable 'repeatable-read 'read-committed 'read-uncommitted #f))
        void?)]
  [commit-transaction
   (-> connection? void?)]
@@ -440,4 +449,8 @@
  [in-transaction?
   (-> connection? boolean?)]
  [needs-rollback?
-  (-> connection? boolean?)])
+  (-> connection? boolean?)]
+ [call-with-transaction
+  (->* (connection? (-> any))
+       (#:isolation (or/c 'serializable 'repeatable-read 'read-committed 'read-uncommitted #f))
+       void?)])

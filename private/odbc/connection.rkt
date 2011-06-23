@@ -524,6 +524,32 @@
               (set! tx-status #f)
               (void))))))
 
+    ;; GetTables
+
+    (define/public (get-tables fsym catalog schema table)
+      (define-values (dvecs rows)
+        (call-with-lock fsym
+          (lambda ()
+            (let* ([db (get-db fsym)]
+                   [stmt (let-values ([(status stmt) (SQLAllocHandle SQL_HANDLE_STMT db)])
+                           (handle-status fsym status db)
+                           stmt)]
+                   [_ (handle-status fsym (SQLTables stmt catalog schema table))]
+                   [result-dvecs
+                    ;; FIXME: refactor prepare1
+                    (let-values ([(status result-count) (SQLNumResultCols stmt)]
+                                 [(scratchbuf) (make-bytes 100)])
+                      (handle-status fsym status stmt)
+                      (for/list ([i (in-range 1 (add1 result-count))])
+                        (describe-result-column fsym stmt i scratchbuf)))]
+                   [rows (fetch* fsym stmt (map field-dvec->typeid result-dvecs))])
+              (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
+              (handle-status fsym (SQLFreeHandle SQL_HANDLE_STMT stmt) stmt)
+              (values result-dvecs rows)))))
+      ;; Layout is: #(catalog schema table table-type remark)
+      (recordset (map field-dvec->field-info dvecs)
+                 rows))
+
     ;; Handler
 
     (define add-notice! ;; field, not method; allocate only once

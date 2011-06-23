@@ -3,6 +3,8 @@ To do
 
 ** For version 1.2:
 
+- disable geometry types for now?
+
 ** For version 2.0:
 
 - merge util/connect into base
@@ -46,6 +48,9 @@ Types
 
 ----
 
+- add ODBC-like functions for inspecting schemas (list-tables, etc)
+  - util/schema (?), util/info (for information_schema) (?)
+
 - for wrapped/managed connections, detect if underlying connection gets
   disconnected by server (eg, times out after 10 minutes of inactivity)
   - at least, pool should make sure connection is alive when gotten from idle list
@@ -53,6 +58,8 @@ Types
 
 - document/enumerate errors
 - document exn:fail:sql, when used, when not used, links to SQLSTATE docs?
+
+- disconnect on custudian shutdown (?)
 
 - disconnect should always work, even on thread-damaged connections
   - but might need version with timeout and/or rudely? flag, because
@@ -71,6 +78,8 @@ Types
   - SQL_MAX_{CATALOG,COLUMN,IDENTIFIER,SCHEMA_NAME,TABLE_NAME}_NAME (min 128)
 
 - cursors? (Olin thinks cursors are important. I'm not sure.)
+  - how do people want to use cursors?
+  - how about implicit support only in 'in-query'?
 
 - ODBC: increase buffer size for eg column names, table names, etc.
 - ODBC: use async execution to avoid blocking all Racket threads
@@ -87,8 +96,10 @@ Types
   - when is it useful in practice?
     - would make it easier to handle timeouts...
 
-- add ODBC-like functions for inspecting schemas (list-tables, etc)
+- add tuple type
+    #s(tuple header values), header is vector of symbols, values is vector of values
 
+- use Racket logging for debugging (?)
 
 History
 =======

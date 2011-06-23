@@ -371,6 +371,20 @@
 
 ;; ========================================
 
+(define (get-schemas c)
+  (recordset-rows
+   (send c query 'get-schemas
+         "select catalog_name, schema_name from information_schema.schemata"
+         vectorlist-collector)))
+
+(define (get-tables c)
+  (recordset-rows
+   (send c query 'get-tables
+         "select table_catalog, table_schema, table_name from information_schema.tables"
+         vectorlist-collector)))
+
+;; ========================================
+
 (define preparable/c (or/c string? virtual-statement?))
 
 (provide (rename-out [in-query* in-query]))
@@ -453,4 +467,11 @@
  [call-with-transaction
   (->* (connection? (-> any))
        (#:isolation (or/c 'serializable 'repeatable-read 'read-committed 'read-uncommitted #f))
-       void?)])
+       void?)]
+
+#|
+ [get-schemas
+  (-> connection? (listof vector?))]
+ [get-tables
+  (-> connection? (listof vector?))]
+|#)

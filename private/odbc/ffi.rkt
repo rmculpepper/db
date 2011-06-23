@@ -374,3 +374,16 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (value : _sqluinteger) ;; the attrs we care about have uint value
         (_sqlinteger = 0)
         -> _sqlreturn))
+
+(define-odbc SQLTables
+  (_fun (handle catalog schema table) ::
+        (handle : _sqlhstmt)
+        (catalog : _string)
+        (_sqlsmallint = (if catalog (string-utf-8-length catalog) 0))
+        (schema : _string)
+        (_sqlsmallint = (if schema (string-utf-8-length schema) 0))
+        (table : _string)
+        (_sqlsmallint = (if table (string-utf-8-length table) 0))
+        (_bytes = #f)
+        (_sqlsmallint = 0)
+        -> _sqlreturn))

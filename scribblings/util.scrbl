@@ -204,10 +204,10 @@ shutting down its ports.
 
 @;{========================================}
 
-@subsection{RaDSN (Racket data source names)}
+@subsection{Data source names}
 
-A RaDSN (Racket Data Source name) is a symbol associated with a
-connection specification in a RaDSN file (inspired by ODBC's DSNs).
+A DSN (Data Source name) is a symbol associated with a
+connection specification in a DSN file (inspired by ODBC's DSNs).
 
 @defstruct*[data-source
               ([connector (or/c 'postgresql 'mysql 'sqlite3 'odbc)]
@@ -219,7 +219,7 @@ connection specification in a RaDSN file (inspired by ODBC's DSNs).
   which connection function is used to create the connection. The
   @racket[args] field is a partial list of arguments passed to the
   connection function; additional arguments may be added when
-  @racket[radsn-connect] is called. The @racket[extensions] field
+  @racket[dsn-connect] is called. The @racket[extensions] field
   contains additional information about a connection; for example,
   this library's testing framework uses it to store SQL dialect
   flags.
@@ -228,62 +228,62 @@ connection specification in a RaDSN file (inspired by ODBC's DSNs).
   @racket[postgresql-data-source], etc auxiliary functions.
 }
 
-@defproc[(radsn-connect [radsn (or/c symbol? data-source?)]
-                        [#:radsn-file radsn-file path-string? (current-radsn-file)]
-                        [arg any/c] ...
-                        [#:<kw> kw-arg any/c] ...)
+@defproc[(dsn-connect [dsn (or/c symbol? data-source?)]
+                      [#:dsn-file dsn-file path-string? (current-dsn-file)]
+                      [arg any/c] ...
+                      [#:<kw> kw-arg any/c] ...)
          connection?]{
 
   Makes a connection using the connection information associated with
-  @racket[radsn] in @racket[radsn-file]. The given @racket[arg]s and
-  @racket[kw-arg]s are added to those specified by @racket[radsn] to
+  @racket[dsn] in @racket[dsn-file]. The given @racket[arg]s and
+  @racket[kw-arg]s are added to those specified by @racket[dsn] to
   form the complete arguments supplied to the connect function.
 
-  If @racket[radsn-file] does not exist, or if it contains no entry
-  for @racket[radsn], an exception is raised. If @racket[radsn] is a
-  @racket[data-source], then @racket[radsn-file] is ignored.
+  If @racket[dsn-file] does not exist, or if it contains no entry
+  for @racket[dsn], an exception is raised. If @racket[dsn] is a
+  @racket[data-source], then @racket[dsn-file] is ignored.
 
 @examples/results[
-[(put-radsn 'me
-            (postgresql-data-source #:user "me"
-                                    #:database "me" 
-                                    #:password "icecream"))
+[(put-dsn 'me
+          (postgresql-data-source #:user "me"
+                                  #:database "me" 
+                                  #:password "icecream"))
  (void)]
-[(radsn-connect 'me)
+[(dsn-connect 'me)
  (new connection%)]
-[(radsn-connect 'me #:notice-handler (lambda (code msg) ....))
+[(dsn-connect 'me #:notice-handler (lambda (code msg) ....))
  (new connection%)]
 ]
 }
 
-@defparam[current-radsn-file x path-string?]{
+@defparam[current-dsn-file x path-string?]{
 
-  A parameter holding the location of the default RaDSN file. The
+  A parameter holding the location of the default DSN file. The
   initial value is a file located immediately within
   @racket[(find-system-path 'prefs-dir)].
 }
 
-@defproc[(get-radsn [radsn symbol?]
-                    [default any/c #f]
-                    [#:radsn-file radsn-file path-string? (current-radsn-file)])
+@defproc[(get-dsn [dsn symbol?]
+                  [default any/c #f]
+                  [#:dsn-file dsn-file path-string? (current-dsn-file)])
          (or/c data-source? any/c)]{
 
-  Returns the @racket[data-source] associated with @racket[radsn] in
-  @racket[radsn-file].
+  Returns the @racket[data-source] associated with @racket[dsn] in
+  @racket[dsn-file].
 
-  If @racket[radsn-file] does not exist, an exception is raised. If
-  @racket[radsn-file] does not have an entry for @racket[radsn],
+  If @racket[dsn-file] does not exist, an exception is raised. If
+  @racket[dsn-file] does not have an entry for @racket[dsn],
   @racket[default] is called if it is a function or returned
   otherwise.
 }
 
-@defproc[(put-radsn [radsn symbol?]
-                    [ds (or/c data-source? #f)]
-                    [#:radsn-file radsn-file path-string? (current-radsn-file)])
+@defproc[(put-dsn [dsn symbol?]
+                  [ds (or/c data-source? #f)]
+                  [#:dsn-file dsn-file path-string? (current-dsn-file)])
          void?]{
 
-  Associates @racket[radsn] with the given data source @racket[ds] in
-  @racket[radsn-file], replacing the previous association, if one
+  Associates @racket[dsn] with the given data source @racket[ds] in
+  @racket[dsn-file], replacing the previous association, if one
   exists.
 }
 
@@ -334,7 +334,7 @@ connection specification in a RaDSN file (inspired by ODBC's DSNs).
   that return a @racket[data-source] describing the (partial)
   connection information. All arguments are optional, even those that
   are mandatory in the corresponding connection function; the missing
-  arguments must be supplied when @racket[radsn-connect] is called.
+  arguments must be supplied when @racket[dsn-connect] is called.
 }
 
 

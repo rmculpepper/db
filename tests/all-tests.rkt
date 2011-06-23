@@ -27,7 +27,7 @@ RUNNING THE TESTS
 Prefs file maps symbol => <conf>
 
 <conf> ::= (profile <conf> ...)
-         | (radsn <symbol>)
+         | (dsn <symbol>)
          | (ref <symbol>)
 
 Profiles are flattened, not hierarchical.
@@ -43,12 +43,12 @@ Profiles are flattened, not hierarchical.
   (let ([conf (get-preference name (lambda () #f) 'timestamp (pref-file))])
     (if conf
         (parse-dbconf conf)
-        (let ([r (get-radsn name)])
+        (let ([r (get-dsn name)])
           (if r
               (list (dbconf name r))
               (error 'get-dbconf "no such dbconf: ~e" name))))))
 
-(struct dbconf (name radsn) #:transparent)
+(struct dbconf (name dsn) #:transparent)
 
 (define-syntax-rule (expect name pred)
   (unless (pred name) (error 'parse "bad ~a: ~e" 'name name)))
@@ -61,16 +61,16 @@ Profiles are flattened, not hierarchical.
     [(list 'ref conf-name)
      (expect conf-name symbol?)
      (get-dbconf conf-name)]
-    [(list 'radsn radsn-name)
-     (expect radsn-name symbol?)
-     (list (dbconf radsn-name (get-radsn radsn-name)))]))
+    [(list 'dsn dsn-name)
+     (expect dsn-name symbol?)
+     (list (dbconf dsn-name (get-dsn dsn-name)))]))
 
 ;; ----
 
 (define (dbconf->unit x)
   (match x
     [(dbconf dbtestname (and r (data-source connector _args exts)))
-     (let* ([connect (lambda () (radsn-connect r))]
+     (let* ([connect (lambda () (dsn-connect r))]
             [dbsys (case connector ((odbc-driver) 'odbc) (else connector))]
             [dbflags (cond [(assq 'db:test exts) => cadr]
                            [else '()])])

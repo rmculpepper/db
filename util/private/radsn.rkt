@@ -10,9 +10,9 @@
          "../../main.rkt")
 
 #|
-RaDSN v0.1 format
+DSN v0.1 format
 
-A RaDSN (prefs) file maps symbol => <data-source>
+A DSN (prefs) file maps symbol => <data-source>
 
 <data-source> ::= (db <connector> <args> <extensions>)
 
@@ -25,7 +25,7 @@ A RaDSN (prefs) file maps symbol => <data-source>
 
 Extensions associate arbitrary extra information with a data-source (for
 example, SQL dialect information, testing flags, etc). Extension keys
-starting with 'radsn:', 'db:', 'racket:', and 'plt:' are
+starting with 'dsn:', 'db:', 'racket:', and 'plt:' are
 reserved. Keys may occur multiple times, but the order should not be
 considered important.
 
@@ -109,19 +109,19 @@ considered important.
 
 ;; ----------------------------------------
 
-(define current-radsn-file
-  (make-parameter (build-path (find-system-path 'pref-dir) "db-radsn-0.rktd")))
+(define current-dsn-file
+  (make-parameter (build-path (find-system-path 'pref-dir) "db-dsn-0.rktd")))
 
-(define (get-radsn name [default #f] #:radsn-file [file (current-radsn-file)])
+(define (get-dsn name [default #f] #:dsn-file [file (current-dsn-file)])
   (let* ([sexpr (get-preference name (lambda () #f) 'timestamp file)])
     (or (and sexpr (sexpr->data-source sexpr))
         (if (procedure? default) (default) default))))
 
-(define (put-radsn name value #:radsn-file [file (current-radsn-file)])
+(define (put-dsn name value #:dsn-file [file (current-dsn-file)])
   (let* ([sexpr (and value (data-source->sexpr value))])
     (put-preferences (list name)
                      (list sexpr)
-                     (lambda () (error 'put-radsn "RaDSN file locked"))
+                     (lambda () (error 'put-dsn "DSN file locked"))
                      file)))
 
 ;; ----------------------------------------
@@ -134,23 +134,23 @@ considered important.
     ((odbc) odbc-connect)
     ((odbc-driver) odbc-driver-connect)))
 
-(define radsn-connect
+(define dsn-connect
   (make-keyword-procedure
    (lambda (kws kwargs name . pargs)
      (let* ([kws (map list kws kwargs)]
-            [file-entry (assq '#:radsn-file kws)]
+            [file-entry (assq '#:dsn-file kws)]
             [kws* (if file-entry (remq file-entry kws) kws)]
-            [file (if file-entry (cdr file-entry) (current-radsn-file))])
+            [file (if file-entry (cdr file-entry) (current-dsn-file))])
        (unless (or (symbol? name) (data-source? name))
-         (error 'radsn-connect
+         (error 'dsn-connect
                 "expected symbol for first argument, got: ~e" name))
        (unless (or (path-string? file) (not file))
-         (error 'radsn-connect
-                "expected path or string for #:radsn-file keyword, got: ~e"
+         (error 'dsn-connect
+                "expected path or string for #:dsn-file keyword, got: ~e"
                 file))
-       (let ([r (if (data-source? name) name (get-radsn name #f #:radsn-file file))])
+       (let ([r (if (data-source? name) name (get-dsn name #f #:dsn-file file))])
          (unless r
-           (error 'radsn-connect "cannot find data source named ~e" name))
+           (error 'dsn-connect "cannot find data source named ~e" name))
          (let* ([rargs (parse-arglist (data-source-args r))]
                 [rpargs (first rargs)]
                 [rkwargs (second rargs)]
@@ -199,12 +199,12 @@ considered important.
          ([connector connector?]
           [args arglist?]
           [extensions (listof (list/c symbol? datum?))])]
- [radsn-connect procedure?] ;; Can't express "or any kw at all" w/ ->* contract.
- [current-radsn-file (parameter/c path-string?)]
- [get-radsn
-  (->* (symbol?) (any/c #:radsn-file path-string?) any)]
- [put-radsn
-  (->* (symbol? (or/c data-source? #f)) (#:radsn-file path-string?) void?)]
+ [dsn-connect procedure?] ;; Can't express "or any kw at all" w/ ->* contract.
+ [current-dsn-file (parameter/c path-string?)]
+ [get-dsn
+  (->* (symbol?) (any/c #:dsn-file path-string?) any)]
+ [put-dsn
+  (->* (symbol? (or/c data-source? #f)) (#:dsn-file path-string?) void?)]
  [postgresql-data-source
   (->* ()
        (#:user string?

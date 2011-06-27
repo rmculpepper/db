@@ -24,4 +24,5 @@
 
 (define release-notes
   '("Fixed many ODBC bugs, added detailed ODBC status notes to documentation."
-    "Added connection pools, transaction functions, and DSN-like facility."))
+    "Added connection pools, virtual connections and statements, "
+    "transaction functions, and a DSN-like facility."))

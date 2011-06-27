@@ -109,7 +109,7 @@ History
 - postgresql mostly uses binary format
 - added geometric types, sql-bits
 - added more detailed notes on odbc status
-- renames (odbc #:database -> #:dsn, connection-generator -> virtual-connection)
+- renames (odbc #:database -> #:dsn, {conn,stmt}-generator -> virtual-{conn,stmt})
 + odbc:
   - fixed bug on windows
   - use wchar

@@ -1,16 +1,44 @@
+(planet ryanc/db)
+=================
+
+A database interface for functional programmers.
+
+Development hosted at https://github.com/rmculpepper/db
+
+
+History
+=======
+
+** Changes for version 1.1
+
++ fixed native library names for ODBC, SQLite on windows
+
+** Changes for version 1.2
+
+- postgresql mostly uses binary format
+- added geometric types, sql-bits
+- added more detailed notes on odbc status
+- renames (odbc #:database -> #:dsn, {conn,stmt}-generator -> virtual-{conn,stmt})
++ odbc:
+  - fixed bug on windows
+  - use wchar
+  - tested/fixed Oracle support
+  - tested/fixed DB2 support
++ added connection-pools, radsn utils
++ added transaction functions
+- sqlite3 better busy handling
+
 To do
 =====
 
 ** For version 1.2:
-
-- disable geometry types for now?
 
 ** For version 2.0:
 
 - merge util/connect into base
 - eliminate dbsystem objects (??)
 - eliminate deprecated features
-  - query-fold, connection-generator, odbc-connect #:database arg
+  - query-fold, {conn,stmt}-generator, odbc-connect #:database arg
 
 - set required-core-version to 5.1.1
 - drop private/generic/check-access.rkt
@@ -48,6 +76,8 @@ Types
 
 ----
 
+Misc
+
 - add ODBC-like functions for inspecting schemas (list-tables, etc)
   - util/schema (?), util/info (for information_schema) (?)
 
@@ -81,40 +111,10 @@ Types
   - how do people want to use cursors?
   - how about implicit support only in 'in-query'?
 
-- ODBC: increase buffer size for eg column names, table names, etc.
 - ODBC: use async execution to avoid blocking all Racket threads
-- ODBC: alternative to connection strings (eg property alist)
-  - probably best to create tmp DSN file, because string syntax is awful
-
-- check/improve time representations (?)
 
 - add evt versions of functions
   - for query functions (?)
   - connection-pool-lease-evt
   - when is it useful in practice?
     - would make it easier to handle timeouts...
-
-- add tuple type
-    #s(tuple header values), header is vector of symbols, values is vector of values
-
-History
-=======
-
-** Changes for version 1.1
-
-+ fixed native library names for ODBC, SQLite on windows
-
-** Changes for version 1.2
-
-- postgresql mostly uses binary format
-- added geometric types, sql-bits
-- added more detailed notes on odbc status
-- renames (odbc #:database -> #:dsn, {conn,stmt}-generator -> virtual-{conn,stmt})
-+ odbc:
-  - fixed bug on windows
-  - use wchar
-  - tested/fixed Oracle support
-  - tested/fixed DB2 support
-+ added connection-pools, radsn utils
-+ added transaction functions
-- sqlite3 better busy handling

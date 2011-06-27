@@ -99,8 +99,6 @@ Types
 - add tuple type
     #s(tuple header values), header is vector of symbols, values is vector of values
 
-- use Racket logging for debugging (?)
-
 History
 =======
 

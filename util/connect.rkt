@@ -83,8 +83,6 @@
     (define custodian (current-custodian))
     (define req-channel (make-channel))
 
-    (define DEBUG? #f)
-
     ;; == methods called in manager thread ==
 
     ;; key=>conn : hasheq[key => connection]
@@ -125,15 +123,13 @@
               (handle-evt (apply choice-evt keys)
                           ;; Assignment to key has expired: move to idle or disconnect.
                           (lambda (key)
-                            (when DEBUG?
-                              (eprintf "** virtual-connection: key expiration: ~e\n" key))
+                            (dbdebug "virtual-connection: key expiration: ~e" key)
                             (remove! key #f))))
             (let ([alarm-evts (hash-map alarms (lambda (k v) v))])
               (handle-evt (apply choice-evt alarm-evts)
                           ;; Disconnect idle connection.
                           (lambda (key)
-                            (when DEBUG?
-                              (eprintf "** virtual-connection: timeout\n"))
+                            (dbdebug "virtual-connection: timeout")
                             (remove! key #t)))))
       (manage))
 
@@ -201,9 +197,7 @@
 
     (define/public (free-statement stmt)
       (error 'free-statement
-             "internal error: virtual connection does not own statements"))
-
-    (define/public (debug ?) (set! DEBUG? ?))))
+             "internal error: virtual connection does not own statements"))))
 
 ;; ----
 
@@ -240,7 +234,6 @@
 
     (define req-channel (make-channel))
 
-    (define DEBUG? #f)
     (define proxy-counter 1) ;; for debugging
     (define actual-counter 1) ;; for debugging
     (define actual=>number (make-weak-hasheq))
@@ -262,22 +255,20 @@
                     [else (new-connection)])]
              [proxy-number (begin0 proxy-counter (set! proxy-counter (add1 proxy-counter)))]
              [c (new proxy-connection% (pool this) (connection raw-c) (number proxy-number))])
-        (when DEBUG?
-          (eprintf "** connection-pool: leasing connection #~a (~a @~a)\n"
-                   proxy-number
-                   (if take-idle? "idle" "new")
-                   (hash-ref actual=>number raw-c "???")))
+        (dbdebug "connection-pool: leasing connection #~a (~a @~a)"
+                 proxy-number
+                 (if take-idle? "idle" "new")
+                 (hash-ref actual=>number raw-c "???"))
         (hash-set! proxy=>evt c key)
         c))
 
     (define/private (release* proxy raw-c why)
-      (when DEBUG?
-        (eprintf "** connection-pool: releasing connection #~a (~a, ~a)\n"
-                 (send proxy get-number)
-                 (cond [(not raw-c) "no-op"]
-                       [(< (length idle-list) max-idle-connections) "idle"]
-                       [else "disconnect"])
-                 why))
+      (dbdebug "connection-pool: releasing connection #~a (~a, ~a)"
+               (send proxy get-number)
+               (cond [(not raw-c) "no-op"]
+                     [(< (length idle-list) max-idle-connections) "idle"]
+                     [else "disconnect"])
+               why)
       (hash-remove! proxy=>evt proxy)
       (when raw-c
         (with-handlers ([exn:fail? void])
@@ -325,16 +316,7 @@
       (thread-resume manager-thread)
       (let ([raw-c (send proxy release-connection)])
         (channel-put req-channel (lambda () (release* proxy raw-c "proxy disconnect"))))
-      (void))
-
-    (define/public (debug ?)
-      (case ?
-        ((#t) (set! DEBUG? #t))
-        ((#f) (set! DEBUG? #f)))
-      (when ?
-        (eprintf "** connection-pool: status: ~a assigned, ~a idle; max #~a, max @~a\n"
-                 (hash-count proxy=>evt) (length idle-list)
-                 (sub1 proxy-counter) (sub1 actual-counter))))))
+      (void))))
 
 ;; --
 

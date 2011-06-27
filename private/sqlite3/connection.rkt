@@ -247,6 +247,7 @@
       (call-with-values thunk
         (lambda (s . rest)
           (cond [(and (= s SQLITE_BUSY) (< iteration busy-retry-limit))
+                 (dbdebug "sqlite: busy, will retry")
                  (sleep busy-retry-delay)
                  (handle* who thunk (add1 iteration))]
                 [else (apply values (handle-status who s) rest)]))))

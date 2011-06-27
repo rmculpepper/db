@@ -31,6 +31,9 @@
          make-handler
          guess-socket-path/paths
 
+         dblogger
+         dbdebug
+
          (struct-out exn:fail:sql)
          raise-sql-error)
 
@@ -352,6 +355,15 @@
             [low  (hex-digit->int (string-ref s (+ i i 1)))])
         (bytes-set! b i (+ (arithmetic-shift high 4) low))))
     b))
+
+;; ----------------------------------------
+
+;; Logging
+
+(define dblogger (make-logger 'db (current-logger)))
+
+(define (dbdebug fmt . args)
+  (log-message dblogger 'debug (apply format fmt args) #f))
 
 ;; ----------------------------------------
 

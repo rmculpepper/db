@@ -43,20 +43,16 @@
     (define/override (connected?) (and -db #t))
 
     (define/public (query fsym stmt collector)
-      (let* ([result
-              (call-with-lock fsym
-                (lambda ()
-                  (check-valid-tx-status fsym)
-                  (let ([db (get-db fsym)])
-                    (query1 fsym stmt))))]
-             [stmt (car result)]
-             [info0 (cadr result)]
-             [rows (cddr result)])
+      (let-values ([(stmt* info rows)
+                    (call-with-lock fsym
+                      (lambda ()
+                        (check-valid-tx-status fsym)
+                        (query1 fsym stmt)))])
         (statement:after-exec stmt)
-        (cond [(pair? info0)
+        (cond [(pair? info)
                (let-values ([(init combine finalize headers?)
-                             (collector (length info0) #t)])
-                 (recordset (and headers? info0)
+                             (collector (length info) #t)])
+                 (recordset (and headers? info)
                             (finalize
                              (for/fold ([accum init]) ([row (in-list rows)])
                                (combine accum row)))))]
@@ -85,7 +81,7 @@
                  [rows (step* fsym db stmt)])
             (HANDLE fsym (sqlite3_reset stmt))
             (HANDLE fsym (sqlite3_clear_bindings stmt))
-            (cons stmt (cons info rows))))))
+            (values stmt info rows)))))
 
     (define/private (load-param fsym db stmt i param)
       (HANDLE fsym
@@ -215,8 +211,9 @@
                  (let ([db (get-db fsym)])
                    (when (get-tx-status db)
                      (error/already-in-tx fsym))
-                   (let ([r (query1 fsym "BEGIN TRANSACTION")])
-                     (car r)))))])
+                   (let-values ([(stmt* _info _rows)
+                                 (query1 fsym "BEGIN TRANSACTION")])
+                     stmt*))))])
         (statement:after-exec stmt)
         (void)))
 
@@ -228,13 +225,14 @@
                    (unless (eq? mode 'rollback)
                      (check-valid-tx-status fsym))
                    (when (get-tx-status db)
-                     (let ([r (case mode
-                                ((commit)
-                                 (query1 fsym "COMMIT TRANSACTION"))
-                                ((rollback)
-                                 (query1 fsym "ROLLBACK TRANSACTION")))])
+                     (let-values ([(stmt* _info _rows)
+                                   (case mode
+                                     ((commit)
+                                      (query1 fsym "COMMIT TRANSACTION"))
+                                     ((rollback)
+                                      (query1 fsym "ROLLBACK TRANSACTION")))])
                        (set! tx-status #f)
-                       (car r))))))])
+                       stmt*)))))])
         (statement:after-exec stmt)
         (void)))
 

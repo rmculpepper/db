@@ -53,56 +53,57 @@
     (define/override (connected?) (and db #t))
 
     (define/public (query fsym stmt collector)
-      (check-valid-tx-status fsym)
-      (query1 fsym stmt collector))
+      (let-values ([(stmt* dvecs rows)
+                    (call-with-lock fsym
+                      (lambda ()
+                        (check-valid-tx-status fsym)
+                        (query1 fsym stmt collector)))])
+        (statement:after-exec stmt*)
+        (cond [(pair? dvecs)
+               (let-values ([(init combine finalize headers?)
+                             (collector (length dvecs) #t)])
+                 (recordset (and headers? (map field-dvec->field-info dvecs))
+                            (finalize
+                             (for/fold ([accum init]) ([row (in-list rows)])
+                               (combine accum row)))))]
+              [else (simple-result '())])))
 
     (define/private (query1 fsym stmt collector)
-      (cond [(string? stmt)
-             (let* ([pst (prepare1 fsym stmt #t)]
-                    [sb (send pst bind fsym null)])
-               (query1 fsym sb collector))]
-            [(statement-binding? stmt)
-             (let ([pst (statement-binding-pst stmt)]
-                   [params (statement-binding-params stmt)])
-               (send pst check-owner fsym this stmt)
-               (query1/p fsym pst params collector))]))
+      (let* ([stmt (cond [(string? stmt)
+                          (let* ([pst (prepare1 fsym stmt #t)])
+                            (send pst bind fsym null))]
+                         [(statement-binding? stmt)
+                          stmt])]
+             [pst (statement-binding-pst stmt)]
+             [params (statement-binding-params stmt)])
+        (send pst check-owner fsym this stmt)
+        (let ([result-dvecs (send pst get-result-dvecs)])
+          (for ([dvec (in-list result-dvecs)])
+            (let ([typeid (field-dvec->typeid dvec)])
+              (unless (supported-typeid? typeid)
+                (error/unsupported-type fsym typeid)))))
+        (let-values ([(dvecs rows) (query1:inner fsym pst params collector)])
+          (values stmt dvecs rows))))
 
-    (define/private (query1/p fsym pst params collector)
-      (let ([result-dvecs (send pst get-result-dvecs)])
-        (for ([dvec (in-list result-dvecs)])
-          (let ([typeid (field-dvec->typeid dvec)])
-            (unless (supported-typeid? typeid)
-              (error/unsupported-type fsym typeid)))))
-      (define-values (dvecs rows)
-        (call-with-lock fsym
-          (lambda ()
-            (let* ([db (get-db fsym)]
-                   [stmt (send pst get-handle)])
-              (let* (;; FIXME: reset/clear first (?)
-                     [param-bufs
-                      ;; Need to keep references to all bufs until after SQLExecute.
-                      (for/list ([i (in-naturals 1)]
-                                 [param (in-list params)]
-                                 [param-typeid (in-list (send pst get-param-typeids))])
-                        (load-param fsym db stmt i param param-typeid))])
-                (handle-status fsym (SQLExecute stmt) stmt)
-                (strong-void param-bufs))
-              (let* ([result-dvecs (send pst get-result-dvecs)]
-                     [rows
-                      (and (pair? result-dvecs)
-                           (fetch* fsym stmt (map field-dvec->typeid result-dvecs)))])
-                (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
-                (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
-                (values result-dvecs rows))))))
-      (send pst after-exec)
-      (let-values ([(init combine finalize headers?)
-                    (collector (length dvecs) #t)])
-        (cond [(pair? dvecs)
-               (recordset (and headers? (map field-dvec->field-info dvecs))
-                          (finalize
-                           (for/fold ([accum init]) ([row (in-list rows)])
-                             (combine accum row))))]
-              [else (simple-result '())])))
+    (define/private (query1:inner fsym pst params collector)
+      (let* ([db (get-db fsym)]
+             [stmt (send pst get-handle)])
+        (let* (;; FIXME: reset/clear first (?)
+               [param-bufs
+                ;; Need to keep references to all bufs until after SQLExecute.
+                (for/list ([i (in-naturals 1)]
+                           [param (in-list params)]
+                           [param-typeid (in-list (send pst get-param-typeids))])
+                  (load-param fsym db stmt i param param-typeid))])
+          (handle-status fsym (SQLExecute stmt) stmt)
+          (strong-void param-bufs))
+        (let* ([result-dvecs (send pst get-result-dvecs)]
+               [rows
+                (and (pair? result-dvecs)
+                     (fetch* fsym stmt (map field-dvec->typeid result-dvecs)))])
+          (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
+          (handle-status fsym (SQLFreeStmt stmt SQL_RESET_PARAMS) stmt)
+          (values result-dvecs rows))))
 
     (define/private (load-param fsym db stmt i param typeid)
       ;; NOTE: param buffers must not move between bind and execute

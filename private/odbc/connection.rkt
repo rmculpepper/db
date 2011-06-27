@@ -7,7 +7,6 @@
          racket/list
          racket/math
          ffi/unsafe
-         ffi/unsafe/atomic
          "../generic/interfaces.rkt"
          "../generic/prepared.rkt"
          "../generic/sql-data.rkt"

@@ -88,8 +88,6 @@ Types
 
 - check/improve time representations (?)
 
-- protect exports from {sqlite3,odbc}/ffi.rkt (?)
-
 - add evt versions of functions
   - for query functions (?)
   - connection-pool-lease-evt

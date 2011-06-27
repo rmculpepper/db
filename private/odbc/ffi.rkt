@@ -8,7 +8,7 @@
          ffi/unsafe/define
          "ffi-constants.rkt")
 (provide (all-from-out "ffi-constants.rkt"))
-(provide (all-defined-out))
+(provide (protect-out (all-defined-out)))
 
 (define-cpointer-type _sqlhandle)
 

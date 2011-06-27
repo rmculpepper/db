@@ -7,7 +7,6 @@
 #lang racket/base
 (require racket/class
          ffi/unsafe
-         ffi/unsafe/atomic
          "../generic/interfaces.rkt"
          "../generic/prepared.rkt"
          "../generic/sql-data.rkt"

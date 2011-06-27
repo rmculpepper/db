@@ -5,13 +5,11 @@
 ;; Based in part on code Copyright 2009, 2010 Jay McCarthy
 
 #lang racket/base
-(require (rename-in racket/contract
-                    [-> c->])
-         ffi/unsafe
+(require ffi/unsafe
          ffi/unsafe/define)
-
 (require "ffi-constants.rkt")
-(provide (all-from-out "ffi-constants.rkt"))
+(provide (all-from-out "ffi-constants.rkt")
+         (protect-out (all-defined-out)))
 
 (define-ffi-definer define-sqlite
   (case (system-type)
@@ -142,9 +140,12 @@
 
 ;; ----------------------------------------
 
+#|
+(require (rename-in racket/contract [-> c->]))
+
 (define status? exact-nonnegative-integer?)
 
-; Contracts
+;; Contracts
 (provide/contract
  [status?
   (c-> any/c boolean?)]
@@ -196,3 +197,4 @@
   (c-> sqlite3_statement? status?)]
  [sqlite3_get_autocommit
   (c-> sqlite3_database? boolean?)])
+|#

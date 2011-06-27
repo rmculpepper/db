@@ -21,7 +21,7 @@ Connections are made using the following functions.
                   [#:database database string?]
                   [#:server server string? "localhost"]
                   [#:port port exact-positive-integer? 5432]
-                  [#:socket socket (or/c path-string? #f) #f]
+                  [#:socket socket (or/c path-string? 'guess #f) #f]
                   [#:password password (or/c string? #f) #f]
                   [#:allow-cleartext-password? allow-cleartext-password?
                    boolean? #f]
@@ -48,10 +48,10 @@ Connections are made using the following functions.
   To connect via a local socket, specify the socket path as the
   @racket[socket] argument. You must not supply the @racket[socket]
   argument if you have also supplied either of the TCP arguments. See
-  also @secref{connecting-to-server} for notes on socket paths, and
-  see @racket[postgresql-guess-socket-path] for a way of automatically
-  determining the socket path.  Sockets are only available under Linux
-  (x86) and Mac OS X.
+  also @secref{connecting-to-server} for notes on socket
+  paths. Supplying a @racket[socket] argument of @racket['guess] is
+  the same as supplying @racket[(postgresql-guess-socket-path)].
+  Sockets are only available under Linux (x86) and Mac OS X.
 
   If the server requests password authentication, the
   @racket[password] argument must be present; otherwise an exception
@@ -109,7 +109,7 @@ Connections are made using the following functions.
                          #:user "me"
                          #:database "me")
      (new connection%)]
-    [(postgresql-connect #:socket (postgresql-guess-socket-path)
+    [(postgresql-connect #:socket 'guess (code:comment "or (postgresql-guess-socket-path)")
                          #:user "me"
                          #:database "me")
      (new connection%)])
@@ -142,7 +142,9 @@ Connections are made using the following functions.
   arguments is similar to those of the @racket[postgresql-connect]
   function, except that the first argument to a
   @racket[notice-handler] function is a MySQL-specific integer code
-  rather than a SQLSTATE string.
+  rather than a SQLSTATE string, and a @racket[socket] argument of
+  @racket['guess] is the same as supplying
+  @racket[(mysql-guess-socket-path)].
 
   If the connection cannot be made, an exception is raised.
 

@@ -33,8 +33,11 @@
                 [else (make-print-notice notice-handler)])]
          [c (new connection% (notice-handler notice-handler))])
     (cond [socket
-           (let-values ([(in out) (unix-socket-connect socket)])
-             (send c attach-to-ports in out))]
+           (let ([socket (if (eq? socket 'guess)
+                             (mysql-guess-socket-path)
+                             socket)])
+             (let-values ([(in out) (unix-socket-connect socket)])
+               (send c attach-to-ports in out)))]
           [else
            (let ([server (or server "localhost")]
                  [port (or port 3306)])

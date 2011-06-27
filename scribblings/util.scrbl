@@ -244,9 +244,9 @@ connection specification in a DSN file (inspired by ODBC's DSNs).
   @racket[data-source], then @racket[dsn-file] is ignored.
 
 @examples/results[
-[(put-dsn 'me
+[(put-dsn 'mydb
           (postgresql-data-source #:user "me"
-                                  #:database "me" 
+                                  #:database "mydb" 
                                   #:password "icecream"))
  (void)]
 [(dsn-connect 'me)
@@ -295,7 +295,7 @@ connection specification in a DSN file (inspired by ODBC's DSNs).
            [#:database database string? @#,absent]
            [#:server server string? @#,absent]
            [#:port port exact-positive-integer? @#,absent]
-           [#:socket socket (or/c path-string? #f) @#,absent]
+           [#:socket socket (or/c path-string? 'guess #f) @#,absent]
            [#:password password (or/c string? #f) @#,absent]
            [#:allow-cleartext-password? allow-cleartext-password? boolean? @#,absent]
            [#:ssl ssl (or/c 'yes 'optional 'no) @#,absent]
@@ -307,7 +307,7 @@ connection specification in a DSN file (inspired by ODBC's DSNs).
            [#:database database string? @#,absent]
            [#:server server string? @#,absent]
            [#:port port exact-positive-integer? @#,absent]
-           [#:socket socket (or/c path-string? #f) @#,absent]
+           [#:socket socket (or/c path-string? 'guess #f) @#,absent]
            [#:password password (or/c string? #f) @#,absent]
            [#:notice-handler notice-handler (or/c 'output 'error) @#,absent])
          data-source?]

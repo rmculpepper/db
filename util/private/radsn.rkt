@@ -211,7 +211,7 @@ considered important.
         #:database string?
         #:server string?
         #:port exact-positive-integer?
-        #:socket string?
+        #:socket (or/c string? 'guess)
         #:password (or/c string? #f)
         #:allow-cleartext-password? boolean?
         #:ssl (or/c 'yes 'optional 'no)
@@ -224,7 +224,7 @@ considered important.
         #:database string?
         #:server string?
         #:port exact-positive-integer?
-        #:socket string?
+        #:socket (or/c string? 'guess)
         #:password (or/c string? #f)
         #:notice-handler (or/c 'output 'error))
        data-source?)]

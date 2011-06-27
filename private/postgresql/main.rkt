@@ -34,7 +34,11 @@
         [notification-handler
          (if (procedure? notification-handler)
              notification-handler
-             (make-print-notification notification-handler))])
+             (make-print-notification notification-handler))]
+        [socket
+         (if (eq? socket 'guess)
+             (postgresql-guess-socket-path)
+             socket)])
     (when (> connection-options 1)
       (uerror 'postgresql-connect "cannot give both server/port and socket arguments"))
     (let ([c (new connection%

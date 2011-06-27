@@ -16,7 +16,7 @@
        (#:password (or/c string? (list/c 'hash string?) #f)
         #:server (or/c string? #f)
         #:port (or/c exact-positive-integer? #f)
-        #:socket (or/c path-string? #f)
+        #:socket (or/c path-string? 'guess #f)
         #:allow-cleartext-password? boolean?
         #:ssl (or/c 'yes 'no 'optional)
         #:ssl-context ssl-client-context?

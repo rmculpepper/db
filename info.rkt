@@ -23,6 +23,6 @@
 (define repositories '("4.x"))
 
 (define release-notes
-  '("Fixed many ODBC bugs, added detailed ODBC status notes to documentation."
+  '("Fixed many ODBC bugs, added detailed ODBC status notes to documentation. "
     "Added connection pools, virtual connections and statements, "
     "transaction functions, and a DSN-like facility."))

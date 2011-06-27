@@ -307,7 +307,7 @@
            null])))
 
     (define/private (query1:get-rows fsym field-dvecs binary? wbox)
-      ;; Note: binary? should always be #f, unless force-prepare-sql? misses something.
+      ;; Note: binary? should always be #t, unless force-prepare-sql? misses something.
       (let ([r (recv fsym (if binary? 'binary-data 'data) field-dvecs)])
         (match r
           [(struct row-data-packet (data))

@@ -35,7 +35,7 @@
     (define use-describe-param?
       (and strict-parameter-types?
            (let-values ([(status supported?) (SQLGetFunctions db SQL_API_SQLDESCRIBEPARAM)])
-             (handle-status 'connect status db)
+             (handle-status 'odbc-connect status db)
              supported?)))
 
     (inherit call-with-lock
@@ -407,17 +407,8 @@
                     (let ([status (SQLPrepare stmt sql)])
                       (handle-status fsym status stmt)
                       stmt))]
-                 [param-typeids
-                  (let-values ([(status param-count) (SQLNumParams stmt)])
-                    (handle-status fsym status stmt)
-                    (for/list ([i (in-range 1 (add1 param-count))])
-                      (describe-param fsym stmt i)))]
-                 [result-dvecs
-                  (let-values ([(status result-count) (SQLNumResultCols stmt)]
-                               [(scratchbuf) (make-bytes 100)])
-                    (handle-status fsym status stmt)
-                    (for/list ([i (in-range 1 (add1 result-count))])
-                      (describe-result-column fsym stmt i scratchbuf)))])
+                 [param-typeids (describe-params fsym stmt)]
+                 [result-dvecs (describe-result-columns fsym stmt)])
             (let ([pst (new prepared-statement%
                             (handle stmt)
                             (close-on-exec? close-on-exec?)
@@ -427,19 +418,26 @@
               (hash-set! statement-table pst #t)
               pst)))))
 
-    (define/private (describe-param fsym stmt i)
-      (cond [use-describe-param?
-             (let-values ([(status type size digits nullable)
-                           (SQLDescribeParam stmt i)])
-               (handle-status fsym status stmt)
-               type)]
-            [else SQL_UNKNOWN_TYPE]))
-
-    (define/private (describe-result-column fsym stmt i scratchbuf)
-      (let-values ([(status name type size digits nullable)
-                    (SQLDescribeCol stmt i scratchbuf)])
+    (define/private (describe-params fsym stmt)
+      (let-values ([(status param-count) (SQLNumParams stmt)])
         (handle-status fsym status stmt)
-        (vector name type size digits)))
+        (for/list ([i (in-range 1 (add1 param-count))])
+          (cond [use-describe-param?
+                 (let-values ([(status type size digits nullable)
+                               (SQLDescribeParam stmt i)])
+                   (handle-status fsym status stmt)
+                   type)]
+                [else SQL_UNKNOWN_TYPE]))))
+
+    (define/private (describe-result-columns fsym stmt)
+      (let-values ([(status result-count) (SQLNumResultCols stmt)]
+                   [(scratchbuf) (make-bytes 200)])
+        (handle-status fsym status stmt)
+        (for/list ([i (in-range 1 (add1 result-count))])
+          (let-values ([(status name type size digits nullable)
+                        (SQLDescribeCol stmt i scratchbuf)])
+            (handle-status fsym status stmt)
+            (vector name type size digits)))))
 
     (define/public (disconnect)
       (define (go)
@@ -535,13 +533,7 @@
                            (handle-status fsym status db)
                            stmt)]
                    [_ (handle-status fsym (SQLTables stmt catalog schema table))]
-                   [result-dvecs
-                    ;; FIXME: refactor prepare1
-                    (let-values ([(status result-count) (SQLNumResultCols stmt)]
-                                 [(scratchbuf) (make-bytes 100)])
-                      (handle-status fsym status stmt)
-                      (for/list ([i (in-range 1 (add1 result-count))])
-                        (describe-result-column fsym stmt i scratchbuf)))]
+                   [result-dvecs (describe-result-columns fsym stmt)]
                    [rows (fetch* fsym stmt (map field-dvec->typeid result-dvecs))])
               (handle-status fsym (SQLFreeStmt stmt SQL_CLOSE) stmt)
               (handle-status fsym (SQLFreeHandle SQL_HANDLE_STMT stmt) stmt)

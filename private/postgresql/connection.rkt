@@ -234,15 +234,15 @@
 
     ;; == Query
 
-    ;; query : symbol Statement Collector -> QueryResult
-    (define/public (query fsym stmt0 collector)
+    ;; query : symbol Statement -> QueryResult
+    (define/public (query fsym stmt0)
       (let-values ([(stmt result)
                     (call-with-lock fsym
                       (lambda ()
                         (check-valid-tx-status fsym)
                         (query1 fsym stmt0)))])
         (statement:after-exec stmt)
-        (query1:process-result fsym collector result)))
+        (query1:process-result fsym result)))
 
     (define/private (query1 fsym stmt)
       (let ([stmt (check-statement fsym stmt)])
@@ -320,26 +320,20 @@
          (uerror fsym (nosupport "COPY OUT statements"))]
         [_ (error/comm fsym)]))
 
-    (define/private (query1:process-result fsym collector result)
+    (define/private (query1:process-result fsym result)
       (match result
         [(vector 'recordset field-dvecs rows)
-         (let-values ([(init combine finalize headers?)
-                       (collector (length field-dvecs) #t)])
-           (let* ([type-reader-v
-                   (list->vector (query1:get-type-readers fsym field-dvecs))]
-                  [row-length (length field-dvecs)]
-                  [convert-row
-                   (lambda (row)
-                     (vector-map! (lambda (value type-reader)
-                                    (cond [(sql-null? value) sql-null]
-                                          [else (type-reader value)]))
-                                  row
-                                  type-reader-v))])
-             (recordset (and headers?
-                             (map field-dvec->field-info field-dvecs))
-                        (finalize
-                         (for/fold ([accum init]) ([row (in-list rows)])
-                           (combine accum (convert-row row)))))))]
+         (let* ([type-reader-v
+                 (list->vector (query1:get-type-readers fsym field-dvecs))]
+                [convert-row!
+                 (lambda (row)
+                   (vector-map! (lambda (value type-reader)
+                                  (cond [(sql-null? value) sql-null]
+                                        [else (type-reader value)]))
+                                row
+                                type-reader-v))])
+           (for-each convert-row! rows)
+           (recordset (map field-dvec->field-info field-dvecs) rows))]
         [(vector 'command command)
          (simple-result command)]))
 

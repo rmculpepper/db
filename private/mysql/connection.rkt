@@ -225,8 +225,7 @@
 
     ;; Set connection to use utf8 encoding
     (define/private (after-connect)
-      (query 'mysql-connect "set names 'utf8'"
-             (lambda (fields ordered?) (values #f void void #f)))
+      (query 'mysql-connect "set names 'utf8'")
       (void))
 
 
@@ -237,8 +236,8 @@
     ;; name-counter : number
     (define name-counter 0)
 
-    ;; query : symbol Statement Collector -> QueryResult
-    (define/public (query fsym stmt collector)
+    ;; query : symbol Statement -> QueryResult
+    (define/public (query fsym stmt)
       (check-valid-tx-status fsym)
       (let*-values ([(stmt result)
                      (call-with-lock fsym
@@ -246,9 +245,9 @@
                          (let ([stmt (check-statement fsym stmt)])
                            (values stmt (query1 fsym stmt #t)))))])
         ;; For some reason, *really* slow: (statement:after-exec stmt)
-        (query1:process-result fsym collector result)))
+        (query1:process-result fsym result)))
 
-    ;; query1 : symbol Statement Collector -> QueryResult
+    ;; query1 : symbol Statement -> QueryResult
     (define/private (query1 fsym stmt warnings?)
       (let ([wbox (and warnings? (box 0))])
         (fresh-exchange)
@@ -318,15 +317,10 @@
            (when wbox (set-box! wbox warnings))
            null])))
 
-    (define/private (query1:process-result fsym collector result)
+    (define/private (query1:process-result fsym result)
       (match result
         [(vector 'recordset field-dvecs rows)
-         (let-values ([(init combine finalize headers?)
-                       (collector (length field-dvecs) #t)])
-           (recordset (and headers? (map field-dvec->field-info field-dvecs))
-                      (finalize
-                       (for/fold ([acc init]) ([row (in-list rows)])
-                         (combine acc row)))))]
+         (recordset (map field-dvec->field-info field-dvecs) rows)]
         [(vector 'command command-info)
          (simple-result command-info)]))
 

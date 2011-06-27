@@ -51,23 +51,17 @@
     (define/public (get-dbsystem) dbsystem)
     (define/override (connected?) (and db #t))
 
-    (define/public (query fsym stmt collector)
+    (define/public (query fsym stmt)
       (let-values ([(stmt* dvecs rows)
                     (call-with-lock fsym
                       (lambda ()
                         (check-valid-tx-status fsym)
-                        (query1 fsym stmt collector)))])
+                        (query1 fsym stmt)))])
         (statement:after-exec stmt*)
-        (cond [(pair? dvecs)
-               (let-values ([(init combine finalize headers?)
-                             (collector (length dvecs) #t)])
-                 (recordset (and headers? (map field-dvec->field-info dvecs))
-                            (finalize
-                             (for/fold ([accum init]) ([row (in-list rows)])
-                               (combine accum row)))))]
+        (cond [(pair? dvecs) (recordset (map field-dvec->field-info dvecs) rows)]
               [else (simple-result '())])))
 
-    (define/private (query1 fsym stmt collector)
+    (define/private (query1 fsym stmt)
       (let* ([stmt (cond [(string? stmt)
                           (let* ([pst (prepare1 fsym stmt #t)])
                             (send pst bind fsym null))]
@@ -81,10 +75,10 @@
             (let ([typeid (field-dvec->typeid dvec)])
               (unless (supported-typeid? typeid)
                 (error/unsupported-type fsym typeid)))))
-        (let-values ([(dvecs rows) (query1:inner fsym pst params collector)])
+        (let-values ([(dvecs rows) (query1:inner fsym pst params)])
           (values stmt dvecs rows))))
 
-    (define/private (query1:inner fsym pst params collector)
+    (define/private (query1:inner fsym pst params)
       (let* ([db (get-db fsym)]
              [stmt (send pst get-handle)])
         (let* (;; FIXME: reset/clear first (?)
@@ -392,31 +386,31 @@
             [else (get-string)]))
 
     (define/public (prepare fsym stmt close-on-exec?)
-      (check-valid-tx-status fsym)
-      (prepare1 fsym stmt close-on-exec?))
-
-    (define/private (prepare1 fsym sql close-on-exec?)
       (call-with-lock fsym
         (lambda ()
-          ;; no time between prepare and table entry
-          (let* ([stmt
-                  (let*-values ([(db) (get-db fsym)]
-                                [(status stmt) (SQLAllocHandle SQL_HANDLE_STMT db)])
-                    ;; FIXME: if error, free stmt handle
-                    (handle-status fsym status db)
-                    (let ([status (SQLPrepare stmt sql)])
-                      (handle-status fsym status stmt)
-                      stmt))]
-                 [param-typeids (describe-params fsym stmt)]
-                 [result-dvecs (describe-result-columns fsym stmt)])
-            (let ([pst (new prepared-statement%
-                            (handle stmt)
-                            (close-on-exec? close-on-exec?)
-                            (owner this)
-                            (param-typeids param-typeids)
-                            (result-dvecs result-dvecs))])
-              (hash-set! statement-table pst #t)
-              pst)))))
+          (check-valid-tx-status fsym)
+          (prepare1 fsym stmt close-on-exec?))))
+
+    (define/private (prepare1 fsym sql close-on-exec?)
+      ;; no time between prepare and table entry
+      (let* ([stmt
+              (let*-values ([(db) (get-db fsym)]
+                            [(status stmt) (SQLAllocHandle SQL_HANDLE_STMT db)])
+                ;; FIXME: if error, free stmt handle
+                (handle-status fsym status db)
+                (let ([status (SQLPrepare stmt sql)])
+                  (handle-status fsym status stmt)
+                  stmt))]
+             [param-typeids (describe-params fsym stmt)]
+             [result-dvecs (describe-result-columns fsym stmt)])
+        (let ([pst (new prepared-statement%
+                        (handle stmt)
+                        (close-on-exec? close-on-exec?)
+                        (owner this)
+                        (param-typeids param-typeids)
+                        (result-dvecs result-dvecs))])
+          (hash-set! statement-table pst #t)
+          pst)))
 
     (define/private (describe-params fsym stmt)
       (let-values ([(status param-count) (SQLNumParams stmt)])

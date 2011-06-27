@@ -54,7 +54,7 @@
       (connected?)
       (disconnect)
       (get-dbsystem)
-      (query fsym stmt collector)
+      (query fsym stmt)
       (prepare fsym stmt close-on-exec?)
       (free-statement stmt)
       (transaction-status fsym)
@@ -175,7 +175,7 @@
     (define-forward
       (#f #f     (connected?))
       (#t '_     (get-dbsystem))
-      (#t '_     (query fsym stmt collector))
+      (#t '_     (query fsym stmt))
       (#t '_     (start-transaction fsym isolation))
       (#f (void) (end-transaction fsym mode))
       (#f #f     (transaction-status fsym)))
@@ -340,7 +340,7 @@
 
     (define-forward define/public
       (get-dbsystem)
-      (query fsym stmt collector)
+      (query fsym stmt)
       (prepare fsym stmt close-on-exec?)
       (free-statement stmt)
       (transaction-status fsym)

@@ -45,7 +45,7 @@
     connected?    ;; -> boolean
     disconnect    ;; -> void
     get-dbsystem  ;; -> dbsystem<%>
-    query         ;; symbol statement collector -> QueryResult
+    query         ;; symbol statement -> QueryResult
     prepare       ;; symbol preparable boolean -> prepared-statement<%>
 
     start-transaction  ;; symbol (U 'serializable ...) -> void
@@ -131,19 +131,13 @@
 
 ;; An query-result is one of:
 ;;  - (simple-result alist)
-;;  - (recordset Header/#f data), determined by collector
+;;  - (recordset Header data)
 ;;    for user-visible recordsets: headers present, data is (listof vector)
 (struct simple-result (info) #:transparent)
 (struct recordset (headers rows) #:transparent)
 
 ;; A Header is (listof FieldInfo)
 ;; A FieldInfo is an alist, contents dbsys-dependent
-
-;; Collector = (nat order -> headers? init combine finish)
-;;   where init : A
-;;         combine : A vector -> A
-;;         finish : A -> A
-;;         order is #t for normal order, #f for reversed
 
 
 ;; === Class utilities

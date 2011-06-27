@@ -41,20 +41,14 @@
     (define/public (get-dbsystem) dbsystem)
     (define/override (connected?) (and -db #t))
 
-    (define/public (query fsym stmt collector)
+    (define/public (query fsym stmt)
       (let-values ([(stmt* info rows)
                     (call-with-lock fsym
                       (lambda ()
                         (check-valid-tx-status fsym)
                         (query1 fsym stmt)))])
         (statement:after-exec stmt)
-        (cond [(pair? info)
-               (let-values ([(init combine finalize headers?)
-                             (collector (length info) #t)])
-                 (recordset (and headers? info)
-                            (finalize
-                             (for/fold ([accum init]) ([row (in-list rows)])
-                               (combine accum row)))))]
+        (cond [(pair? info) (recordset info rows)]
               [else (simple-result '())])))
 
     (define/private (query1 fsym stmt)

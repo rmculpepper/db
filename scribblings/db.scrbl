@@ -25,16 +25,18 @@ systems. The following database systems are currently supported:
 @item{@bold{@hyperlink["http://www.sqlite.org"]{SQLite} version 3} --- requires native library}
 @item{@bold{ODBC} --- requires ODBC installation}
 ]
-Support for PostgreSQL and MySQL does not rely on any
-native client libraries; this package is everything you
-need to connect to a PostgreSQL or MySQL server. SQLite and ODBC
-support require the appropriate native libraries to be installed.
+Support for PostgreSQL and MySQL does not rely on any native client
+libraries; this package is everything you need to connect to a
+PostgreSQL or MySQL server. Support for SQLite and ODBC requires the
+appropriate native libraries to be installed.
 
-The query operations are functional in spirit. Queries return results;
-they do not stow them away in the connection for later manipulation
-and retrieval. In other words, connections do not contain query
-state. Connections are internally synchronized, so multiple threads
-can use a connection simultaneously.
+The query operations are functional in spirit: queries return results
+or raise exceptions rather than stashing their state into a cursor
+object for later navigation and retrieval. Query parameters and result
+fields are automatically translated to and from appropriate Racket
+values. Resources are managed automatically by the garbage collector
+and via custodians. Connections are internally synchronized, so
+multiple threads can use a connection simultaneously.
 
 @bold{Acknowledgments} Thanks to Dave Gurnell, Noel Welsh, Mike Burns,
 and Doug Orleans for contributions to @tt{spgsql}, the PostgreSQL-only

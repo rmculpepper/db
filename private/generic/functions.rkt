@@ -6,8 +6,7 @@
 (require (for-syntax racket/base)
          racket/contract
          racket/class
-         (rename-in "interfaces.rkt"
-                    [virtual-statement make-virtual-statement]))
+         "interfaces.rkt")
 
 ;; == Administrative procedures
 
@@ -38,7 +37,8 @@
   (or (string? x)
       (prepared-statement? x)
       (virtual-statement? x)
-      (statement-binding? x)))
+      (statement-binding? x)
+      (prop:statement? x)))
 
 (define complete-statement?
   (or/c string? statement-binding?))
@@ -54,9 +54,29 @@
 (define (prepared-statement-result-types pst)
   (send pst get-result-types))
 
-(define (virtual-statement gen)
-  (make-virtual-statement (make-weak-hasheq)
-                          (if (string? gen) (lambda (_) gen) gen)))
+;; A virtual-statement is:
+;;   - (virtual-statement table gen)
+;;     where table is a weak-hasheq[connection => prepared-statement]
+;;     and gen is (dbsystem -> string)
+(struct virtual-statement (table gen)
+        #:property prop:statement
+        (lambda (stmt c)
+          (let ([table (virtual-statement-table stmt)]
+                [gen (virtual-statement-gen stmt)]
+                [cache? (not (is-a? c no-cache-prepare<%>))])
+            (let ([table-pst (hash-ref table c #f)])
+              (or table-pst
+                  (let* ([sql-string (gen (send c get-dbsystem))]
+                         [pst (prepare1 'virtual-statement c sql-string (not cache?))])
+                    (when cache? (hash-set! table c pst))
+                    pst))))))
+
+(define virtual-statement*
+  (let ([virtual-statement
+         (lambda (gen)
+           (virtual-statement (make-weak-hasheq)
+                              (if (string? gen) (lambda (_) gen) gen)))])
+    virtual-statement))
 
 ;; == Query procedures
 
@@ -88,14 +108,15 @@
          (uerror fsym "query returned multiple rows (expected 1): ~e" sql)]))
 
 (define (compose-statement fsym c stmt args checktype)
-  (cond [(or (pair? args)
+  (cond [(prop:statement? stmt)
+         (let ([stmt* ((prop:statement-ref stmt) stmt c)])
+           (compose-statement fsym c stmt* args checktype))]
+        [(or (pair? args)
              (prepared-statement? stmt)
              (virtual-statement? stmt))
          (let ([pst
                 (cond [(string? stmt)
                        (prepare1 fsym c stmt #t)]
-                      [(virtual-statement? stmt)
-                       (prepare1 fsym c stmt #f)]
                       [(prepared-statement? stmt)
                        ;; Ownership check done later, by query method.
                        stmt]
@@ -107,7 +128,7 @@
                               stmt)])])
            (send pst check-results fsym checktype stmt)
            (send pst bind fsym args))]
-        [else ;; no args, and sql is either string or statement-binding
+        [else ;; no args, and stmt is either string or statement-binding
          stmt]))
 
 
@@ -223,18 +244,8 @@
 ;; ----
 
 (define (prepare1 fsym c stmt close-on-exec?)
-  (cond [(string? stmt)
-         (send c prepare fsym stmt close-on-exec?)]
-        [(virtual-statement? stmt)
-         (let ([table (virtual-statement-table stmt)]
-               [gen (virtual-statement-gen stmt)]
-               [cache? (not (is-a? c no-cache-prepare<%>))])
-           (let ([table-pst (hash-ref table c #f)])
-             (or table-pst
-                 (let* ([sql-string (gen (send c get-dbsystem))]
-                        [pst (prepare1 fsym c sql-string (not cache?))])
-                   (when cache? (hash-set! table c pst))
-                   pst))))]))
+  ;; stmt is string
+  (send c prepare fsym stmt close-on-exec?))
 
 ;; ========================================
 
@@ -298,10 +309,6 @@
 
  [statement?
   (-> any/c any)]
- #|
- [complete-statement?
-  (-> any/c any)]
- |#
  [prepared-statement?
   (-> any/c any)]
  [prepared-statement-parameter-types
@@ -339,9 +346,11 @@
  [bind-prepared-statement
   (-> prepared-statement? list? any)]
 
- [virtual-statement
+ [rename virtual-statement* virtual-statement
   (-> (or/c string? (-> dbsystem? string?))
       virtual-statement?)]
+ [virtual-statement?
+  (-> any/c boolean?)]
 
  [start-transaction
   (->* (connection?)

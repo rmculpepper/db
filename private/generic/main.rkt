@@ -3,14 +3,13 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require (except-in "interfaces.rkt"
-                    virtual-statement)
+(require "interfaces.rkt"
          "sql-data.rkt"
          "functions.rkt")
 (provide (struct-out simple-result)
          (struct-out recordset)
+         prop:statement
          statement-binding?
-         virtual-statement?
          (rename-out [virtual-statement statement-generator]
                      [virtual-statement? statement-generator?])
 

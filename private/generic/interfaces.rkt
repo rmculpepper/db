@@ -11,8 +11,11 @@
          (struct-out simple-result)
          (struct-out recordset)
 
+         prop:statement
+         prop:statement?
+         prop:statement-ref
+
          (struct-out statement-binding)
-         (struct-out virtual-statement)
 
          init-private
 
@@ -115,16 +118,14 @@
 
 ;; ==== Auxiliary structures
 
+;; Value of prop:statement should be a function from struct instance to statement.
+(define-values (prop:statement prop:statement? prop:statement-ref)
+  (make-struct-type-property 'prop:statement))
+
 ;; A statement-binding is:
 ;;   - (statement-binding prepared-statement ??? (listof ???))
 ;;     meta might include information such as text vs binary format
 (struct statement-binding (pst meta params))
-
-;; A virtual-statement is:
-;;   - (virtual-statement table gen)
-;;     where table is a weak-hasheq[connection => prepared-statement]
-;;     and gen is (dbsystem -> string)
-(struct virtual-statement (table gen))
 
 ;; A YesNoOptional is one of 'yes, 'no, 'optional
 ;; An SSLMode is one of 'sslv2-or-v3, 'sslv2, 'sslv3, 'tls

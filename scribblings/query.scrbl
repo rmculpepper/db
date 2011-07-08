@@ -67,26 +67,19 @@ All queries require both a connection and a @deftech{statement}, which
 is one of the following:
 @itemlist[
 @item{a string containing a single SQL statement, possibly with
-parameters}
+  parameters}
 @item{a @tech{prepared statement} produced by @racket[prepare]}
 @item{a @tech{virtual statement} produced by
-@racket[virtual-statement]}
+  @racket[virtual-statement]}
 @item{a statement-binding value produced by
-@racket[bind-prepared-statement]}
+  @racket[bind-prepared-statement]}
+@item{an instance of a struct type that implements @racket[prop:statement]}
 ]
 
 @defproc[(statement? [x any/c]) boolean?]{
 
   Returns @racket[#t] if @racket[x] is a @tech{statement}, @racket[#f]
   otherwise.
-
-  Equivalent to the following:
-  @racketblock[
-    (or (string? x)
-        (prepared-statement? x)
-        (virtual-statement? x)
-        (statement-binding? x))
-  ]
 }
 
 
@@ -585,4 +578,18 @@ rollback invalid transactions.
   normally, the transaction is committed and @racket[proc]'s results
   are returned. If @racket[proc] raises an exception, the transaction
   is rolled back.
+}
+
+@section{Creating new kinds of statements}
+
+@defthing[prop:statement struct-type-property?]{
+
+A struct type property for creating new kinds of statements. The value
+associated with this property should satisfy the contract
+@racketblock[
+(any/c connection? . -> . statement?)
+]
+The property value is applied to the struct instance and a connection,
+and it must return a @tech{statement}.
+
 }

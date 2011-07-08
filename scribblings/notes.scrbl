@@ -5,10 +5,9 @@
           racket/sandbox
           "config.rkt")
 
-@title[#:tag "system-specific-notes"]{System-specific notes}
+@title[#:tag "notes"]{Notes}
 
-This section describes miscellaneous issues specific to particular
-database systems.
+This section describes miscellaneous issues.
 
 @section[#:tag "connecting-to-server"]{Local sockets for PostgreSQL and MySQL servers}
 
@@ -101,7 +100,8 @@ particular data source.
 The following sections describe the configurations that this library
 has been tested with. The platform @bold{win32} means Windows Vista on
 a 32-bit processor and @bold{linux} means Ubuntu 11.04 and unixODBC on
-both x86 (32-bit) and x86-64 processors, unless otherwise specified.
+both x86 (32-bit) and x86-64 processors, unless otherwise
+specified. The iODBC Driver Manager is not supported.
 
 Reports of success or failure on other platforms or with other drivers
 would be appreciated.
@@ -159,7 +159,7 @@ variables must be set according to the @tt{oracle_env.{csh,sh}} script
 for the driver to work. 
 
 Columns of type @tt{TIME} can cause a memory error (ie, Racket
-aborts). This seems to be due to a
+crashes). This seems to be due to a
 @hyperlink["http://forums.oracle.com/forums/thread.jspa?threadID=572661"]{bug}
 in Oracle's ODBC driver, but I do not yet have a workaround.
 

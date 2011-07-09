@@ -396,11 +396,14 @@
       (let* ([stmt
               (let*-values ([(db) (get-db fsym)]
                             [(status stmt) (SQLAllocHandle SQL_HANDLE_STMT db)])
-                ;; FIXME: if error, free stmt handle
                 (handle-status fsym status db)
-                (let ([status (SQLPrepare stmt sql)])
-                  (handle-status fsym status stmt)
-                  stmt))]
+                (with-handlers ([(lambda (e) #t)
+                                 (lambda (e)
+                                   (SQLFreeHandle SQL_HANDLE_STMT stmt)
+                                   (raise e))])
+                  (let ([status (SQLPrepare stmt sql)])
+                    (handle-status fsym status stmt)
+                    stmt)))]
              [param-typeids (describe-params fsym stmt)]
              [result-dvecs (describe-result-columns fsym stmt)])
         (let ([pst (new prepared-statement%

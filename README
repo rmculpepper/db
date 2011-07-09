@@ -80,6 +80,8 @@ Types
 
 Misc
 
+- use ffi/unsafe/alloc to simplify odbc handle allocation
+
 - add ODBC-like functions for inspecting schemas (list-tables, etc)
   - util/schema (?), util/info (for information_schema) (?)
 

@@ -3,9 +3,7 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/unit
-(require (for-syntax racket/base
-                     "../private/generic/unstable-syntax.rkt")
-         racket/string
+(require racket/string
          rackunit
          "config.rkt"
          "../base.rkt")
@@ -22,10 +20,8 @@
 ;;   'string = query w/ string
 ;;   'prepare = query w/ prepared
 ;;   'bind = query w/ prepared+bound
-(define-syntax (Q* stx)
-  (syntax-case stx ()
-    [(Q prep-mode function obj stmt arg ...)
-     #'(Q** prep-mode function obj (sql stmt) (list arg ...))]))
+(define-syntax-rule (Q* prep-mode function obj stmt arg ...)
+  (Q** prep-mode function obj (sql stmt) (list arg ...)))
 (define (Q** prep-mode function obj stmt args)
   (case prep-mode
     ((string) (apply function obj stmt args))

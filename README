@@ -27,6 +27,7 @@ History
 + added connection-pools, radsn utils
 + added transaction functions
 - sqlite3 better busy handling
+- added prop:statement
 
 To do
 =====

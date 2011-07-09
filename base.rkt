@@ -3,5 +3,11 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require "private/generic/main.rkt")
-(provide (all-from-out "private/generic/main.rkt"))
+(require racket/contract
+         "private/generic/main.rkt"
+         "private/generic/connect-util.rkt"
+         "private/generic/dsn.rkt")
+
+(provide (all-from-out "private/generic/main.rkt")
+         (all-from-out "private/generic/dsn.rkt")
+         (all-from-out "private/generic/connect-util.rkt"))

@@ -5,8 +5,8 @@
 #lang racket/base
 (require racket/contract
          racket/class
-         "../private/generic/interfaces.rkt"
-         (only-in "../private/generic/functions.rkt" connection?))
+         "interfaces.rkt"
+         (only-in "functions.rkt" connection?))
 
 ;; Kill-safe wrapper
 
@@ -388,16 +388,10 @@
 (provide/contract
  [kill-safe-connection
   (-> connection? connection?)]
-
  [virtual-connection
   (->* ((or/c (-> connection?) connection-pool?))
-       () ;; (#:timeout (and/c real? positive?))
+       ()
        connection?)]
- [rename virtual-connection connection-generator
-  (->* ((-> connection?))
-       (#:timeout (and/c real? positive?))
-       connection?)]
-
  [connection-pool
   (->* ((-> connection?))
        (#:max-connections (or/c (integer-in 1 10000) +inf.0)
@@ -409,6 +403,3 @@
   (->* (connection-pool?)
        ((or/c custodian? evt?))
        connection?)])
-
-(require "private/radsn.rkt")
-(provide (all-from-out "private/radsn.rkt"))

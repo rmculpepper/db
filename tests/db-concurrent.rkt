@@ -6,7 +6,6 @@
 (require racket/class
          rackunit
          "../base.rkt"
-         "../util/connect.rkt"
          "config.rkt")
 (import database^ config^)
 (export test^)

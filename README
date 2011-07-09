@@ -34,7 +34,6 @@ To do
 
 ** For version 2.0:
 
-- merge util/connect into base
 - eliminate dbsystem objects (??)
 - eliminate deprecated features
   - query-fold, {conn,stmt}-generator, odbc-connect #:database arg

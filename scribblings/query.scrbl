@@ -58,7 +58,7 @@ safe to perform concurrent queries on the same connection object from
 different threads. Connections are not kill-safe: killing a thread
 that is using a connection---or shutting down the connection's
 managing custodian---may leave the connection locked, causing future
-operations to block indefinitely. See @secref["connect-util"] for a
+operations to block indefinitely. See @secref["kill-safe"] for a
 way to make kill-safe connections.
 
 

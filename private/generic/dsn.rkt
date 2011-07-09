@@ -7,7 +7,25 @@
          racket/match
          racket/file
          racket/list
-         "../../main.rkt")
+         racket/runtime-path
+         racket/promise
+         "main.rkt")
+
+(define-syntax-rule (define-lazy-functions modpath fun ...)
+  (begin (define-runtime-module-path-index mpi modpath)
+         (deflazyfun mpi fun) ...))
+(define-syntax-rule (deflazyfun mpi fun)
+  (begin (define fun-p (delay (dynamic-require mpi 'fun)))
+         (define fun
+           (make-keyword-procedure
+            (lambda (kws kwargs . args)
+              (keyword-apply (force fun-p) kws kwargs args))))))
+
+(define-lazy-functions "../../main.rkt"
+  postgresql-connect
+  mysql-connect
+  sqlite3-connect
+  odbc-connect)
 
 #|
 DSN v0.1 format
@@ -16,7 +34,7 @@ A DSN (prefs) file maps symbol => <data-source>
 
 <data-source> ::= (db <connector> <args> <extensions>)
 
-<connector> ::= postgresql | mysql | sqlite3 | odbc | odbc-driver
+<connector> ::= postgresql | mysql | sqlite3 | odbc
 
 <args> ::= (<arg> ...)
 <arg>  ::= <datum> | { <kw> <datum> }
@@ -51,7 +69,7 @@ considered important.
            (datum? (cdr x)))))
 
 (define (connector? x)
-  (memq x '(postgresql mysql sqlite3 odbc odbc-driver)))
+  (memq x '(postgresql mysql sqlite3 odbc)))
 
 (define (parse-arglist x [default none])
   (define (fail . args)
@@ -131,8 +149,7 @@ considered important.
     ((postgresql) postgresql-connect)
     ((mysql) mysql-connect)
     ((sqlite3) sqlite3-connect)
-    ((odbc) odbc-connect)
-    ((odbc-driver) odbc-driver-connect)))
+    ((odbc) odbc-connect)))
 
 (define dsn-connect
   (make-keyword-procedure
@@ -189,10 +206,6 @@ considered important.
   (mk-specialized 'odbc-data-source 'odbc 0
                   '(#:dsn #:database #:user #:password #:notice-handler
                     #:strict-parameter-types? #:character-mode)))
-
-(define odbc-driver-data-source
-  (mk-specialized 'odbc-driver-data-source 'odbc-driver 1
-                  '(#:strict-parameter-types? #:character-mode)))
 
 (provide/contract
  [struct data-source

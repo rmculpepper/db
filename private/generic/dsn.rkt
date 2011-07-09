@@ -3,7 +3,8 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require racket/contract
+(require (planet ryanc/macros:2/lazy-require)
+         racket/contract
          racket/match
          racket/file
          racket/list
@@ -11,17 +12,9 @@
          racket/promise
          "main.rkt")
 
-(define-syntax-rule (define-lazy-functions modpath fun ...)
-  (begin (define-runtime-module-path-index mpi modpath)
-         (deflazyfun mpi fun) ...))
-(define-syntax-rule (deflazyfun mpi fun)
-  (begin (define fun-p (delay (dynamic-require mpi 'fun)))
-         (define fun
-           (make-keyword-procedure
-            (lambda (kws kwargs . args)
-              (keyword-apply (force fun-p) kws kwargs args))))))
+(define-lazy-require-definer define-main "../../main.rkt")
 
-(define-lazy-functions "../../main.rkt"
+(define-main
   postgresql-connect
   mysql-connect
   sqlite3-connect

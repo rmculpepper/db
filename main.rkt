@@ -4,62 +4,39 @@
 
 #lang racket/base
 (require (for-syntax racket/base)
+         (planet ryanc/macros:2/lazy-require)
          racket/runtime-path
          racket/promise
          racket/contract
          "base.rkt")
 (provide (all-from-out "base.rkt"))
 
-;; Lazy instantiation 
+(define-lazy-require-definer define-postgresql "private/postgresql/main.rkt")
+(define-lazy-require-definer define-mysql "private/mysql/main.rkt")
+(define-lazy-require-definer define-sqlite3 "private/sqlite3/main.rkt")
+(define-lazy-require-definer define-odbc "private/odbc/main.rkt")
+(define-lazy-require-definer define-openssl 'openssl)
 
-(define-syntax-rule (define-lazy-functions modpath fun ...)
-  (begin (define-runtime-module-path-index mpi modpath)
-         (deflazyfun mpi fun) ...))
-(define-syntax-rule (deflazyfun mpi fun)
-  (begin (define fun-p (delay (dynamic-require mpi 'fun)))
-         (define fun
-           (wrap-kw-fun
-            (make-keyword-procedure
-             (lambda (kws kwargs . args)
-               (keyword-apply (force fun-p) kws kwargs args)))))))
-
-;; Note: bug in contracts applied to result of make-keyword-procedure
-;; Workaround: reduce kw-arity to known kws
-
-(define known-keywords
-  (sort '(#:user #:database #:password #:server #:port #:socket
-          #:allow-cleartext-password? #:ssl #:ssl-context
-          #:notice-handler #:notification-handler
-          #:mode #:busy-retry-limit #:busy-retry-delay
-          #:dsn #:strict-parameter-types? #:character-mode)
-        keyword<?))
-
-(define (wrap-kw-fun proc)
-  (procedure-reduce-keyword-arity
-   proc (procedure-arity proc) '() known-keywords))
-
-;; ----
-
-(define-lazy-functions "private/postgresql/main.rkt"
+(define-postgresql
   postgresql-connect
   postgresql-guess-socket-path
   postgresql-password-hash)
 
-(define-lazy-functions "private/mysql/main.rkt"
+(define-mysql
   mysql-connect
   mysql-guess-socket-path
   mysql-password-hash)
 
-(define-lazy-functions "private/sqlite3/main.rkt"
+(define-sqlite3
   sqlite3-connect)
 
-(define-lazy-functions "private/odbc/main.rkt"
+(define-odbc
   odbc-connect
   odbc-driver-connect
   odbc-data-sources
   odbc-drivers)
 
-(define-lazy-functions 'openssl
+(define-openssl
   ssl-client-context?)
 
 (provide/contract

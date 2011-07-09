@@ -35,7 +35,6 @@ To do
 ** For version 2.0:
 
 - split private/generic/socket.rkt into separate package
-- use ryanc/macros:2/lazy-require in main.rkt
 - use ryanc/macros:2/relation in message modules
 - use struct-type-property/c for prop:statement
 

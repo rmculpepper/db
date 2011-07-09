@@ -138,23 +138,6 @@
              ((gen)
               (for ([(x y) (in-query c (virtual-statement stmt) 2)]) 0)))))))))
 
-(define (fold-tests)
-  (test-suite "query-fold"
-    (test-case "query-fold - sum"
-      (with-connection c
-        (let [(q (query-fold c "select N from the_numbers" + 0))]
-          (check-equal? q (foldl + 0 (map car test-data))))))
-    (test-case "query-fold/query-list - sum"
-      (with-connection c
-        (let [(q (query-fold c "select N from the_numbers" + 0))
-              (q2 (query-list c "select N from the_numbers"))]
-          (check-equal? q (foldl + 0 q2)))))
-    (test-case "query-fold - max"
-      (with-connection c
-        (let [(q (query-fold c "select N from the_numbers where N > 0 order by N"
-                             max -1000))]
-          (check-equal? q (foldl max -1000 (map car test-data))))))))
-
 (define low-level-tests
   (test-suite "low-level"
     (test-case "query - select"
@@ -303,7 +286,6 @@
     (simple-tests 'prepare)
     (simple-tests 'bind)
     (simple-tests 'gen)
-    (fold-tests)
     low-level-tests
     misc-tests
     error-tests))

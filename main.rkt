@@ -107,10 +107,8 @@
 
  ;; Duplicates contracts at odbc.rkt
  [odbc-connect
-  (->* ()
-       (#:dsn (or/c string? #f)
-        #:database (or/c string? #f)
-        #:user (or/c string? #f)
+  (->* (#:dsn (or/c string? #f))
+       (#:user (or/c string? #f)
         #:password (or/c string? #f)
         #:notice-handler (or/c 'output 'error output-port? procedure?)
         #:strict-parameter-types? boolean?

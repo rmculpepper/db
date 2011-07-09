@@ -285,22 +285,6 @@ future version of this library (even new minor versions).
   supports both recordset-returning and effect-only queries.
 }
 
-@defproc[(query-fold [connection connection?]
-                     [stmt (or/c string? statement-binding?)]
-                     [fold-proc (_alpha _field _... -> _alpha)]
-                     [init _alpha])
-         _alpha]{
-
-  Left fold over the results of the query. The arity of
-  @racket[fold-proc] must include a number one greater than the number
-  of columns returned by the query. Inline parameter arguments are not
-  supported; parameter binding must be done explicitly with
-  @racket[bind-prepared-statement].
-
-  This function is deprecated; use @racket[for/fold] with
-  @racket[in-query] instead.
-}
-
 
 @section{Prepared statements}
 
@@ -439,15 +423,6 @@ closed.
 
   Returns @racket[#t] if @racket[x] is a @tech{virtual statement}
   created by @racket[virtual-statement], @racket[#f] otherwise.
-}
-
-@deftogether[[
-@defproc[(statement-generator [gen (or/c string? (-> dbsystem? string?))])
-         virtual-statement?]
-@defproc[(statement-generator? [x any/c]) boolean?]]]{
-
-  Deprecated. Equivalents of @racket[virtual-statement] and
-  @racket[virtual-statement?].
 }
 
 

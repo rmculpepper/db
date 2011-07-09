@@ -15,19 +15,13 @@
          odbc-drivers
          (rename-out [dbsystem odbc-dbsystem]))
 
-(define (odbc-connect #:dsn [dsn #f]
-                      #:database [database #f]
+(define (odbc-connect #:dsn dsn
                       #:user [user #f]
                       #:password [auth #f]
                       #:notice-handler [notice-handler void]
                       #:strict-parameter-types? [strict-parameter-types? #f]
                       #:character-mode [char-mode 'wchar])
-  (when (and dsn database)
-    (uerror 'odbc-connect "cannot give both #:dsn and #:database arguments"))
-  (unless (or dsn database)
-    (uerror 'odbc-connect "missing #:dsn argument"))
-  (let ([dsn (or dsn database)]
-        [notice-handler (make-handler notice-handler "notice")])
+  (let ([notice-handler (make-handler notice-handler "notice")])
     (call-with-env 'odbc-connect
       (lambda (env)
         (call-with-db 'odbc-connect env

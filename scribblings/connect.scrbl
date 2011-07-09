@@ -224,8 +224,7 @@ Base connections are made using the following functions.
      (new connection%)])
 }
 
-@defproc[(odbc-connect [#:dsn dsn (or/c string? #f) #f]
-                       [#:database database (or/c string? #f) #f]
+@defproc[(odbc-connect [#:dsn dsn string?]
                        [#:user user (or/c string? #f) #f]
                        [#:password password (or/c string? #f) #f]
                        [#:notice-handler notice-handler
@@ -243,9 +242,7 @@ Base connections are made using the following functions.
   that information may be incorporated into the data source
   definition, or it might not be relevant to the data source's driver.
   The @racket[notice-handler] argument behaves the same as in
-  @racket[postgresql-connect].  The @racket[database] argument is a
-  deprecated equivalent of @racket[dsn]. One or the other must be
-  provided, but not both.
+  @racket[postgresql-connect].
 
   If @racket[strict-parameter-types?] is true, then the connection
   attempts to determine and enforce specific types for query

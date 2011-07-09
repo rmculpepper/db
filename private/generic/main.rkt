@@ -10,9 +10,6 @@
          (struct-out recordset)
          prop:statement
          statement-binding?
-         (rename-out [virtual-statement statement-generator]
-                     [virtual-statement? statement-generator?])
-
          (except-out (all-from-out "sql-data.rkt")
                      make-sql-bits/bytes
                      sql-bits-bv

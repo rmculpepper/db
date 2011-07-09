@@ -204,7 +204,7 @@ considered important.
 
 (define odbc-data-source
   (mk-specialized 'odbc-data-source 'odbc 0
-                  '(#:dsn #:database #:user #:password #:notice-handler
+                  '(#:dsn #:user #:password #:notice-handler
                     #:strict-parameter-types? #:character-mode)))
 
 (provide/contract

@@ -189,14 +189,6 @@
   (let ([sql (compose-statement 'query c sql args #f)])
     (query1 c 'query sql)))
 
-;; -- Functions that don't accept stmt params --
-
-;; query-fold : connection Statement ('a field ... -> 'a) 'a -> 'a
-(define (query-fold c stmt f base)
-  (let ([rows (recordset-rows (query/recordset c 'query-fold stmt #f))])
-    (for/fold ([acc base]) ([row (in-list rows)])
-      (apply f acc (vector->list row)))))
-
 ;; ========================================
 
 (define (in-query c stmt . args)
@@ -332,9 +324,6 @@
   (->* (connection? statement?) () #:rest list? any)]
  [query
   (->* (connection? statement?) () #:rest list? any)]
-
- [query-fold
-  (-> connection? complete-statement? procedure? any/c any)]
 
  #|
  [in-query

@@ -32,8 +32,6 @@ History
 To do
 =====
 
-** For version 1.2:
-
 ** For version 2.0:
 
 - merge util/connect into base
@@ -41,7 +39,6 @@ To do
 - eliminate deprecated features
   - query-fold, {conn,stmt}-generator, odbc-connect #:database arg
 
-- set required-core-version to 5.1.1
 - drop private/generic/check-access.rkt
 - split private/generic/socket.rkt into separate package
 - use ryanc/macros:2/lazy-require in main.rkt

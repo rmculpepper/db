@@ -7,8 +7,8 @@
 
 @title[#:tag "util"]{Utilities}
 
-The bindings described in this section are not provided by
-@(my-racketmodname).
+The bindings described in this section are provided by the specific
+modules below, not by @(my-racketmodname).
 
 @section[#:tag "connect-util"]{Connection utilities}
 

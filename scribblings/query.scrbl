@@ -4,11 +4,12 @@
           scribble/struct
           racket/sandbox
           "config.rkt"
-          "tabbing.rkt")
+          "tabbing.rkt"
+          (for-label (this-package-in main util/geometry util/postgresql)))
 
 @title[#:tag "query-api"]{Queries}
 
-@(my-declare-exporting)
+@declare-exporting/this-package[main]
 
 The database package implements a high-level functional query API,
 unlike many other database libraries, which present a stateful,

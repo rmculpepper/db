@@ -3,16 +3,17 @@
           scribble/eval
           scribble/struct
           scheme/sandbox
-          "config.rkt")
+          "config.rkt"
+          (for-label (this-package-in main util/connect util/geometry util/postgresql)))
 
 @title[#:tag "util"]{Utilities}
 
 The bindings described in this section are provided by the specific
-modules below, not by @(my-racketmodname).
+modules below, not by @racketmodname/this-package[main].
 
 @section[#:tag "connect-util"]{Connection utilities}
 
-@(my-defmodule util/connect)
+@defmodule/this-package[util/connect]
 
 @subsection{Connection pooling}
 
@@ -342,7 +343,7 @@ connection specification in a DSN file (inspired by ODBC's DSNs).
 
 @section[#:tag "geometry"]{Geometric types}
 
-@(my-defmodule util/geometry)
+@defmodule/this-package[util/geometry]
 
 The following structures and functions deal with geometric values
 based on the OpenGIS (ISO 19125) model.
@@ -425,7 +426,7 @@ structures to and from WKB format is supported by the
 
 @section[#:tag "postgresql-ext"]{PostgreSQL-specific types}
 
-@(my-defmodule util/postgresql)
+@defmodule/this-package[util/postgresql]
 
 The following structures represent certain of PostgreSQL's built-in
 geometric types that have no appropriate analogue in the OpenGIS

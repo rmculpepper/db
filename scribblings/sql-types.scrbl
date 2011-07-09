@@ -5,11 +5,12 @@
           scheme/sandbox
           "config.rkt"
           "tabbing.rkt"
-          (for-label (prefix-in srfi: srfi/19)))
+          (for-label (prefix-in srfi: srfi/19)
+                     (this-package-in main util/geometry util/postgresql)))
 
 @title[#:tag "sql-types"]{SQL types and conversions}
 
-@(my-declare-exporting)
+@declare-exporting/this-package[main]
 
 Connections automatically convert query results to appropriate Racket
 types. Likewise, query parameters are accepted as Racket values and
@@ -107,8 +108,8 @@ to the same type.
 ]
 
 The geometric types such as @racket['point] are represented by
-structures defined in the @(my-racketmodname util/geometry) and
-@(my-racketmodname util/postgresql) modules.
+structures defined in the @racketmodname/this-package[util/geometry] and
+@racketmodname/this-package[util/postgresql] modules.
 
 PostgreSQL user-defined @emph{domains} are supported in query results
 if the underlying type is supported. Recordset headers and

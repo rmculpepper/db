@@ -3,44 +3,20 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require (for-syntax racket/base "../private/generic/unstable-syntax.rkt")
-         scribble/manual
+(require scribble/manual
          scribble/eval
          racket/sandbox
+         planet/version
+         planet/scribble
          (for-label racket/base
-                    racket/contract
-                    (planet ryanc/db:1:2)
-                    (planet ryanc/db:1:2/util/connect)
-                    (planet ryanc/db:1:2/util/geometry)
-                    (planet ryanc/db:1:2/util/postgresql)))
+                    racket/contract))
 (provide (all-defined-out)
+         (all-from-out planet/scribble)
          (for-label (all-from-out racket/base)
-                    (all-from-out racket/contract)
-                    (all-from-out (planet ryanc/db:1:2))
-                    (all-from-out (planet ryanc/db:1:2/util/connect))
-                    (all-from-out (planet ryanc/db:1:2/util/geometry))
-                    (all-from-out (planet ryanc/db:1:2/util/postgresql))))
+                    (all-from-out racket/contract)))
 
-(define (my-package-version) "1.2")
-(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:2)))))
-
-(define-syntax-rule (defmy name underlying)
-  (define-syntax (name stx)
-    (syntax-case stx ()
-      [(name)
-       #'(underlying (planet ryanc/db:1:2))]
-      [(name id)
-       (identifier? #'id)
-       (with-syntax ([mod (format-id #'id "ryanc/db:1:2/~a" #'id)])
-         #'(underlying (planet mod)))])))
-
-(defmy my-defmodule defmodule)
-(defmy my-defmodule/nd defmodule/nd)
-(defmy my-declare-exporting declare-exporting)
-(defmy my-racketmodname racketmodname)
-
-(define-syntax-rule (defmodule/nd mod)
-  (defmodule*/no-declare (mod)))
+(define (my-package-version)
+  (format "~a.~a" (this-package-version-maj) (this-package-version-min)))
 
 ;; ----
 

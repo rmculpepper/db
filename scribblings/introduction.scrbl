@@ -3,7 +3,8 @@
           scribble/eval
           scribble/struct
           racket/sandbox
-          "config.rkt")
+          "config.rkt"
+          (for-label (this-package-in main)))
 
 @title[#:tag "introduction"]{Introduction}
 
@@ -12,7 +13,7 @@ database and perform simple queries. Some of the SQL syntax used below
 is PostgreSQL-specific, such as the syntax of query parameters.
 
 @my-interaction[
-[#, @(my-require-form)
+[(require #, @racketmodname/this-package[main])
  (void)]
 ]
 

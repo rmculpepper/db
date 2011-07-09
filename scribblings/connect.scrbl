@@ -4,11 +4,12 @@
           scribble/struct
           racket/sandbox
           "config.rkt"
-          (for-label openssl))
+          (for-label openssl
+                     (this-package-in main)))
 
 @title[#:tag "connect"]{Connections}
 
-@(my-declare-exporting)
+@(declare-exporting/this-package main)
 
 This section describes functions for creating connections as well as
 administrative functions for managing connections.
@@ -357,41 +358,41 @@ system. See @secref["db-types"].
 
 @section{System-specific modules}
 
-The @(my-racketmodname) module exports all of the functions listed in
-this manual except those described in @secref["util"]. The database
-system-specific connection modules are loaded lazily to avoid
-unnecessary dependencies on foreign libraries.
+The @racketmodname/this-package[main] module exports all of the
+functions listed in this manual except those described in
+@secref["util"]. The database system-specific connection modules are
+loaded lazily to avoid unnecessary dependencies on foreign libraries.
 
 The following modules provide subsets of the bindings described in
 this manual.
 
-@(my-defmodule/nd base)
+@defmodule*/no-declare/this-package[(base)]
 
 Provides all generic connection operations (those described in
 @secref{managing-connections} and @secref{query-api}) and SQL data
 support (@secref{sql-types}).
 
-@(my-defmodule/nd postgresql)
+@defmodule*/no-declare/this-package[(postgresql)]
 
 Provides only @racket[postgresql-connect] and
 @racket[postgresql-guess-socket-path].
 
-@(my-defmodule/nd mysql)
+@defmodule*/no-declare/this-package[(mysql)]
 
 Provides only @racket[mysql-connect] and
 @racket[mysql-guess-socket-path].
 
-@(my-defmodule/nd sqlite3)
+@defmodule*/no-declare/this-package[(sqlite3)]
 
 Provides only @racket[sqlite3-connect]. In contrast to
-@(my-racketmodname), this module immediately attempts to load the
-SQLite native library when required, and it raises an exception if it
-cannot be found.
+@racketmodname/this-package[main], this module immediately attempts to
+load the SQLite native library when required, and it raises an
+exception if it cannot be found.
 
-@(my-defmodule/nd odbc)
+@defmodule*/no-declare/this-package[(odbc)]
 
 Provides only @racket[odbc-connect], @racket[odbc-driver-connect],
 @racket[odbc-data-sources], and @racket[odbc-drivers]. In contrast to
-@(my-racketmodname), this module immediately attempts to load the ODBC
-native library when required, and it raises an exception if it cannot
-be found.
+@racketmodname/this-package[main], this module immediately attempts to
+load the ODBC native library when required, and it raises an exception
+if it cannot be found.

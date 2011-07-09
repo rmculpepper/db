@@ -15,7 +15,7 @@
 
 @centered{@bold{@italic{A database interface for functional programmers.}}}
 
-@(my-defmodule)
+@defmodule/this-package[main]
 
 This package provides a high-level interface to several database
 systems. The following database systems are currently supported:

@@ -3,7 +3,8 @@
           scribble/eval
           scribble/struct
           racket/sandbox
-          "config.rkt")
+          "config.rkt"
+          (for-label (this-package-in main)))
 
 @title[#:tag "notes"]{Notes}
 

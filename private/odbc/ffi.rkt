@@ -91,7 +91,7 @@
 
 (define (cpstr2 str)
   (let-values ([(shorts slen) (scheme_ucs4_to_utf16 str 0 (string-length str))])
-    (let* ([n (* slen 2)] ;; FIXME: assumes short is 2 bytes
+    (let* ([n (* slen 2)]
            [rawcopy (malloc (add1 n) 'atomic-interior)]
            [copy (make-sized-byte-string rawcopy n)])
       (memcpy copy shorts n)
@@ -184,7 +184,7 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (#f : _pointer)
         (connection : _string)
         ((if connection (string-utf-8-length connection) 0) : _sqlsmallint)
-        (#f : _bytes) ;; FIXME
+        (#f : _bytes)
         (0 : _sqlsmallint)
         (out-length : (_ptr o _sqlsmallint))
         (driver-completion : _sqlusmallint)
@@ -341,7 +341,7 @@ Docs at http://msdn.microsoft.com/en-us/library/ms712628%28v=VS.85%29.aspx
         (rec-number : _sqlsmallint)
         (sql-state-buf : _bytes = (make-bytes 6))
         (native-errcode : (_ptr o _sqlinteger))
-        (message-buf : _bytes = (make-bytes 1024)) ;; FIXME
+        (message-buf : _bytes = (make-bytes 1024))
         ((bytes-length message-buf) : _sqlsmallint)
         (message-len : (_ptr o _sqlsmallint))
         -> (status : _sqlreturn)

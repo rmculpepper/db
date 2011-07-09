@@ -81,8 +81,7 @@
     (define/private (query1:inner fsym pst params)
       (let* ([db (get-db fsym)]
              [stmt (send pst get-handle)])
-        (let* (;; FIXME: reset/clear first (?)
-               [param-bufs
+        (let* ([param-bufs
                 ;; Need to keep references to all bufs until after SQLExecute.
                 (for/list ([i (in-naturals 1)]
                            [param (in-list params)]
@@ -283,7 +282,6 @@
                    ;; didn't fit in buf, and we have no idea how much more there is
                    ;; start = 0
                    (let* ([data-end (- (bytes-length buf) ntlen)])
-                     ;; FIXME: maybe in this case we want a bigger buffer (?)
                      (loop buf 0 (cons (subbytes buf 0 data-end) rchunks)))]
                   [else
                    (let ([len (+ start len-or-ind)])

@@ -678,7 +678,6 @@ Based on protocol documentation here:
                       (io:read-length-coded-bytes in)
                       #:srid? #t))
 
-    ;; FIXME
     ((decimal)
      (error/internal 'get-param "unimplemented decimal type: ~s" type))
     ((enum set)

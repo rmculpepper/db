@@ -15,7 +15,7 @@
 
 (define odbc-dbsystem%
   (class* object% (dbsystem<%>)
-    (define/public (get-short-name) 'odbc) ;; FIXME: need also underlying driver info
+    (define/public (get-short-name) 'odbc)
     (define/public (get-known-types) supported-types)
     (define/public (has-support? x) #f)
 

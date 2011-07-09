@@ -69,7 +69,7 @@
     (define/private (recv-message fsym)
       (let ([r (raw-recv)])
         (cond [(ErrorResponse? r)
-               (check-ready-for-query fsym #t) ;; FIXME: eat msgs until ReadyForQuery?
+               (check-ready-for-query fsym #t)
                (raise-backend-error fsym r)]
               [(or (NoticeResponse? r)
                    (NotificationResponse? r)

@@ -6,15 +6,14 @@
 
 #lang racket/base
 (require ffi/unsafe
-         "check-access.rkt")
+         ffi/file)
 (provide unix-socket-connect)
 
 ;; unix-socket-connect : pathlike -> input-port output-port
 ;; Connects to the unix domain socket associated with the given path.
 (define (unix-socket-connect path0)
   (define path (check-pathlike 'unix-socket-connect path0))
-  (scheme_security_check_file "unix-socket-connect" path
-                              (+ SCHEME_GUARD_FILE_READ SCHEME_GUARD_FILE_WRITE))
+  (security-guard-check-file 'unix-socket-connect path '(read write))
   (define s (make-socket))
   (unless (positive? s)
     (error 'unix-socket-connect

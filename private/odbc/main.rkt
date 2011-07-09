@@ -6,7 +6,6 @@
 (require racket/class
          racket/contract
          "../generic/interfaces.rkt"
-         "../generic/check-access.rkt"
          "connection.rkt"
          "dbsystem.rkt"
          "ffi.rkt")

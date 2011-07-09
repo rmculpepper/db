@@ -5,7 +5,7 @@
 #lang racket/base
 (require racket/class
          racket/contract
-         "../generic/check-access.rkt"
+         ffi/file
          "connection.rkt"
          "dbsystem.rkt"
          "ffi.rkt")
@@ -25,12 +25,11 @@
                   [(temporary) #""])]
                [(or (path? path-or-sym) (string? path-or-sym))
                 (let ([path (cleanse-path (path->complete-path path-or-sym))])
-                  (scheme_security_check_file "sqlite3-connect"
-                                              path
-                                              (+ SCHEME_GUARD_FILE_READ
-                                                 (case mode
-                                                   ((read-only) 0)
-                                                   (else SCHEME_GUARD_FILE_WRITE))))
+                  (security-guard-check-file 'sqlite3-connect
+                                             path
+                                             (case mode
+                                               ((read-only) '(read))
+                                               (else '(read write))))
                   (path->bytes path))])])
     (let-values ([(db open-status)
                   (sqlite3_open_v2 path

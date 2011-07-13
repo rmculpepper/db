@@ -29,6 +29,11 @@ History
 - sqlite3 better busy handling
 - added prop:statement
 
+** Changes for version 1.3
+
++ fixed unix-socket-connect
+
+
 To do
 =====
 

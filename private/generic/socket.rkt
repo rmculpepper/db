@@ -6,27 +6,27 @@
 
 #lang racket/base
 (require ffi/unsafe
+         (rename-in racket/contract [-> c->])
          "check-access.rkt")
-(provide unix-socket-connect)
+(provide/contract
+ [unix-socket-connect
+  (c-> path-string? (values input-port? output-port?))])
 
 ;; unix-socket-connect : pathlike -> input-port output-port
 ;; Connects to the unix domain socket associated with the given path.
 (define (unix-socket-connect path0)
-  (define path (check-pathlike 'unix-socket-connect path0))
-  (scheme_security_check_file "unix-socket-connect" path
+  (define path-b (check-pathlike 'unix-socket-connect path0))
+  (scheme_security_check_file "unix-socket-connect" path0
                               (+ SCHEME_GUARD_FILE_READ SCHEME_GUARD_FILE_WRITE))
   (define s (make-socket))
   (unless (positive? s)
-    (error 'unix-socket-connect
-           "failed to create socket"))
-  (define addr (make-unix-sockaddr (path->bytes path)))
-  (define addrlen (+ (ctype-sizeof _short) (bytes-length path)))
+    (error 'unix-socket-connect "failed to create socket"))
+  (define addr (make-unix-sockaddr path-b))
+  (define addrlen (+ (ctype-sizeof _short) (bytes-length path-b)))
   (define ce (_connect s addr addrlen))
   (unless (zero? ce)
     (_close s)
-    (raise-user-error
-     'unix-socket-connect
-     "failed to connect socket to path: ~s" path))
+    (error 'unix-socket-connect "failed to connect socket to path: ~s" path0))
   (with-handlers ([(lambda (e) #t)
                    (lambda (e)
                      (_close s)
@@ -113,7 +113,9 @@
     (raise-type-error function
                       "path, string, or bytes"
                       path0))
-  (let ([path (cleanse-path (path->complete-path path0))])
-    (unless (< (bytes-length (path->bytes path)) 100)
+  (let* ([path (cleanse-path (path->complete-path path0))]
+         [path-b (path->bytes path)])
+    (unless (< (bytes-length path-b) 100)
       (error 'unix-socket-connect
-             "expected path of less than 100 bytes, got ~e" path))))
+             "expected path of less than 100 bytes, got ~e" path))
+    path-b))

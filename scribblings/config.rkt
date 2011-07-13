@@ -9,29 +9,29 @@
          racket/sandbox
          (for-label racket/base
                     racket/contract
-                    (planet ryanc/db:1:2)
-                    (planet ryanc/db:1:2/util/connect)
-                    (planet ryanc/db:1:2/util/geometry)
-                    (planet ryanc/db:1:2/util/postgresql)))
+                    (planet ryanc/db:1:3)
+                    (planet ryanc/db:1:3/util/connect)
+                    (planet ryanc/db:1:3/util/geometry)
+                    (planet ryanc/db:1:3/util/postgresql)))
 (provide (all-defined-out)
          (for-label (all-from-out racket/base)
                     (all-from-out racket/contract)
-                    (all-from-out (planet ryanc/db:1:2))
-                    (all-from-out (planet ryanc/db:1:2/util/connect))
-                    (all-from-out (planet ryanc/db:1:2/util/geometry))
-                    (all-from-out (planet ryanc/db:1:2/util/postgresql))))
+                    (all-from-out (planet ryanc/db:1:3))
+                    (all-from-out (planet ryanc/db:1:3/util/connect))
+                    (all-from-out (planet ryanc/db:1:3/util/geometry))
+                    (all-from-out (planet ryanc/db:1:3/util/postgresql))))
 
-(define (my-package-version) "1.2")
-(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:2)))))
+(define (my-package-version) "1.3")
+(define (my-require-form) (racket (require #,(racketmodname (planet ryanc/db:1:3)))))
 
 (define-syntax-rule (defmy name underlying)
   (define-syntax (name stx)
     (syntax-case stx ()
       [(name)
-       #'(underlying (planet ryanc/db:1:2))]
+       #'(underlying (planet ryanc/db:1:3))]
       [(name id)
        (identifier? #'id)
-       (with-syntax ([mod (format-id #'id "ryanc/db:1:2/~a" #'id)])
+       (with-syntax ([mod (format-id #'id "ryanc/db:1:3/~a" #'id)])
          #'(underlying (planet mod)))])))
 
 (defmy my-defmodule defmodule)

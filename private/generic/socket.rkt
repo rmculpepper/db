@@ -6,31 +6,36 @@
 
 #lang racket/base
 (require ffi/unsafe
-         ffi/file)
-(provide unix-socket-connect)
+         ffi/file
+         (rename-in racket/contract [-> c->]))
+(provide/contract
+ [unix-socket-connect
+  (c-> path-string?
+       (values input-port? output-port?))])
 
 ;; unix-socket-connect : pathlike -> input-port output-port
 ;; Connects to the unix domain socket associated with the given path.
 (define (unix-socket-connect path0)
-  (define path (check-pathlike 'unix-socket-connect path0))
-  (security-guard-check-file 'unix-socket-connect path '(read write))
-  (define s (make-socket))
-  (unless (positive? s)
-    (error 'unix-socket-connect
-           "failed to create socket"))
-  (define addr (make-unix-sockaddr (path->bytes path)))
-  (define addrlen (+ (ctype-sizeof _short) (bytes-length path)))
-  (define ce (_connect s addr addrlen))
-  (unless (zero? ce)
-    (_close s)
-    (raise-user-error
-     'unix-socket-connect
-     "failed to connect socket to path: ~s" path))
-  (with-handlers ([(lambda (e) #t)
-                   (lambda (e)
-                     (_close s)
-                     (raise e))])
-    (_make_fd_output_port s 'socket #f #f #t)))
+  (security-guard-check-file 'unix-socket-connect path0 '(read write))
+  (let* ([path* (cleanse-path (path->complete-path path0))]
+         [path-b (path->bytes path*)])
+    (unless (< (bytes-length path-b) 100)
+      (error 'unix-socket-connect
+             "expected path of less than 100 bytes, got ~e" path*))
+    (define s (make-socket))
+    (unless (positive? s)
+      (error 'unix-socket-connect "failed to create socket"))
+    (define addr (make-unix-sockaddr path-b))
+    (define addrlen (+ (ctype-sizeof _short) (bytes-length path-b)))
+    (define ce (_connect s addr addrlen))
+    (unless (zero? ce)
+      (_close s)
+      (error 'unix-socket-connect "failed to connect socket to path: ~s" path0))
+    (with-handlers ([(lambda (e) #t)
+                     (lambda (e)
+                       (_close s)
+                       (raise e))])
+      (_make_fd_output_port s 'socket #f #f #t))))
 
 (define platform
   (let ([os (system-type 'os)]
@@ -106,13 +111,3 @@
      (make-sockaddr_un AF_UNIX path))
     ((macosx)
      (make-macosx_sockaddr_un (bytes-length path) AF_UNIX path))))
-
-(define (check-pathlike function path0)
-  (unless (or (string? path0) (path? path0) (bytes? path0))
-    (raise-type-error function
-                      "path, string, or bytes"
-                      path0))
-  (let ([path (cleanse-path (path->complete-path path0))])
-    (unless (< (bytes-length (path->bytes path)) 100)
-      (error 'unix-socket-connect
-             "expected path of less than 100 bytes, got ~e" path))))

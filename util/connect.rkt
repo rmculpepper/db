@@ -307,10 +307,13 @@
                          [sema (make-semaphore 0)])
                     (channel-put req-channel
                                  (lambda ()
-                                   (set! result (lease* key))
+                                   (set! result
+                                         (with-handlers ([exn? values])
+                                           (lease* key)))
                                    (semaphore-post sema)))
                     (semaphore-wait sema)
-                    result))))
+                    (cond [(exn? result) (raise result)]
+                          [else result])))))
 
     (define/public (release proxy)
       (thread-resume manager-thread)

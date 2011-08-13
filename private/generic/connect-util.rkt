@@ -111,7 +111,7 @@
                           (and c (send c transaction-status 'virtual-connection)))])
         (cond [(not c) (void)]
               [(and timeout? in-trans?)
-               (hash-set! alarms c (fresh-alarm-for key timeout))]
+               (hash-set! alarms c (fresh-alarm-for key))]
               [else
                (hash-remove! key=>conn key)
                (hash-remove! alarms c)
@@ -187,7 +187,7 @@
           (send c disconnect)
           (thread-resume manager-thread)
           (channel-put req-channel
-                       (lambda () (remove! key #f #f)))))
+                       (lambda () (remove! key #f)))))
       (void))
 
     (define/public (prepare fsym stmt close-on-exec?)

@@ -16,7 +16,9 @@
   (begin (define-runtime-module-path-index mpi modpath)
          (deflazyfun mpi fun) ...))
 (define-syntax-rule (deflazyfun mpi fun)
-  (begin (define fun-p (delay (dynamic-require mpi 'fun)))
+  ;; Use delay/sync because delay promise is not reentrant.
+  ;; FIXME: delay/sync promise is probably not kill-safe, though
+  (begin (define fun-p (delay/sync (dynamic-require mpi 'fun)))
          (define fun
            (wrap-kw-fun
             (make-keyword-procedure

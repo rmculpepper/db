@@ -33,6 +33,10 @@ History
 
 + fixed unix-socket-connect
 
+** Changes for version 1.4
+
++ fixed arity errors from compiler warnings
+
 
 To do
 =====

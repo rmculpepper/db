@@ -606,7 +606,7 @@ Based on protocol documentation here:
 
     ((tiny) (io:read-byte in)) ;; FIXME signed/unsigned
     ((short) (io:read-le-int16 in (not (memq 'unsigned flags))))
-    ((int24) (io:read-le-int24 in (not (memq 'unsigned flags))))
+    ((int24) (io:read-le-int24 in)) ;; FIXME signed/unsigned
     ((long) (io:read-le-int32 in (not (memq 'unsigned flags))))
     ((longlong) (io:read-le-int64 in (not (memq 'unsigned flags))))
     ((varchar var-string)

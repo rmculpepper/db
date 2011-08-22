@@ -110,25 +110,20 @@ Based on protocol documentation here:
 
 ;; READING
 
-(define (io:read-null-terminated-string port)
-  (let [(strport (open-output-bytes))]
-    (let loop ()
-      (let ([next (read-byte port)])
-        (cond [(zero? next)
-               (get-output-string strport)]
-              [else
-               (write-byte next strport)
-               (loop)])))))
-
 (define (io:read-null-terminated-bytes port)
   (let [(strport (open-output-bytes))]
     (let loop ()
       (let ([next (read-byte port)])
-        (cond [(zero? next)
+        (cond [(eof-object? next)
+               (error/comm 'io:read-null-terminated-bytes "(unexpected EOF)")]
+              [(zero? next)
                (get-output-bytes strport)]
               [else
                (write-byte next strport)
                (loop)])))))
+
+(define (io:read-null-terminated-string port)
+  (bytes->string/utf-8 (io:read-null-terminated-bytes port)))
 
 (define (io:read-byte port)
   (read-byte port))
@@ -205,7 +200,8 @@ Based on protocol documentation here:
    scramble
    server-capabilities
    charset
-   server-status)
+   server-status
+   auth)
   #:transparent)
 
 (define-struct (client-authentication-packet packet)
@@ -384,11 +380,11 @@ Based on protocol documentation here:
      (parse-handshake-packet in len))
     ((auth)
      (unless (eq? (peek-byte in) #x00)
-       (error/comm 'parse-packet "(expect authentication ok packet)"))
+       (error/comm 'parse-packet "(expected authentication ok packet)"))
      (parse-ok-packet in len))
     ((ok)
      (unless (eq? (peek-byte in) #x00)
-       (error/comm 'parse-packet "(expect ok packet)"))
+       (error/comm 'parse-packet "(expected ok packet)"))
      (parse-ok-packet in len))
     ((result)
      (if (eq? (peek-byte in) #x00)
@@ -422,21 +418,47 @@ Based on protocol documentation here:
          [server-version (io:read-null-terminated-string in)]
          [thread-id (io:read-le-int32 in)]
          [scramble1 (io:read-bytes-as-bytes in 8)]
-         [_ (io:read-byte in)]
-         [server-capabilities (io:read-le-int16 in)]
+         [_ (io:read-byte in)] ;; always \0
+         [server-capabilities-lo (io:read-le-int16 in)]
          [charset (decode-charset (io:read-byte in))]
          [server-status (io:read-le-int16 in)]
-         [_ (io:read-bytes-as-bytes in 13)]
-         [scramble2 (io:read-bytes-as-bytes in 12)]
-         [_ (io:read-byte in)] ;; always \0
-         )
+         [server-capabilities-hi (io:read-le-int16 in)]
+         [scramble-len
+          ;; total scramble size (both parts), including null terminator
+          ;;  - in 5.1.58, this byte is always 0 (so adjust to 21)
+          ;;  - in 5.5.12, usually 21 for mysql_native_password auth
+          ;; always >= 20 bytes
+          (let ([len (io:read-byte in)])
+            (cond [(zero? len) 21]
+                  [(>= len 21) len]
+                  [else (error/comm 'parse-handshake-packet
+                                    (format "(bad scramble length: ~s)" len))]))]
+         [_ (io:read-bytes-as-bytes in 10)] ;; always \0
+         [scramble2
+          (let* (;; subtract 8 for earlier part, subtract 1 for null-terminator byte
+                 [len (- scramble-len 8 1)]
+                 [scramble2 (io:read-bytes-as-bytes in len)])
+            (io:read-byte in) ;; always \0, at least for supported auth types
+            scramble2)]
+         [server-capabilities
+          (decode-server-flags (+ server-capabilities-lo
+                                  (arithmetic-shift server-capabilities-hi 16)))]
+         [auth
+          ;; IIUC, present iff (memq 'plugin-auth server-capabilities)
+          ;; (alternative: do peek-byte, test for eof)
+          ;;  - in 5.1.58, absent
+          ;;  - in 5.5.12, a null-terminated auth string
+          (cond [(memq 'plugin-auth server-capabilities)
+                 (io:read-null-terminated-string in)]
+                [else "mysql_native_password"])])
     (make-handshake-packet protocol-version
                            server-version
                            thread-id
                            (bytes-append scramble1 scramble2)
-                           (decode-server-flags server-capabilities)
+                           server-capabilities
                            charset
-                           server-status)))
+                           server-status
+                           auth)))
 
 (define (parse-client-authentication-packet in len)
   (let* ([flags (io:read-le-int32 in)]
@@ -552,7 +574,7 @@ Based on protocol documentation here:
          [warnings (and (>= len 12) (io:read-le-int16 in))]
          [_ (io:read-bytes-to-eof in)])
     (unless (zero? ok)
-      (error/comm 'parse-ok-prepared-statement-packet (format "first byte was ~s" ok)))
+      (error/comm 'parse-ok-prepared-statement-packet (format "(first byte was ~s)" ok)))
     (make-ok-prepared-statement-packet statement-handler-id columns params)))
 
 (define (parse-parameter-packet in len)
@@ -812,7 +834,9 @@ Based on protocol documentation here:
     (#x4000  . protocol-41-OLD)
     (#x8000  . secure-connection)
     (#x10000 . multi-statements)
-    (#x20000 . multi-results)))
+    (#x20000 . multi-results)
+    (#x40000 . ps-multi-statements) ;; ???
+    (#x80000 . plugin-auth)))
 (define server-flags/encoding
   (invert-alist server-flags/decoding))
 

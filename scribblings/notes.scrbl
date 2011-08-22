@@ -79,6 +79,15 @@ automatically supported for unix domain sockets (but not TCP). The
 not supported.
 
 
+@section{MySQL authentication}
+
+As of version 5.5.7, MySQL supports
+@hyperlink["http://dev.mysql.com/doc/mysql-security-excerpt/5.5/en/pluggable-authentication.html"]{authentication
+plugins}. The only plugin currently supported by this package is
+@tt{mysql_native_password} (the default), which corresponds to the
+password authentication mechanism used since version 4.1.
+
+
 @section{SQLite and ODBC native libraries}
 
 SQLite support requires the appropriate native library, specifically

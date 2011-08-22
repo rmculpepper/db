@@ -460,36 +460,6 @@ Based on protocol documentation here:
                            server-status
                            auth)))
 
-(define (parse-client-authentication-packet in len)
-  (let* ([flags (io:read-le-int32 in)]
-         [max-length (io:read-le-int32 in)]
-         [charset (io:read-byte in)]
-         [_1 (io:read-bytes-as-bytes in 23)]
-         [user (io:read-null-terminated-string in)]
-         [scramble (io:read-length-coded-bytes in)]
-         [_2 (io:read-byte in)]
-         [db (io:read-null-terminated-string in)])
-    (list (decode-server-flags flags)
-          max-length
-          charset
-          _1
-          user
-          scramble
-          _2
-          db)))
-
-(define (parse-old-client-authentication-packet in len)
-  (let* ([flags (io:read-le-int16 in)]
-         [max-length (io:read-le-int24 in)]
-         [user (io:read-null-terminated-string in)]
-         [scramble (io:read-bytes-as-bytes in 8)]
-         [_2 (io:read-byte in)])
-    (list (decode-server-flags flags)
-          max-length
-          user
-          scramble
-          _2)))
-
 (define (parse-ok-packet in len)
   (let* ([_ (io:read-byte in)]
          [affected-rows (io:read-length-code in)]

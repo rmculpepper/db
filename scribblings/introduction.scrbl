@@ -4,13 +4,20 @@
           scribble/struct
           racket/sandbox
           "config.rkt"
-          (for-label (this-package-in main)))
+          (for-label (this-package-in main)
+                     web-server/lang/web))
 
 @title[#:tag "introduction"]{Introduction}
 
+This section introduces this package's basic features and discusses
+how to build a database-backed web servlet.
+
+@section{Basic Features}
+
 The following annotated program demonstrates how to connect to a
 database and perform simple queries. Some of the SQL syntax used below
-is PostgreSQL-specific, such as the syntax of query parameters.
+is PostgreSQL-specific, such as the syntax of query parameters
+(@litchar{$1} rather than @litchar{?}).
 
 @my-interaction[
 [(require #, @racketmodname/this-package[main])
@@ -162,6 +169,97 @@ times with different parameter values.
  (list 0 1)]
 ]
 
+When a connection's work is done, it should be disconnected.
+
+@my-interaction[
+[(disconnect pgc)
+ (void)]
+]
+
+
+@;{============================================================}
+
+@section{Databases and Web Servlets}
+
+Using database connections is more complicated in a web servlet than
+in a standalone program. A single servlet is potentially used to serve
+many requests at once, each in a separate request handling
+thread. Furthermore, the use of @racket[send/suspend],
+@racket[send/suspend/dispatch], etc, means that there are many places
+where a servlet may start and stop executing to service a request.
+
+Why not use a single connection to handle all of a servlet's requests?
+That is, create the connection with the servlet instance and never
+disconnect it. Such a servlet would look something like the following:
+
+@racketmod[
+#:file "bad-servlet.rkt" 
+web-server
+(define db-conn (postgresql-connect ....))
+(define (serve req)
+  .... db-conn ....)
+]
+
+The main problem with using one connection for all requests is that
+while all connection functions are thread-safe, two threads accessing
+a connection concurrently may still interfere. For example, if two
+threads both attempt to start a new transaction, the second one will
+fail, because the first thread has already put the connection into an
+``in transaction'' state. And if one thread is accessing the
+connection within a transaction and another thread issues a query, the
+second thread may see invalid data or even disrupt the work of the
+first thread (see
+@hyperlink["http://en.wikipedia.org/wiki/Isolation_%28database_systems%29"]{isolation}).
+
+The proper way to use database connections in a servlet is to create a
+connection for each request and disconnect it when the request
+is handled. But since a request thread may start and stop executing in
+many places (due to @racket[send/suspend], etc), inserting the code to
+connect and disconnect at the proper places can be challenging and
+messy.
+
+A better solution is to use a @tech{virtual connection}, which creates
+request-specific (that is, thread-specific) ``actual connections'' by
+need and disconnects them when the request is handled (that is, when
+the thread terminates):
+
+@racketmod[
+#:file "better-servlet.rkt" 
+web-server
+(define db-conn
+  (virtual-connection
+   (lambda () (postgresql-connect ....))))
+(define (serve req)
+  .... db-conn ....)
+]
+
+This solution preserves the simplicity of the naive solution but fixes
+the isolation problem, at the cost of creating many short-lived
+database connections. That cost can be eliminated by using a
+@tech{connection pool}:
+
+@racketmod[
+#:file "best-servlet.rkt" 
+web-server
+(define db-conn
+  (virtual-connection
+   (connection-pool
+    (lambda () (postgresql-connect ....)))))
+(define (serve req)
+  .... db-conn ....)
+]
+
+By using a virtual connection backed by a connection pool, a servlet
+can achieve simplicity, isolation, and performance.
+
+@;{
+
+TODO:
+ - talk about virtual statements, too
+ - show actual working servlet code
+
+--
+
 A prepared statement is tied to the connection used to create it;
 attempting to use it with another connection results in an
 error. Unfortunately, in some scenarios such as web servlets, the
@@ -181,10 +279,4 @@ caches them for future use with the same connection.
 [(code:line (query-list pgc1 get-less-than-pst 3) (code:comment "uses existing prep. stmt."))
  (list 0 1 2)]
 ]
-
-When a connection's work is done, it should be disconnected.
-
-@my-interaction[
-[(disconnect pgc)
- (void)]
-]
+}

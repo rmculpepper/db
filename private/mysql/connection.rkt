@@ -189,8 +189,10 @@
         (fresh-exchange)
         (let ([r (recv 'mysql-connect 'handshake)])
           (match r
-            [(struct handshake-packet (pver sver tid scramble capabilities charset status))
+            [(struct handshake-packet (pver sver tid scramble capabilities charset status auth))
              (check-required-flags capabilities)
+             (unless (equal? auth "mysql_native_password")
+               (uerror 'mysql-connect "unsupported authentication plugin: ~s" auth))
              (send-message
               (make-client-authentication-packet
                (desired-capabilities capabilities)

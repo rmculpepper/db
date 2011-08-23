@@ -37,11 +37,15 @@ History
 
 + fixed arity errors from compiler warnings
 
+** Changes for version 1.5
+
++ fixed mysql protocol: auth plugin extension in versions >= 5.5.7
++ added notes on web servlets to introduction
+
+
 
 To do
 =====
-
-** For version 1.2:
 
 ** For version 2.0:
 

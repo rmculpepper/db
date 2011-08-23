@@ -23,4 +23,5 @@
 (define repositories '("4.x"))
 
 (define release-notes
-  '())
+  '("Fixed MySQL support for v5.5.7 and up. "
+    "Added notes on web servlets to introduction."))

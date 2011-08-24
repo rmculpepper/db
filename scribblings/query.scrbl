@@ -84,7 +84,7 @@ is one of the following:
 }
 
 
-@section{Simple queries}
+@section{Simple Queries}
 
 The simple query API consists of a set of functions specialized to
 various types of queries. For example, @racket[query-value] is
@@ -245,7 +245,7 @@ based on the number of variables in the clause's left-hand side:
 }
 
 
-@section{General query support}
+@section{General Query Support}
 
 A general query result is either a @racket[simple-result] or a
 @racket[recordset].
@@ -286,7 +286,7 @@ future version of this library (even new minor versions).
 }
 
 
-@section{Prepared statements}
+@section{Prepared Statements}
 
 A @deftech{prepared statement} is the result of a call to
 @racket[prepare].
@@ -556,7 +556,7 @@ rollback invalid transactions.
   is rolled back.
 }
 
-@section{Creating new kinds of statements}
+@section{Creating New Kinds of Statements}
 
 @defthing[prop:statement struct-type-property?]{
 

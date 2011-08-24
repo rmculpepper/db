@@ -8,7 +8,7 @@
           (for-label (prefix-in srfi: srfi/19)
                      (this-package-in main util/geometry util/postgresql)))
 
-@title[#:tag "sql-types"]{SQL types and conversions}
+@title[#:tag "sql-types"]{SQL Types and Conversions}
 
 @declare-exporting/this-package[main]
 
@@ -41,12 +41,12 @@ prepared statements can be inspected using
 @racket[prepared-statement-result-types].
 
 
-@section[#:tag "db-types"]{SQL type conversions}
+@section[#:tag "db-types"]{SQL Type Conversions}
 
 This section describes the correspondences between SQL types and
 Racket types for the supported database systems. 
 
-@subsection[#:tag "postgresql-types"]{PostgreSQL types}
+@subsection[#:tag "postgresql-types"]{PostgreSQL Types}
 
 This section applies to connections created with
 @racket[postgresql-connect]. 
@@ -125,7 +125,7 @@ types, and row types. These are currently not supported, but support
 may be added in future versions of this library.
 
 
-@subsection[#:tag "mysql-types"]{MySQL types}
+@subsection[#:tag "mysql-types"]{MySQL Types}
 
 This section applies to connections created with
 @racket[mysql-connect].
@@ -179,7 +179,7 @@ The MySQL @tt{enum} and @tt{set} types are not supported. As a
 workaround, cast them to/from either integers or strings.
 
 
-@subsection[#:tag "sqlite-types"]{SQLite types}
+@subsection[#:tag "sqlite-types"]{SQLite Types}
 
 This section applies to connections created with
 @racket[sqlite3-connect].
@@ -218,7 +218,7 @@ is converted as @tt{real}, not @tt{integer}.
 ]
 
 
-@subsection[#:tag "odbc-types"]{ODBC types}
+@subsection[#:tag "odbc-types"]{ODBC Types}
 
 This section applies to connections created with @racket[odbc-connect]
 or @racket[odbc-driver-connect].
@@ -274,7 +274,7 @@ Interval types are not currently supported on ODBC.
 
 @;{----------------------------------------}
 
-@section[#:tag "sql-data"]{SQL data}
+@section[#:tag "sql-data"]{SQL Data}
 
 This section describes data types for representing various SQL types
 that have no existing appropriate counterpart in Racket.
@@ -324,7 +324,7 @@ SQL @tt{NULL} is translated into the unique @scheme[sql-null] value.
 }
 
 
-@subsection{Dates and times}
+@subsection{Dates and Times}
 
 The @tt{DATE}, @tt{TIME} (@tt{WITH TIME ZONE} and without),
 @tt{TIMESTAMP} (@tt{WITH TIME ZONE} and without), and @tt{INTERVAL}

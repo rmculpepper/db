@@ -3,7 +3,7 @@
           scribble/struct
           "config.rkt")
 
-@title[#:version (my-package-version)]{db: Database connectivity}
+@title[#:version (my-package-version)]{db: Database Connectivity}
 @author[@author+email["Ryan Culpepper" "ryanc@racket-lang.org"]]
 
 @section-index["database"]

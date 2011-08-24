@@ -13,7 +13,7 @@ modules below, not by @racketmodname/this-package[main].
 
 @;{========================================}
 
-@section[#:tag "geometry"]{Geometric types}
+@section[#:tag "geometry"]{Geometric Types}
 
 @defmodule/this-package[util/geometry]
 
@@ -96,7 +96,7 @@ structures to and from WKB format is supported by the
 
 @;{========================================}
 
-@section[#:tag "postgresql-ext"]{PostgreSQL-specific types}
+@section[#:tag "postgresql-ext"]{PostgreSQL-specific Types}
 
 @defmodule/this-package[util/postgresql]
 

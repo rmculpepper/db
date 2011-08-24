@@ -10,7 +10,7 @@
 
 This section describes miscellaneous issues.
 
-@section[#:tag "connecting-to-server"]{Local sockets for PostgreSQL and MySQL servers}
+@section[#:tag "connecting-to-server"]{Local Sockets for PostgreSQL and MySQL Servers}
 
 PostgreSQL and MySQL servers are sometimes configured by default to
 listen only on local sockets (also called ``unix domain
@@ -35,7 +35,7 @@ example, on Ubuntu 10.10 running MySQL 5.1, the socket is located at
 searched using the @racket[mysql-guess-socket-path] function.
 
 
-@section{Database character encodings}
+@section{Database Character Encodings}
 
 In most cases, a PostgreSQL or MySQL database's character encoding is
 irrelevant, since the connect function always requests translation to
@@ -51,7 +51,7 @@ utility such as @tt{iconv}), create a new database with the desired
 encoding, and @tt{pg_restore} from the recoded dump file.
 
 
-@section{Prepared query parameter types}
+@section{Prepared Query Parameter Types}
 
 Different database systems vary in their handling of query parameter
 types. For example, consider the following parameterized SQL
@@ -66,7 +66,7 @@ behavior based on the driver, the data source configuration, and the
 connection parameters (see @secref["odbc-status"] for specific notes).
 
 
-@section{PostgreSQL authentication}
+@section{PostgreSQL Authentication}
 
 PostgreSQL supports a large variety of authentication mechanisms,
 controlled by the @tt{pg_hba.conf} server configuration file. This
@@ -80,7 +80,7 @@ automatically supported for unix domain sockets (but not TCP). The
 not supported.
 
 
-@section{MySQL authentication}
+@section{MySQL Authentication}
 
 As of version 5.5.7, MySQL supports
 @hyperlink["http://dev.mysql.com/doc/mysql-security-excerpt/5.5/en/pluggable-authentication.html"]{authentication
@@ -89,7 +89,7 @@ plugins}. The only plugin currently supported by this package is
 password authentication mechanism used since version 4.1.
 
 
-@section{SQLite and ODBC native libraries}
+@section{SQLite and ODBC Native Libraries}
 
 SQLite support requires the appropriate native library, specifically
 @tt{libsqlite3.so.0} on Unix or @tt{sqlite3.dll} on Windows.
@@ -100,7 +100,7 @@ ODBC support requires the appropriate native library, specifically
 must be installed and any Data Sources configured.
 
 
-@section[#:tag "odbc-status"]{ODBC support status}
+@section[#:tag "odbc-status"]{ODBC Support Status}
 
 ODBC support is experimental. This library is compatible only with
 ODBC 3.x Driver Managers. The behavior of ODBC connections can vary
@@ -116,7 +116,7 @@ specified. The iODBC Driver Manager is not supported.
 Reports of success or failure on other platforms or with other drivers
 would be appreciated.
 
-@subsection{PostgreSQL ODBC driver}
+@subsection{PostgreSQL ODBC Driver}
 
 The PostgreSQL ODBC driver version 09.00.0300 has been tested on
 @bold{win32} and @bold{linux}. 
@@ -130,7 +130,7 @@ by Ubuntu 11.04, seem to have a bug in the character mode this library
 uses by default; use the @racket[#:character-mode 'utf-8] connection
 option as a workaround.
 
-@subsection{MySQL ODBC driver}
+@subsection{MySQL ODBC Driver}
 
 The MySQL ODBC driver version 5.1.6-1 has been tested on @bold{win32}
 and @bold{linux}.
@@ -138,7 +138,7 @@ and @bold{linux}.
 Avoid using the @racket[#:strict-parameter-types?] connection option,
 as the driver assigns all parameters the type @tt{varchar}. 
 
-@subsection{SQLite3 ODBC driver}
+@subsection{SQLite3 ODBC Driver}
 
 Avoid using the @racket[#:strict-parameter-types?] connection option,
 as the driver assigns all parameters the type @tt{longvarchar}.
@@ -147,7 +147,7 @@ strictly, replacing nonconforming values in query results with
 @tt{NULL}. All computed columns, even those with explicit @tt{CAST}s,
 seem to be returned as @tt{text}.
 
-@subsection{DB2 ODBC driver}
+@subsection{DB2 ODBC Driver}
 
 The driver from IBM DB2 Express-C v9.7 has been tested on @bold{linux}
 (32-bit only).
@@ -159,7 +159,7 @@ configuration: @tt{Driver = /home/db2inst1/sqllib/lib32/libdb2.so}.
 The DB2 driver does not seem to accept a separate argument for the
 database to connect to; it must be the same as the Data Source name.
 
-@subsection{Oracle ODBC driver}
+@subsection{Oracle ODBC Driver}
 
 The driver from Oracle Database 10g Release 2 Express Edition has been
 tested on @bold{linux} (32-bit only).

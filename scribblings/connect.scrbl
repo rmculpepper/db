@@ -14,7 +14,7 @@
 This section describes functions for creating connections as well as
 administrative functions for managing connections.
 
-@section[#:tag "creating-connections"]{Base connections}
+@section[#:tag "creating-connections"]{Base Connections}
 
 Base connections are made using the following functions.
 
@@ -301,7 +301,7 @@ Base connections are made using the following functions.
 
 @;{============================================================}
 
-@section{Connection pooling}
+@section{Connection Pooling}
 
 Creating an ordinary connection is often a relatively costly
 operation; it may involve steps such as process creation and SSL
@@ -376,7 +376,7 @@ the transaction is rolled back.
 
 @;{========================================}
 
-@section{Virtual connections}
+@section{Virtual Connections}
 
 A @deftech{virtual connection} creates actual connections on demand and
 automatically releases them when they are no longer needed.
@@ -465,7 +465,7 @@ execute parameterized queries expressed as strings or encapsulated via
 
 @;{========================================}
 
-@section[#:tag "kill-safe"]{Kill-safe connections}
+@section[#:tag "kill-safe"]{Kill-safe Connections}
 
 @defproc[(kill-safe-connection [c connection?]) 
          connection?]{
@@ -483,7 +483,7 @@ shutting down its ports.
 
 @;{========================================}
 
-@section{Data source names}
+@section{Data Source Names}
 
 A DSN (Data Source name) is a symbol associated with a
 connection specification in a DSN file (inspired by ODBC's DSNs).
@@ -619,7 +619,7 @@ connection specification in a DSN file (inspired by ODBC's DSNs).
 
 @;{============================================================}
 
-@section[#:tag "managing-connections"]{Mangaging connections}
+@section[#:tag "managing-connections"]{Mangaging Connections}
 
 @defproc[(connection? [x any/c])
          boolean?]{
@@ -673,7 +673,7 @@ system. See @secref["db-types"].
 }
 
 
-@section{System-specific modules}
+@section{System-specific Modules}
 
 The @racketmodname/this-package[main] module exports all of the
 functions listed in this manual except those described in

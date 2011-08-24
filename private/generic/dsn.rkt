@@ -3,7 +3,7 @@
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require (planet ryanc/macros:2/lazy-require)
+(require "lazy-require.rkt"
          racket/contract
          racket/match
          racket/file

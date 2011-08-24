@@ -4,7 +4,7 @@
 
 #lang racket/base
 (require (for-syntax racket/base)
-         (planet ryanc/macros:2/lazy-require)
+         "private/generic/lazy-require.rkt"
          racket/runtime-path
          racket/promise
          racket/contract

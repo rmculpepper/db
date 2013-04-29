@@ -1,13 +1,13 @@
-;; Copyright 2011 Ryan Culpepper
+;; Copyright 2011-2013 Ryan Culpepper
 ;; Released under the terms of the LGPL version 3 or later.
 ;; See the file COPYRIGHT for details.
 
 #lang racket/base
-(require racket/contract
-         "private/generic/main.rkt"
-         "private/generic/connect-util.rkt"
-         "private/generic/dsn.rkt")
-
-(provide (all-from-out "private/generic/main.rkt")
-         (all-from-out "private/generic/dsn.rkt")
-         (all-from-out "private/generic/connect-util.rkt"))
+(require db/base
+         db/util/datetime)
+(provide (all-from-out db/base)
+         (all-from-out db/util/datetime)
+         (rename-out [rows-result recordset]
+                     [rows-result? recordset?]
+                     [rows-result-headers recordset-headers]
+                     [rows-result-rows recordset-rows]))

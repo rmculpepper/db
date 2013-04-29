@@ -1,28 +1,21 @@
-;; Copyright 2011 Ryan Culpepper
+;; Copyright 2011-2013 Ryan Culpepper
 ;; Released under the terms of the LGPL version 3 or later.
 ;; See the file COPYRIGHT for details.
 
 #lang setup/infotab
 
-(define name "db")
-(define compile-omit-paths
-  '("tests"))
+(define name "db (PLaneT)")
 (define scribblings '(("scribblings/db.scrbl" (multi-page))))
+(define compile-omit-paths '("tests"))
 
 (define blurb
-  '("A database interface for functional programmers. "
-    "This library provides a high-level, functional interface to PostgreSQL, "
-    "MySQL, and SQLite databases as well as ODBC data sources. "
-    "PostgreSQL and MySQL support is implemented in pure Racket. "
-    "The optional SQLite and ODBC support requires the appropriate "
-    "native client libraries."))
+  '("Obsolete: this library is now part of the Racket distribution; use "
+    (tt "(require db)") " instead."))
 (define categories '(io net))
 (define can-be-loaded-with 'all)
 (define primary-file "main.rkt")
-(define required-core-version "5.1.1")
+(define required-core-version "5.2")
 (define repositories '("4.x"))
 
 (define release-notes
-  '("Fixed many ODBC bugs, added detailed ODBC status notes to documentation. "
-    "Added connection pools, virtual connections and statements, "
-    "transaction functions, and a DSN-like facility."))
+  '("Redirect to db library distributed with Racket."))
